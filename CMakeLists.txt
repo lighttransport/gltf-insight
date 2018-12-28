@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 
 set(BUILD_TARGET "gltf-insight")
 
+project(${BUILD_TARGET})
 
 find_package(OpenGL REQUIRED)
 
@@ -21,19 +22,6 @@ set(SOURCES
 
 list(APPEND UI_SOURCES ${CMAKE_SOURCE_DIR}/deps/glad/src/glad.c)
 
-add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES})
-
-target_link_libraries(
-    ${BUILD_TARGET}
-    ${OPENGL_LIBRARIES}
-)
-
-if(UNIX)
-target_link_libraries(
-    ${X11_LIBRARIES}
-)
-endif()
-
 # [ImGUi]
 list(APPEND UI_SOURCE
     ${CMAKE_SOURCE_DIR}/third_party/imgui/imgui.cpp
@@ -49,6 +37,21 @@ set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "" FORCE)
 set(GLFW_INSTALL OFF CACHE INTERNAL "" FORCE)
 add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/glfw)
 include_directories(${CMAKE_SOURCE_DIR}/third_party/glfw/include)
+list(APPEND EXT_LIBRARIES glfw)
+
+add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES})
+
+target_link_libraries(
+    ${BUILD_TARGET}
+    ${OPENGL_LIBRARIES}
+    ${EXT_LIBRARIES}
+)
+
+if(UNIX)
+target_link_libraries(
+    ${X11_LIBRARIES}
+)
+endif()
 
 
 source_group("Source Files" FILES ${SOURCES})
