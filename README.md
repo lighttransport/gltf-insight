@@ -15,6 +15,9 @@ gltf-insight uses TinyGLTF for load/save glTF model and ImGUI for GUI.
 * [x] Linux
 * [x] macOS
 
+## Setup
+
+git submodule updat init:
 ## Build
 
 ### Windows + Visual Studio 2017
@@ -38,4 +41,5 @@ MIT license
 ### Third party licenses
 
 * glad : MIT license
-* ImGUi : MIT license
+* glfw : zlib/png licens
+* ImGUI : MIT license
