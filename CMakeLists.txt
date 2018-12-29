@@ -20,6 +20,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/dep
 
 set(SOURCES
     src/main.cc
+    src/gltf-loader.cc
 )
 
 list(APPEND UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad.c)
@@ -50,6 +51,12 @@ target_link_libraries(
     ${OPENGL_LIBRARIES}
     ${EXT_LIBRARIES}
 )
+
+# # Increase warning level for clang.
+# IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+#     target_compile_options(${BUILD_TARGET} PRIVATE -Weverything -Wno-system-headers -Werror -Wno-padded -Wno-c++98-compat-pedantic -Wno-documentation -Wno-documentation-unknown-command -Wno-reserved-id-macro)
+# ENDIF ()
+
 
 
 source_group("Source Files" FILES ${SOURCES})

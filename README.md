@@ -34,12 +34,20 @@ $ cmake ..
 $ make
 ```
 
+## TODO
+
+* keyframe display
+* Animation curve display : https://github.com/ocornut/imgui/issues/786
+
 ## License
 
 MIT license
 
 ### Third party licenses
 
+* TinyGLTF : MIT license
+* json.hpp : MIT license
 * glad : MIT license
 * glfw : zlib/png licens
 * ImGUI : MIT license
+* cxxopts : MIT license
