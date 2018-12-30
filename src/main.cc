@@ -11,7 +11,10 @@
 
 #include "cxxopts.hpp"
 
+#include "ImCurveEdit.h"
+#include "ImSequencer.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 
 // imgui
 #include "examples/imgui_impl_glfw.h"
@@ -21,6 +24,8 @@
 
 #include "GLFW/glfw3.h"
 
+#include "animation-sequencer.inc.h"
+
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
@@ -28,30 +33,30 @@
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
 
-static bool ImGuiCombo(const char* label, int* current_item,
-                       const std::vector<std::string>& items) {
-    return ImGui::Combo(label, current_item,
-        [](void* data, int idx_i, const char** out_text){
-            size_t idx = static_cast<size_t>(idx_i);
-            const std::vector<std::string>* str_vec =
-              reinterpret_cast<std::vector<std::string>*>(data);
-            if (idx_i < 0 || str_vec->size() <= idx) {
-              return false;
-            }
-            *out_text = str_vec->at(idx).c_str();
-            return true;
-        },
-        reinterpret_cast<void*>(const_cast<std::vector<std::string> *>(&items)),
-        static_cast<int>(items.size()),
-        static_cast<int>(items.size()));
+static bool ImGuiCombo(const char *label, int *current_item,
+                       const std::vector<std::string> &items) {
+  return ImGui::Combo(
+      label, current_item,
+      [](void *data, int idx_i, const char **out_text) {
+        size_t idx = static_cast<size_t>(idx_i);
+        const std::vector<std::string> *str_vec =
+            reinterpret_cast<std::vector<std::string> *>(data);
+        if (idx_i < 0 || str_vec->size() <= idx) {
+          return false;
+        }
+        *out_text = str_vec->at(idx).c_str();
+        return true;
+      },
+      reinterpret_cast<void *>(const_cast<std::vector<std::string> *>(&items)),
+      static_cast<int>(items.size()), static_cast<int>(items.size()));
 }
 
 static void error_callback(int error, const char *description) {
   std::cerr << "GLFW Error : " << error << ", " << description << std::endl;
 }
 
-static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
-{
+static void key_callback(GLFWwindow *window, int key, int scancode, int action,
+                         int mods) {
   (void)scancode;
 
   ImGuiIO &io = ImGui::GetIO();
@@ -75,8 +80,7 @@ static void mouseButtonCallback(int button, int state, float x, float y) {
     retturn
 #endif
 
-static void animation_window(const tinygltf::Model &model)
-{
+static void animation_window(const tinygltf::Model &model) {
   // TODO(syoyo): Cache values
 
   ImGui::Begin("Animations");
@@ -107,7 +111,6 @@ static void animation_window(const tinygltf::Model &model)
   // samplers
   //
   if (ImGui::TreeNode("samplers")) {
-
     std::vector<std::string> sampler_names;
 
     for (size_t i = 0; i < animation.samplers.size(); i++) {
@@ -121,29 +124,34 @@ static void animation_window(const tinygltf::Model &model)
       int sampler_idx = 0;
       ImGuiCombo("samplers", &sampler_idx, sampler_names);
 
-      const tinygltf::AnimationSampler &sampler = animation.samplers[sampler_idx];
+      const tinygltf::AnimationSampler &sampler =
+          animation.samplers[sampler_idx];
 
       ImGui::Text("input  [%d]", sampler.input);
       ImGui::Text("output [%d]", sampler.output);
 
       float min_v, max_v;
-      if (tinygltf::util::GetAnimationSamplerInputMinMax(sampler, model, &min_v, &max_v)) {
+      if (tinygltf::util::GetAnimationSamplerInputMinMax(sampler, model, &min_v,
+                                                         &max_v)) {
         ImGui::Text("Keyframe range : %f, %f [secs]", min_v, max_v);
 
-        int count = tinygltf::util::GetAnimationSamplerInputCount(sampler, model);
+        int count =
+            tinygltf::util::GetAnimationSamplerInputCount(sampler, model);
         ImGui::Text("# of key frames : %d", count);
 
         const tinygltf::Accessor &accessor = model.accessors[sampler.input];
         for (int k = 0; k < count; k++) {
           float value;
-          if (tinygltf::util::DecodeScalarAnimationValue(size_t(k), accessor, model, &value)) {
+          if (tinygltf::util::DecodeScalarAnimationValue(size_t(k), accessor,
+                                                         model, &value)) {
             // TODO(syoyo): Use table.
             ImGui::Text("%d : %f", k, value);
           }
         }
 
       } else {
-        ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.1f, 1.0f), "input accessor must have min/max property");
+        ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.1f, 1.0f),
+                           "input accessor must have min/max property");
       }
     }
 
@@ -154,7 +162,6 @@ static void animation_window(const tinygltf::Model &model)
   // channels
   //
   if (ImGui::TreeNode("channels")) {
-
     std::vector<std::string> channel_names;
 
     for (size_t i = 0; i < animation.channels.size(); i++) {
@@ -168,19 +175,24 @@ static void animation_window(const tinygltf::Model &model)
       int channel_idx = 0;
       ImGuiCombo("channels", &channel_idx, channel_names);
 
-      const tinygltf::AnimationChannel &channel = animation.channels[channel_idx];
+      const tinygltf::AnimationChannel &channel =
+          animation.channels[channel_idx];
 
       ImGui::Text("sampler [%d]", channel.sampler);
-      ImGui::Text("target node [%d] path [%s]", channel.target_node, channel.target_path.c_str());
+      ImGui::Text("target node [%d] path [%s]", channel.target_node,
+                  channel.target_path.c_str());
 
-      const tinygltf::AnimationSampler &sampler = animation.samplers[channel.sampler];
+      const tinygltf::AnimationSampler &sampler =
+          animation.samplers[channel.sampler];
       const tinygltf::Accessor &accessor = model.accessors[sampler.output];
-      int count = tinygltf::util::GetAnimationSamplerOutputCount(sampler, model);
+      int count =
+          tinygltf::util::GetAnimationSamplerOutputCount(sampler, model);
 
       if (channel.target_path.compare("weights") == 0) {
         for (int k = 0; k < count; k++) {
           float value;
-          if (tinygltf::util::DecodeScalarAnimationValue(size_t(k), accessor, model, &value)) {
+          if (tinygltf::util::DecodeScalarAnimationValue(size_t(k), accessor,
+                                                         model, &value)) {
             // TODO(syoyo): Use table.
             ImGui::Text("%d : %f", k, value);
           }
@@ -188,7 +200,8 @@ static void animation_window(const tinygltf::Model &model)
       } else if (channel.target_path.compare("translate") == 0) {
         for (int k = 0; k < count; k++) {
           float xyz[3];
-          if (tinygltf::util::DecodeTranslationAnimationValue(size_t(k), accessor, model, xyz)) {
+          if (tinygltf::util::DecodeTranslationAnimationValue(
+                  size_t(k), accessor, model, xyz)) {
             // TODO(syoyo): Use table.
             ImGui::Text("%d : (%f, %f, %f)", k, xyz[0], xyz[1], xyz[2]);
           }
@@ -196,30 +209,38 @@ static void animation_window(const tinygltf::Model &model)
       } else if (channel.target_path.compare("scale") == 0) {
         for (int k = 0; k < count; k++) {
           float xyz[3];
-          if (tinygltf::util::DecodeScaleAnimationValue(size_t(k), accessor, model, xyz)) {
+          if (tinygltf::util::DecodeScaleAnimationValue(size_t(k), accessor,
+                                                        model, xyz)) {
             // TODO(syoyo): Use table.
             ImGui::Text("%d : (%f, %f, %f)", k, xyz[0], xyz[1], xyz[2]);
           }
         }
       } else if (channel.target_path.compare("rotation") == 0) {
-        
         for (int k = 0; k < count; k++) {
           float xyzw[4];
-          if (tinygltf::util::DecodeRotationAnimationValue(size_t(k), accessor, model, xyzw)) {
+          if (tinygltf::util::DecodeRotationAnimationValue(size_t(k), accessor,
+                                                           model, xyzw)) {
             // TODO(syoyo): Use table.
-            ImGui::Text("%d : (%f, %f, %f, %f)", k, xyzw[0], xyzw[1], xyzw[2], xyzw[3]);
+            ImGui::Text("%d : (%f, %f, %f, %f)", k, xyzw[0], xyzw[1], xyzw[2],
+                        xyzw[3]);
           }
         }
       } else {
-        ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.1f, 1.0f), "??? Unknown target path name [%s]", channel.target_path.c_str());
+        ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.1f, 1.0f),
+                           "??? Unknown target path name [%s]",
+                           channel.target_path.c_str());
       }
     }
 
     ImGui::TreePop();
   }
 
-
   ImGui::End();
+}
+
+static bool BuildAnimationSequencer(const tinygltf::Model &model, gltf_insight::AnimSequence *seq)
+{
+  return true;
 }
 
 static std::string GetFilePathExtension(const std::string &FileName) {
@@ -229,16 +250,14 @@ static std::string GetFilePathExtension(const std::string &FileName) {
 }
 
 int main(int argc, char **argv) {
-
   cxxopts::Options options("gltf-insignt", "glTF data insight tool");
 
   bool debug_output = false;
 
-  options.add_options()
-    ("d,debug", "Enable debugging", cxxopts::value<bool>(debug_output))
-    ("i,input", "Input glTF filename", cxxopts::value<std::string>())
-    ("h,help", "Show help")
-    ;
+  options.add_options()("d,debug", "Enable debugging",
+                        cxxopts::value<bool>(debug_output))(
+      "i,input", "Input glTF filename", cxxopts::value<std::string>())(
+      "h,help", "Show help");
 
   options.parse_positional({"input", "output"});
 
@@ -246,7 +265,6 @@ int main(int argc, char **argv) {
     std::cout << options.help({"", "group"}) << std::endl;
     return EXIT_FAILURE;
   }
-
 
   auto result = options.parse(argc, argv);
 
@@ -273,15 +291,14 @@ int main(int argc, char **argv) {
   if (ext.compare("glb") == 0) {
     std::cout << "Reading binary glTF" << std::endl;
     // assume binary glTF.
-    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
+    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn,
+                                      input_filename.c_str());
   } else {
     std::cout << "Reading ASCII glTF" << std::endl;
     // assume ascii glTF.
-    ret = gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+    ret =
+        gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
   }
-
-
-  
 
   // Setup window
   glfwSetErrorCallback(error_callback);
@@ -289,7 +306,8 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  GLFWwindow *window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
+  GLFWwindow *window =
+      glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);  // Enable vsync
 
@@ -327,6 +345,21 @@ int main(int argc, char **argv) {
 
   ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+  // sequence with default values
+  gltf_insight::AnimSequence mySequence;
+  mySequence.mFrameMin = -100;
+  mySequence.mFrameMax = 1000;
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{0, 10, 30, false});
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{1, 20, 30, false});
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{3, 12, 60, false});
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{2, 61, 90, false});
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{4, 90, 99, false});
+
   // Main loop
   while (!glfwWindowShouldClose(window)) {
     // Poll and handle events (inputs, window resize, etc.)
@@ -345,16 +378,57 @@ int main(int argc, char **argv) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-
     {
-      ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+      ImGui::Begin("Hello, world!");  // Create a window called "Hello, world!"
+                                      // and append into it.
 
-      ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+      ImGui::Text("This is some useful text.");  // Display some text (you can
+                                                 // use a format strings too)
 
       ImGui::End();
     }
 
     animation_window(model);
+
+    {
+      // let's create the sequencer
+      static int selectedEntry = -1;
+      static int firstFrame = 0;
+      static bool expanded = true;
+      static int currentFrame = 120;
+      ImGui::SetNextWindowPos(ImVec2(10, 350));
+
+      ImGui::SetNextWindowSize(ImVec2(940, 480));
+      ImGui::Begin("Sequencer");
+
+      ImGui::PushItemWidth(130);
+      ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
+      ImGui::SameLine();
+      ImGui::InputInt("Frame ", &currentFrame);
+      ImGui::SameLine();
+      ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
+      ImGui::PopItemWidth();
+#if 0
+      Sequencer(
+          &mySequence, &currentFrame, &expanded, &selectedEntry, &firstFrame,
+          ImSequencer::SEQUENCER_EDIT_STARTEND | ImSequencer::SEQUENCER_ADD |
+              ImSequencer::SEQUENCER_DEL | ImSequencer::SEQUENCER_COPYPASTE |
+              ImSequencer::SEQUENCER_CHANGE_FRAME);
+#else
+      Sequencer(
+          &mySequence, &currentFrame, &expanded, &selectedEntry, &firstFrame, 0);
+#endif
+      // add a UI to edit that particular item
+      if (selectedEntry != -1) {
+        const gltf_insight::AnimSequence::AnimSequenceItem &item =
+            mySequence.myItems[selectedEntry];
+        ImGui::Text("I am a %s, please edit me",
+                    gltf_insight::SequencerItemTypeNames[item.mType]);
+        // switch (type) ....
+      }
+
+      ImGui::End();
+    }
 
     {
       // Rendering

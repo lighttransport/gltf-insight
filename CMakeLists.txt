@@ -25,8 +25,9 @@ set(SOURCES
 
 list(APPEND UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad.c)
 
-# [ImGUi]
+# [ImGUI] and [ImGuizmo]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo)
 list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_widgets.cpp
@@ -35,7 +36,14 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_opengl2.cpp
     )
 
-# Use nanogui's glfw3
+list(APPEND UI_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImSequencer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImCurveEdit.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGradient.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
+    )
+
+# [glfw]
 set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "" FORCE)
 set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "" FORCE)
