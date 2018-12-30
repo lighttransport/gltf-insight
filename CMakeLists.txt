@@ -10,6 +10,7 @@ if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include")
     "by running \"git submodule update --init\"")
 endif()
 
+set (CMAKE_CXX_STANDARD 11)
 
 find_package(OpenGL REQUIRED)
 
