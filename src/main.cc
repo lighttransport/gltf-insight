@@ -4,27 +4,25 @@
 #include <iostream>
 #include <vector>
 
+// For OpenGL, we always include loader library first
+#include "glad/include/glad/glad.h"
+
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
 #endif
 
-#include "cxxopts.hpp"
-
 #include "ImCurveEdit.h"
 #include "ImSequencer.h"
+#include "cxxopts.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
 
 // imgui
+#include "GLFW/glfw3.h"
+#include "animation-sequencer.inc.h"
 #include "examples/imgui_impl_glfw.h"
 #include "examples/imgui_impl_opengl2.h"
-
-#include "glad/include/glad/glad.h"
-
-#include "GLFW/glfw3.h"
-
-#include "animation-sequencer.inc.h"
 
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -238,8 +236,8 @@ static void animation_window(const tinygltf::Model &model) {
   ImGui::End();
 }
 
-static bool BuildAnimationSequencer(const tinygltf::Model &model, gltf_insight::AnimSequence *seq)
-{
+static bool BuildAnimationSequencer(const tinygltf::Model &model,
+                                    gltf_insight::AnimSequence *seq) {
   return true;
 }
 
@@ -415,8 +413,8 @@ int main(int argc, char **argv) {
               ImSequencer::SEQUENCER_DEL | ImSequencer::SEQUENCER_COPYPASTE |
               ImSequencer::SEQUENCER_CHANGE_FRAME);
 #else
-      Sequencer(
-          &mySequence, &currentFrame, &expanded, &selectedEntry, &firstFrame, 0);
+      Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry,
+                &firstFrame, 0);
 #endif
       // add a UI to edit that particular item
       if (selectedEntry != -1) {
