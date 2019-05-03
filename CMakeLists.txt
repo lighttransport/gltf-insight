@@ -35,6 +35,7 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_draw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_glfw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_opengl2.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_demo.cpp
     )
 
 list(APPEND UI_SOURCES

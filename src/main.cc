@@ -358,6 +358,7 @@ int main(int argc, char **argv) {
   mySequence.myItems.push_back(
       gltf_insight::AnimSequence::AnimSequenceItem{4, 90, 99, false});
 
+  bool show_imgui_demo = false;
   // Main loop
   while (!glfwWindowShouldClose(window)) {
     // Poll and handle events (inputs, window resize, etc.)
@@ -382,6 +383,9 @@ int main(int argc, char **argv) {
 
       ImGui::Text("This is some useful text.");  // Display some text (you can
                                                  // use a format strings too)
+
+      ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
+      if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
 
       ImGui::End();
     }
