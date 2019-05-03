@@ -54,7 +54,8 @@ struct RampEdit : public ImCurveEdit::Delegate {
     SortValues(curveIndex);
   }
   virtual ImVec2 GetRange() { return ImVec2(mMax.x - mMin.x, mMax.y - mMin.y); }
-  virtual ImVec2 GetMin() { return mMin; }
+  virtual ImVec2 &GetMin() { return mMin; }
+  virtual ImVec2 &GetMax() { return mMax; }
   virtual unsigned int GetBackgroundColor() { return 0; }
   ImVec2 mPts[3][8];
   size_t mPointCount[3];
@@ -161,6 +162,4 @@ struct AnimSequence : public ImSequencer::SequenceInterface {
   }
 };
 
-} // namespace gltf-insight
-
-
+}  // namespace gltf_insight
