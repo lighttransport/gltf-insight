@@ -119,7 +119,7 @@ static void animation_window(const tinygltf::Model &model) {
     if (sampler_names.empty()) {
       ImGui::Text("??? no samplers in animation.");
     } else {
-      int sampler_idx = 0;
+      static int sampler_idx = 0;
       ImGuiCombo("samplers", &sampler_idx, sampler_names);
 
       const tinygltf::AnimationSampler &sampler =
@@ -170,7 +170,7 @@ static void animation_window(const tinygltf::Model &model) {
     if (channel_names.empty()) {
       ImGui::Text("??? no channels in animation.");
     } else {
-      int channel_idx = 0;
+      static int channel_idx = 0;
       ImGuiCombo("channels", &channel_idx, channel_names);
 
       const tinygltf::AnimationChannel &channel =
@@ -195,7 +195,7 @@ static void animation_window(const tinygltf::Model &model) {
             ImGui::Text("%d : %f", k, value);
           }
         }
-      } else if (channel.target_path.compare("translate") == 0) {
+      } else if (channel.target_path.compare("translation") == 0) {
         for (int k = 0; k < count; k++) {
           float xyz[3];
           if (tinygltf::util::DecodeTranslationAnimationValue(
