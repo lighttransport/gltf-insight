@@ -410,7 +410,7 @@ static std::string GetFilePathExtension(const std::string &FileName) {
 struct draw_call_submesh {
   GLenum draw_mode;
   size_t count;
-  GLuint VAO;
+  GLuint VAO, main_texture;
 };
 
 void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
@@ -587,6 +587,20 @@ int main(int argc, char **argv) {
 #endif
   glEnable(GL_DEPTH_TEST);
 
+  const auto nb_textures = model.images.size();
+  std::vector<GLuint> textures;
+  glGenTextures(nb_textures, textures.data());
+
+  for (size_t i = 0; i < textures.size(); ++i) {
+    glBindTexture(GL_TEXTURE_2D, textures[i]);
+    glTexImage2D(GL_TEXTURE_2D, 0,
+                 model.images[i].component == 4 ? GL_RGBA : GL_RGB,
+                 model.images[i].width, model.images[i].height, 0,
+                 model.images[i].component == 4 ? GL_RGBA : GL_RGB,
+                 GL_UNSIGNED_BYTE, model.images[i].image.data());
+    glGenerateMipmap(GL_UNSIGNED_BYTE);
+  }
+
   // Setup Dear ImGui context
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
@@ -634,10 +648,10 @@ int main(int argc, char **argv) {
 
   std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
   std::vector<GLuint> VAOs(nb_submeshes);
-  std::vector<GLuint[3]> VBOs(nb_submeshes);
+  std::vector<GLuint[4]> VBOs(nb_submeshes);
   glGenVertexArrays(nb_submeshes, VAOs.data());
   for (auto &VBO : VBOs) {
-    glGenBuffers(3, VBO);
+    glGenBuffers(4, VBO);
   }
   std::vector<std::vector<unsigned>> indices(nb_submeshes);
   std::vector<std::vector<float>> vertex_coord(nb_submeshes),
@@ -739,6 +753,42 @@ int main(int argc, char **argv) {
         }
       }
     }
+
+    // VERTEX UV
+    {
+      const auto texture = primitive.attributes.at("TEXCOORD_0");
+      const auto &texture_accessor = model.accessors[texture];
+      const auto &texture_buffer_view =
+          model.bufferViews[texture_accessor.bufferView];
+      const auto &texture_buffer = model.buffers[texture_buffer_view.buffer];
+      const auto texture_stride =
+          texture_accessor.ByteStride(texture_buffer_view);
+      const auto texture_start_pointer = texture_buffer.data.data() +
+                                         texture_buffer_view.byteOffset +
+                                         texture_accessor.byteOffset;
+      const size_t byte_size_of_component =
+          tinygltf::GetComponentSizeInBytes(texture_accessor.componentType);
+      assert(texture_accessor.type == TINYGLTF_TYPE_VEC2);
+      assert(sizeof(double) >= byte_size_of_component);
+
+      texture_coord[submesh].resize(texture_accessor.count * 2);
+      for (size_t i = 0; i < texture_accessor.count; ++i) {
+        if (byte_size_of_component == sizeof(double)) {
+          double temp[2];
+          memcpy(&temp, texture_start_pointer + i * texture_stride,
+                 byte_size_of_component * 2);
+          for (size_t j = 0; j < 2; ++j) {
+            texture_coord[submesh][i * 2 + j] = float(temp[j]);  // downcast to
+                                                                 // float
+          }
+        } else if (byte_size_of_component == sizeof(float)) {
+          memcpy(&texture_coord[submesh][i * 2],
+                 texture_start_pointer + i * texture_stride,
+                 byte_size_of_component * 2);
+        }
+      }
+    }
+
     {
       glBindVertexArray(VAOs[submesh]);
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][0]);
@@ -748,20 +798,34 @@ int main(int argc, char **argv) {
       glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(0);
+
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][1]);
       glBufferData(GL_ARRAY_BUFFER, normals[submesh].size() * sizeof(float),
-                   vertex_coord[submesh].data(), GL_STATIC_DRAW);
+                   normals[submesh].data(), GL_STATIC_DRAW);
       glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(1);
-      // TODO texture data? Weight data? Tangent? Bitangent?
 
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][2]);
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][2]);
+      glBufferData(GL_ARRAY_BUFFER,
+                   texture_coord[submesh].size() * sizeof(float),
+                   texture_coord[submesh].data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
+                            nullptr);
+      glEnableVertexAttribArray(2);
+
+      // TODO Weight data? Tangent? Bitangent?
+
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][3]);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                    indices[submesh].size() * sizeof(unsigned),
                    indices[submesh].data(), GL_STATIC_DRAW);
       glBindVertexArray(0);
     }
+
+    const auto &material = model.materials[primitive.material];
+    draw_call_descriptor[submesh].main_texture =
+        material.values.at("baseColorTexture").TextureIndex();
   }
 
   // not doing this seems to break imgui in opengl2 mode...
@@ -778,28 +842,38 @@ int main(int argc, char **argv) {
 
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
+layout (location = 2) in vec2 input_uv;
 
 uniform mat4 mvp;
 uniform mat3 normal;
 
 out vec3 interpolated_normal;
+out vec2 interpolated_uv;
 
 void main()
 {
   gl_Position = mvp * vec4(input_position, 1.0);
   interpolated_normal = normal * input_normal;
+  interpolated_uv = input_uv;
 }
 )glsl";
 
   const char *fragment_shader_source = R"glsl(
 #version 330 core
 
+in vec2 interpolated_uv;
 in vec3 interpolated_normal;
+
 out vec4 output_color;
+
+uniform sampler2D diffuse_texture;
 
 void main()
 {
-  output_color = (vec4(normalize(interpolated_normal), 1.0)  * 0.5 ) +0.5;
+  //output_color = texture(diffuse_texture, interpolated_uv);
+
+  output_color.rg = interpolated_uv;
+  output_color.ba = vec2(0,1);
 }
 )glsl";
 
@@ -983,6 +1057,7 @@ void main()
                          glm::value_ptr(normal));
 
       for (const auto &draw_call_to_perform : draw_call_descriptor) {
+        glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
         glBindVertexArray(draw_call_to_perform.VAO);
         glDrawElements(draw_call_to_perform.draw_mode,
                        draw_call_to_perform.count, GL_UNSIGNED_INT, 0);
