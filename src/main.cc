@@ -588,7 +588,7 @@ int main(int argc, char **argv) {
   glEnable(GL_DEPTH_TEST);
 
   const auto nb_textures = model.images.size();
-  std::vector<GLuint> textures;
+  std::vector<GLuint> textures(nb_textures);
   glGenTextures(nb_textures, textures.data());
 
   for (size_t i = 0; i < textures.size(); ++i) {
@@ -598,7 +598,7 @@ int main(int argc, char **argv) {
                  model.images[i].width, model.images[i].height, 0,
                  model.images[i].component == 4 ? GL_RGBA : GL_RGB,
                  GL_UNSIGNED_BYTE, model.images[i].image.data());
-    glGenerateMipmap(GL_UNSIGNED_BYTE);
+    glGenerateMipmap(GL_TEXTURE_2D);
   }
 
   // Setup Dear ImGui context
@@ -825,7 +825,7 @@ int main(int argc, char **argv) {
 
     const auto &material = model.materials[primitive.material];
     draw_call_descriptor[submesh].main_texture =
-        material.values.at("baseColorTexture").TextureIndex();
+        textures[material.values.at("baseColorTexture").TextureIndex()];
   }
 
   // not doing this seems to break imgui in opengl2 mode...
@@ -858,7 +858,7 @@ void main()
 }
 )glsl";
 
-  const char *fragment_shader_source = R"glsl(
+  const char *fragment_shader_source_textured = R"glsl(
 #version 330 core
 
 in vec2 interpolated_uv;
@@ -870,10 +870,7 @@ uniform sampler2D diffuse_texture;
 
 void main()
 {
-  //output_color = texture(diffuse_texture, interpolated_uv);
-
-  output_color.rg = interpolated_uv;
-  output_color.ba = vec2(0,1);
+  output_color = texture(diffuse_texture, interpolated_uv);
 }
 )glsl";
 
@@ -884,9 +881,10 @@ void main()
   glShaderSource(vertex_shader, 1,
                  static_cast<const GLchar *const *>(&vertex_shader_source),
                  nullptr);
-  glShaderSource(fragment_shader, 1,
-                 static_cast<const GLchar *const *>(&fragment_shader_source),
-                 nullptr);
+  glShaderSource(
+      fragment_shader, 1,
+      static_cast<const GLchar *const *>(&fragment_shader_source_textured),
+      nullptr);
 
   glCompileShader(vertex_shader);
   glCompileShader(fragment_shader);
@@ -953,6 +951,20 @@ void main()
 
       ImGui::End();
     }
+
+    ImGui::Begin("glTF Images", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Text("Textures [%d]", textures.size());
+    ImGui::BeginChild("##ScrollableRegion0", ImVec2(256, 300), false,
+                      ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    for (int i = 0; i < textures.size(); ++i) {
+      auto &texture = textures[i];
+      std::string name = "texture [" + std::to_string(i) + "]";
+      if (ImGui::CollapsingHeader(name.c_str())) {
+        ImGui::Image(ImTextureID(texture), ImVec2(256, 256));
+      }
+    }
+    ImGui::EndChild();
+    ImGui::End();
 
     model_info_window(model);
     animation_window(model);
