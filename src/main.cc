@@ -13,6 +13,7 @@
 #endif
 
 #include "ImCurveEdit.h"
+#include "ImGuizmo.h"
 #include "ImSequencer.h"
 #include "cxxopts.hpp"
 #include "imgui.h"
@@ -28,6 +29,12 @@
 #pragma clang diagnostic pop
 #endif
 
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/quaternion.hpp"
+#include "glm/gtc/type_ptr.hpp"
+#include "glm/gtx/quaternion.hpp"
+#include "glm/matrix.hpp"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
 
@@ -117,6 +124,7 @@ static void describe_node_topology(const tinygltf::Model &model,
     ImGui::TreePop();
   }
 }
+
 static void model_info_window(const tinygltf::Model &model) {
   // TODO also cache info found here
   if (ImGui::Begin("Model information")) {
@@ -399,6 +407,92 @@ static std::string GetFilePathExtension(const std::string &FileName) {
   return "";
 }
 
+struct draw_call_submesh {
+  GLenum draw_mode;
+  size_t count;
+  GLuint VAO;
+};
+
+void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
+                            GLenum severity, GLsizei length,
+                            const GLchar *message, void *userParam) {
+  // ignore non-significant error/warning codes
+  if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
+
+  std::cout << "---------------" << std::endl;
+  std::cout << "Debug message (" << id << "): " << message << std::endl;
+
+  switch (source) {
+    case GL_DEBUG_SOURCE_API:
+      std::cout << "Source: API";
+      break;
+    case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
+      std::cout << "Source: Window System";
+      break;
+    case GL_DEBUG_SOURCE_SHADER_COMPILER:
+      std::cout << "Source: Shader Compiler";
+      break;
+    case GL_DEBUG_SOURCE_THIRD_PARTY:
+      std::cout << "Source: Third Party";
+      break;
+    case GL_DEBUG_SOURCE_APPLICATION:
+      std::cout << "Source: Application";
+      break;
+    case GL_DEBUG_SOURCE_OTHER:
+      std::cout << "Source: Other";
+      break;
+  }
+  std::cout << std::endl;
+
+  switch (type) {
+    case GL_DEBUG_TYPE_ERROR:
+      std::cout << "Type: Error";
+      break;
+    case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
+      std::cout << "Type: Deprecated Behaviour";
+      break;
+    case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
+      std::cout << "Type: Undefined Behaviour";
+      break;
+    case GL_DEBUG_TYPE_PORTABILITY:
+      std::cout << "Type: Portability";
+      break;
+    case GL_DEBUG_TYPE_PERFORMANCE:
+      std::cout << "Type: Performance";
+      break;
+    case GL_DEBUG_TYPE_MARKER:
+      std::cout << "Type: Marker";
+      break;
+    case GL_DEBUG_TYPE_PUSH_GROUP:
+      std::cout << "Type: Push Group";
+      break;
+    case GL_DEBUG_TYPE_POP_GROUP:
+      std::cout << "Type: Pop Group";
+      break;
+    case GL_DEBUG_TYPE_OTHER:
+      std::cout << "Type: Other";
+      break;
+  }
+  std::cout << std::endl;
+
+  switch (severity) {
+    case GL_DEBUG_SEVERITY_HIGH:
+      std::cout << "Severity: high";
+      break;
+    case GL_DEBUG_SEVERITY_MEDIUM:
+      std::cout << "Severity: medium";
+      break;
+    case GL_DEBUG_SEVERITY_LOW:
+      std::cout << "Severity: low";
+      break;
+    case GL_DEBUG_SEVERITY_NOTIFICATION:
+      std::cout << "Severity: notification";
+      break;
+  }
+  std::cout << std::endl;
+  std::cout << std::endl;
+}
+
 int main(int argc, char **argv) {
   cxxopts::Options options("gltf-insignt", "glTF data insight tool");
 
@@ -456,6 +550,10 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
+#ifdef _DEBUG
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
+
   GLFWwindow *window =
       glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
   glfwMakeContextCurrent(window);
@@ -477,6 +575,17 @@ int main(int argc, char **argv) {
     std::cerr << "OpenGL 2.1 is not available." << std::endl;
     return EXIT_FAILURE;
   }
+
+  std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
+
+#ifdef _DEBUG
+  glEnable(GL_DEBUG_OUTPUT);
+  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+  glDebugMessageCallback((GLDEBUGPROC)glDebugOutput, nullptr);
+  glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr,
+                        GL_TRUE);
+#endif
+  glEnable(GL_DEPTH_TEST);
 
   // Setup Dear ImGui context
   ImGui::CreateContext();
@@ -511,6 +620,232 @@ int main(int argc, char **argv) {
       gltf_insight::AnimSequence::AnimSequenceItem{4, 90, 99, false});
 
   bool show_imgui_demo = false;
+
+  const auto mesh_node_index = find_main_mesh_node(model);
+  if (mesh_node_index < 0) {
+    std::cerr << "The loaded gltf file doesn't have any findable mesh";
+    return EXIT_SUCCESS;
+  }
+
+  const auto &mesh_node = model.nodes[mesh_node_index];
+  const auto &mesh = model.meshes[mesh_node.mesh];
+  const auto &primitives = mesh.primitives;
+  const auto nb_submeshes = primitives.size();
+
+  std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
+  std::vector<GLuint> VAOs(nb_submeshes);
+  std::vector<GLuint[3]> VBOs(nb_submeshes);
+  glGenVertexArrays(nb_submeshes, VAOs.data());
+  for (auto &VBO : VBOs) {
+    glGenBuffers(3, VBO);
+  }
+  std::vector<std::vector<unsigned>> indices(nb_submeshes);
+  std::vector<std::vector<float>> vertex_coord(nb_submeshes),
+      texture_coord(nb_submeshes), normals(nb_submeshes);
+
+  for (size_t submesh = 0; submesh < nb_submeshes; ++submesh) {
+    const auto &primitive = primitives[submesh];
+    draw_call_descriptor[submesh].VAO = VAOs[submesh];
+    draw_call_descriptor[submesh].draw_mode = primitive.mode;
+    // INDEX BUFFER
+    {
+      const auto &indices_accessor = model.accessors[primitive.indices];
+      const auto &indices_buffer_view =
+          model.bufferViews[indices_accessor.bufferView];
+      const auto &indices_buffer = model.buffers[indices_buffer_view.buffer];
+      const auto indices_start_pointer = indices_buffer.data.data() +
+                                         indices_buffer_view.byteOffset +
+                                         indices_accessor.byteOffset;
+      const auto indices_stride =
+          indices_accessor.ByteStride(indices_buffer_view);
+      indices[submesh].resize(indices_accessor.count);
+      const size_t byte_size_of_component =
+          tinygltf::GetComponentSizeInBytes(indices_accessor.componentType);
+      assert(indices_accessor.type == TINYGLTF_TYPE_SCALAR);
+      assert(sizeof(unsigned int) >= byte_size_of_component);
+
+      for (size_t i = 0; i < indices_accessor.count; ++i) {
+        unsigned int temp = 0;
+        memcpy(&temp, indices_start_pointer + i * indices_stride,
+               byte_size_of_component);
+        indices[submesh][i] = unsigned(temp);
+      }
+
+      draw_call_descriptor[submesh].count = indices_accessor.count;
+    }
+    // VERTEX POSITIONS}
+    {
+      const auto position = primitive.attributes.at("POSITION");
+      const auto &position_accessor = model.accessors[position];
+      const auto &position_buffer_view =
+          model.bufferViews[position_accessor.bufferView];
+      const auto &position_buffer = model.buffers[position_buffer_view.buffer];
+      const auto position_stride =
+          position_accessor.ByteStride(position_buffer_view);
+      const auto position_start_pointer = position_buffer.data.data() +
+                                          position_buffer_view.byteOffset +
+                                          position_accessor.byteOffset;
+      const size_t byte_size_of_component =
+          tinygltf::GetComponentSizeInBytes(position_accessor.componentType);
+      assert(position_accessor.type == TINYGLTF_TYPE_VEC3);
+      assert(sizeof(double) >= byte_size_of_component);
+
+      vertex_coord[submesh].resize(position_accessor.count * 3);
+      for (size_t i = 0; i < position_accessor.count; ++i) {
+        if (byte_size_of_component == sizeof(double)) {
+          double temp[3];
+          memcpy(&temp, position_start_pointer + i * position_stride,
+                 byte_size_of_component * 3);
+          for (size_t j = 0; j < 3; ++j) {
+            vertex_coord[submesh][i * 3 + j] = float(temp[j]);
+          }
+        } else if (byte_size_of_component == sizeof(float)) {
+          memcpy(&vertex_coord[submesh][i * 3],
+                 position_start_pointer + i * position_stride,
+                 byte_size_of_component * 3);
+        }
+      }
+    }
+    // VERTEX NORMAL
+    {
+      const auto normal = primitive.attributes.at("NORMAL");
+      const auto &normal_accessor = model.accessors[normal];
+      const auto &normal_buffer_view =
+          model.bufferViews[normal_accessor.bufferView];
+      const auto &normal_buffer = model.buffers[normal_buffer_view.buffer];
+      const auto normal_stride = normal_accessor.ByteStride(normal_buffer_view);
+      const auto normal_start_pointer = normal_buffer.data.data() +
+                                        normal_buffer_view.byteOffset +
+                                        normal_accessor.byteOffset;
+      const size_t byte_size_of_component =
+          tinygltf::GetComponentSizeInBytes(normal_accessor.componentType);
+      assert(normal_accessor.type == TINYGLTF_TYPE_VEC3);
+      assert(sizeof(double) >= byte_size_of_component);
+
+      normals[submesh].resize(normal_accessor.count * 3);
+      for (size_t i = 0; i < normal_accessor.count; ++i) {
+        if (byte_size_of_component == sizeof(double)) {
+          double temp[3];
+          memcpy(&temp, normal_start_pointer + i * normal_stride,
+                 byte_size_of_component * 3);
+          for (size_t j = 0; j < 3; ++j) {
+            normals[submesh][i * 3 + j] = float(temp[j]);  // downcast to
+                                                           // float
+          }
+        } else if (byte_size_of_component == sizeof(float)) {
+          memcpy(&normals[submesh][i * 3],
+                 normal_start_pointer + i * normal_stride,
+                 byte_size_of_component * 3);
+        }
+      }
+    }
+    {
+      glBindVertexArray(VAOs[submesh]);
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][0]);
+      glBufferData(GL_ARRAY_BUFFER,
+                   vertex_coord[submesh].size() * sizeof(float),
+                   vertex_coord[submesh].data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                            nullptr);
+      glEnableVertexAttribArray(0);
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][1]);
+      glBufferData(GL_ARRAY_BUFFER, normals[submesh].size() * sizeof(float),
+                   vertex_coord[submesh].data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                            nullptr);
+      glEnableVertexAttribArray(1);
+      // TODO texture data? Weight data? Tangent? Bitangent?
+
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][2]);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                   indices[submesh].size() * sizeof(unsigned),
+                   indices[submesh].data(), GL_STATIC_DRAW);
+      glBindVertexArray(0);
+    }
+  }
+
+  // not doing this seems to break imgui in opengl2 mode...
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+  glm::mat4 model_matrix{1.f}, view_matrix{1.f}, projection_matrix{1.f}, mvp,
+      normal;
+  glm::vec3 camera_position{1, 0, 5};
+  int display_w, display_h;
+
+  const char *vertex_shader_source = R"glsl(
+#version 330 core
+
+layout (location = 0) in vec3 input_position;
+layout (location = 1) in vec3 input_normal;
+
+uniform mat4 mvp;
+uniform mat3 normal;
+
+out vec3 interpolated_normal;
+
+void main()
+{
+  gl_Position = mvp * vec4(input_position, 1.0);
+  interpolated_normal = normal * input_normal;
+}
+)glsl";
+
+  const char *fragment_shader_source = R"glsl(
+#version 330 core
+
+in vec3 interpolated_normal;
+out vec4 output_color;
+
+void main()
+{
+  output_color = (vec4(normalize(interpolated_normal), 1.0)  * 0.5 ) +0.5;
+}
+)glsl";
+
+  GLint vertex_shader, fragment_shader;
+  vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+  fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+
+  glShaderSource(vertex_shader, 1,
+                 static_cast<const GLchar *const *>(&vertex_shader_source),
+                 nullptr);
+  glShaderSource(fragment_shader, 1,
+                 static_cast<const GLchar *const *>(&fragment_shader_source),
+                 nullptr);
+
+  glCompileShader(vertex_shader);
+  glCompileShader(fragment_shader);
+
+  // check shader compilation
+  GLint success = 0;
+  GLchar info_log[512];
+
+  glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
+  if (!success) {
+    glGetShaderInfoLog(vertex_shader, sizeof info_log, nullptr, info_log);
+    std::cerr << info_log << '\n';
+    return EXIT_FAILURE;
+  }
+  glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
+  if (!success) {
+    glGetShaderInfoLog(fragment_shader, sizeof info_log, nullptr, info_log);
+    std::cerr << info_log << '\n';
+    return EXIT_FAILURE;
+  }
+
+  GLuint program = glCreateProgram();
+  glAttachShader(program, vertex_shader);
+  glAttachShader(program, fragment_shader);
+  glLinkProgram(program);
+
+  glGetProgramiv(program, GL_LINK_STATUS, &success);
+  if (!success) {
+    glGetProgramInfoLog(program, sizeof(info_log), nullptr, info_log);
+    std::cerr << info_log << '\n';
+    return EXIT_FAILURE;
+  }
+
   // Main loop
   while (!glfwWindowShouldClose(window)) {
     // Poll and handle events (inputs, window resize, etc.)
@@ -524,20 +859,23 @@ int main(int argc, char **argv) {
     // flags.
     glfwPollEvents();
 
-    // Start the Dear ImGui frame
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+    ImGuizmo::BeginFrame();
 
     {
-      ImGui::Begin("Hello, world!");  // Create a window called "Hello, world!"
-                                      // and append into it.
+      ImGui::Begin("Hello, world!");  // Create a window called "Hello,
+                                      // world!" and append into it.
 
       ImGui::Text("This is some useful text.");  // Display some text (you can
                                                  // use a format strings too)
 
       ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
       if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
+
+      ImGui::SliderFloat3("Camera position", glm::value_ptr(camera_position),
+                          -10, 10);
 
       ImGui::End();
     }
@@ -587,17 +925,78 @@ int main(int argc, char **argv) {
 
     {
       // Rendering
-      ImGui::Render();
-      int display_w, display_h;
       glfwGetFramebufferSize(window, &display_w, &display_h);
       glViewport(0, 0, display_w, display_h);
       glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-      glClear(GL_COLOR_BUFFER_BIT);
-      // glUseProgram(0); // You may want this if using this code in an OpenGL
-      // 3+ context where shaders may be bound, but prefer using the GL3+ code.
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+      projection_matrix = glm::perspective(
+          45.f, float(display_w) / float(display_h), 1.f, 100.f);
+
+      view_matrix =
+          glm::lookAt(camera_position, glm::vec3(0.f), glm::vec3(0, 1.f, 0));
+
+      // ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
+      //                     glm::value_ptr(projection_matrix),
+      //                     ImGuizmo::OPERATION::)
+
+      float matrixTranslation[3], matrixRotation[3], matrixScale[3];
+      ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(model_matrix),
+                                            matrixTranslation, matrixRotation,
+                                            matrixScale);
+      ImGui::InputFloat3("Tr", matrixTranslation, 3);
+      ImGui::InputFloat3("Rt", matrixRotation, 3);
+      ImGui::InputFloat3("Sc", matrixScale, 3);
+      static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::ROTATE);
+      static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
+
+      if (ImGui::RadioButton("Translate",
+                             mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+        mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+      ImGui::SameLine();
+      if (ImGui::RadioButton("Rotate",
+                             mCurrentGizmoOperation == ImGuizmo::ROTATE))
+        mCurrentGizmoOperation = ImGuizmo::ROTATE;
+      ImGui::SameLine();
+      if (ImGui::RadioButton("Scale",
+                             mCurrentGizmoOperation == ImGuizmo::SCALE))
+        mCurrentGizmoOperation = ImGuizmo::SCALE;
+
+      ImGuizmo::RecomposeMatrixFromComponents(matrixTranslation, matrixRotation,
+                                              matrixScale,
+                                              glm::value_ptr(model_matrix));
+
+      ImGuiIO &io = ImGui::GetIO();
+      ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+      ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
+                           glm::value_ptr(projection_matrix),
+                           mCurrentGizmoOperation, mCurrentGizmoMode,
+                           glm::value_ptr(model_matrix), NULL, NULL);
+
+      glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
+      glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
+
+      glUseProgram(program);
+      glUniformMatrix4fv(glGetUniformLocation(program, "mvp"), 1, GL_FALSE,
+                         glm::value_ptr(mvp));
+      glUniformMatrix3fv(glGetUniformLocation(program, "normal"), 1, GL_FALSE,
+                         glm::value_ptr(normal));
+
+      for (const auto &draw_call_to_perform : draw_call_descriptor) {
+        glBindVertexArray(draw_call_to_perform.VAO);
+        glDrawElements(draw_call_to_perform.draw_mode,
+                       draw_call_to_perform.count, GL_UNSIGNED_INT, 0);
+      }
+      glBindVertexArray(0);
+      glUseProgram(0);  // You may want this if using this code in an
+      // OpenGL 3+ context where shaders may be bound, but prefer using the
+      // GL3+ code.
+
+      // TODO render overlays on top of the meshes (bones...)
+
+      ImGui::Render();
       ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 
-      glfwMakeContextCurrent(window);
       glfwSwapBuffers(window);
     }
   }
