@@ -110,15 +110,15 @@ static int find_main_mesh_node(const tinygltf::Model &model) {
   return -1;
 }
 
-static void describe_node_topology(const tinygltf::Model &model,
-                                   int node_index) {
+static void describe_node_topology_in_imgui_tree(const tinygltf::Model &model,
+                                                 int node_index) {
   std::string node_desc = "node [" + std::to_string(node_index) + "]";
   if (ImGui::TreeNode(node_desc.c_str())) {
     const auto &node = model.nodes[node_index];
     if (!node.name.empty()) ImGui::Text("name [%s]", node.name.c_str());
 
     for (auto child : node.children) {
-      describe_node_topology(model, child);
+      describe_node_topology_in_imgui_tree(model, child);
     }
 
     ImGui::TreePop();
@@ -145,7 +145,7 @@ static void model_info_window(const tinygltf::Model &model) {
                   skin.skeleton);
       ImGui::Text("Skin joint count [%d]", skin.joints.size());
       if (ImGui::CollapsingHeader("Skeleton topology"))
-        describe_node_topology(model, skin.skeleton);
+        describe_node_topology_in_imgui_tree(model, skin.skeleton);
     }
 
     // TODO check if the found node with a mesh has morph targets, and
@@ -493,6 +493,23 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
   std::cout << std::endl;
 }
 
+void asset_images_window(const std::vector<GLuint> &textures) {
+  if (ImGui::Begin("glTF Images", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::Text("Number of textures [%d]", textures.size());
+    ImGui::BeginChild("##ScrollableRegion0", ImVec2(256, 286), false,
+                      ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    for (int i = 0; i < textures.size(); ++i) {
+      auto &texture = textures[i];
+      std::string name = "texture [" + std::to_string(i) + "]";
+      if (ImGui::CollapsingHeader(name.c_str())) {
+        ImGui::Image(ImTextureID(texture), ImVec2(256, 256));
+      }
+    }
+    ImGui::EndChild();
+  }
+  ImGui::End();
+}
+
 int main(int argc, char **argv) {
   cxxopts::Options options("gltf-insignt", "glTF data insight tool");
 
@@ -659,8 +676,13 @@ int main(int argc, char **argv) {
 
   for (size_t submesh = 0; submesh < nb_submeshes; ++submesh) {
     const auto &primitive = primitives[submesh];
+
+    // We have one VAO per "submesh" (= gltf primitive)
     draw_call_descriptor[submesh].VAO = VAOs[submesh];
+    // Primitive uses their own draw mode (eg: lines (for hairs?), triangle
+    // fan/strip/list?)
     draw_call_descriptor[submesh].draw_mode = primitive.mode;
+
     // INDEX BUFFER
     {
       const auto &indices_accessor = model.accessors[primitive.indices];
@@ -684,7 +706,7 @@ int main(int argc, char **argv) {
                byte_size_of_component);
         indices[submesh][i] = unsigned(temp);
       }
-
+      // number of elements to pass to glDrawElements(...)
       draw_call_descriptor[submesh].count = indices_accessor.count;
     }
     // VERTEX POSITIONS}
@@ -789,8 +811,10 @@ int main(int argc, char **argv) {
       }
     }
 
-    {
+    {  // GPU upload and shader layout association
       glBindVertexArray(VAOs[submesh]);
+
+      // Layout "0" = vertex coordiantes
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][0]);
       glBufferData(GL_ARRAY_BUFFER,
                    vertex_coord[submesh].size() * sizeof(float),
@@ -799,6 +823,7 @@ int main(int argc, char **argv) {
                             nullptr);
       glEnableVertexAttribArray(0);
 
+      // Layout "1" = vertex normal
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][1]);
       glBufferData(GL_ARRAY_BUFFER, normals[submesh].size() * sizeof(float),
                    normals[submesh].data(), GL_STATIC_DRAW);
@@ -806,6 +831,7 @@ int main(int argc, char **argv) {
                             nullptr);
       glEnableVertexAttribArray(1);
 
+      // Layout "2" = vertex UV
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][2]);
       glBufferData(GL_ARRAY_BUFFER,
                    texture_coord[submesh].size() * sizeof(float),
@@ -814,7 +840,7 @@ int main(int argc, char **argv) {
                             nullptr);
       glEnableVertexAttribArray(2);
 
-      // TODO Weight data? Tangent? Bitangent?
+      // TODO Weight data needs to be accesible from the shader
 
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][3]);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER,
@@ -834,9 +860,57 @@ int main(int argc, char **argv) {
 
   glm::mat4 model_matrix{1.f}, view_matrix{1.f}, projection_matrix{1.f}, mvp,
       normal;
-  glm::vec3 camera_position{1, 0, 5};
   int display_w, display_h;
+  glm::vec3 camera_position{0, 0, 3.F};
 
+  struct aplication_parameters {
+    glm::vec3 &camera_position;
+    bool button_states[3]{false};
+    double last_mouse_x{0}, last_mouse_y{0};
+    double rot_pitch, rot_yaw;
+    double rotation_scale = 0.2;
+  } my_user_pointer{camera_position};
+  glfwSetWindowUserPointer(window, &my_user_pointer);
+
+  glfwSetMouseButtonCallback(
+      window, [](GLFWwindow *window, int button, int action, int mods) {
+        auto *param = reinterpret_cast<aplication_parameters *>(
+            glfwGetWindowUserPointer(window));
+
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+          param->button_states[0] = true;
+        if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS)
+          param->button_states[1] = true;
+        if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+          param->button_states[2] = true;
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_FALSE)
+          param->button_states[0] = false;
+        if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_FALSE)
+          param->button_states[1] = false;
+        if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_FALSE)
+          param->button_states[2] = false;
+      });
+
+  glfwSetCursorPosCallback(window, [](GLFWwindow *window, double mouse_x,
+                                      double mouse_y) {
+    auto *param = reinterpret_cast<aplication_parameters *>(
+        glfwGetWindowUserPointer(window));
+
+    // mouse left pressed
+    if (param->button_states[0] && !ImGui::GetIO().WantCaptureMouse &&
+        !ImGuizmo::IsOver() && !ImGuizmo::IsUsing()) {
+      param->rot_yaw -= param->rotation_scale * (mouse_x - param->last_mouse_x);
+      param->rot_pitch -=
+          param->rotation_scale * (mouse_y - param->last_mouse_y);
+
+      param->rot_pitch = glm::clamp(param->rot_pitch, -90.0, +90.0);
+    }
+
+    param->last_mouse_x = mouse_x;
+    param->last_mouse_y = mouse_y;
+  });
+
+  // TODO shader loader class
   const char *vertex_shader_source = R"glsl(
 #version 330 core
 
@@ -874,9 +948,10 @@ void main()
 }
 )glsl";
 
-  GLint vertex_shader, fragment_shader;
+  GLint vertex_shader, fragment_shader, program;
   vertex_shader = glCreateShader(GL_VERTEX_SHADER);
   fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+  program = glCreateProgram();
 
   glShaderSource(vertex_shader, 1,
                  static_cast<const GLchar *const *>(&vertex_shader_source),
@@ -906,7 +981,6 @@ void main()
     return EXIT_FAILURE;
   }
 
-  GLuint program = glCreateProgram();
   glAttachShader(program, vertex_shader);
   glAttachShader(program, fragment_shader);
   glLinkProgram(program);
@@ -946,25 +1020,13 @@ void main()
       ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
       if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
 
-      ImGui::SliderFloat3("Camera position", glm::value_ptr(camera_position),
-                          -10, 10);
+      // ImGui::SliderFloat3("Camera position", glm::value_ptr(camera_position),
+      //                    -10, 10);
 
       ImGui::End();
     }
 
-    ImGui::Begin("glTF Images", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::Text("Textures [%d]", textures.size());
-    ImGui::BeginChild("##ScrollableRegion0", ImVec2(256, 300), false,
-                      ImGuiWindowFlags_AlwaysVerticalScrollbar);
-    for (int i = 0; i < textures.size(); ++i) {
-      auto &texture = textures[i];
-      std::string name = "texture [" + std::to_string(i) + "]";
-      if (ImGui::CollapsingHeader(name.c_str())) {
-        ImGui::Image(ImTextureID(texture), ImVec2(256, 256));
-      }
-    }
-    ImGui::EndChild();
-    ImGui::End();
+    asset_images_window(textures);
 
     model_info_window(model);
     animation_window(model);
@@ -1019,12 +1081,15 @@ void main()
       projection_matrix = glm::perspective(
           45.f, float(display_w) / float(display_h), 1.f, 100.f);
 
-      view_matrix =
-          glm::lookAt(camera_position, glm::vec3(0.f), glm::vec3(0, 1.f, 0));
+      ImGui::Text("camera pitch %f yaw %f", my_user_pointer.rot_pitch,
+                  my_user_pointer.rot_yaw);
 
-      // ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
-      //                     glm::value_ptr(projection_matrix),
-      //                     ImGuizmo::OPERATION::)
+      glm::quat camera_rotation(
+          glm::vec3(glm::radians(my_user_pointer.rot_pitch), 0.f,
+                    glm::radians(my_user_pointer.rot_yaw)));
+      view_matrix =
+          glm::lookAt(camera_rotation * camera_position, glm::vec3(0.f),
+                      camera_rotation * glm::vec3(0, 1.f, 0));
 
       float matrixTranslation[3], matrixRotation[3], matrixScale[3];
       ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(model_matrix),
