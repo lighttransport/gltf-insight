@@ -35,6 +35,7 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_draw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_glfw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_opengl2.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_demo.cpp
     )
 
 list(APPEND UI_SOURCES
@@ -52,6 +53,10 @@ set(GLFW_INSTALL OFF CACHE INTERNAL "" FORCE)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include)
 list(APPEND EXT_LIBRARIES glfw)
+
+
+# [glm]
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glm)
 
 add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES})
 
