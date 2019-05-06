@@ -35,6 +35,7 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/gtx/quaternion.hpp"
 #include "glm/matrix.hpp"
+#include "gltf-graph.hh"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
 
@@ -510,6 +511,90 @@ void asset_images_window(const std::vector<GLuint> &textures) {
   ImGui::End();
 }
 
+// skeleton_index is the first node that will be added as a child of
+// "graph_root" e.g: a gltf node has a mesh. That mesh has a skin, and that skin
+// as a node index as "skeleton". You need to pass that "skeleton" integer to
+// this function as skeleton_index
+void populate_gltf_skeleton_subgraph(
+    const tinygltf::Model &model, gltf_node &graph_root, int skeleton_index,
+    const std::vector<glm::mat4> &inverse_bind_matrices,
+    const std::map<int, int> &joint_ibm_assignements) {
+  const auto &skeleton_node = model.nodes[skeleton_index];
+  const auto &inverse_bind_matrix =
+      inverse_bind_matrices[joint_ibm_assignements.at(skeleton_index)];
+
+  // glm::mat4 xform(1.f);
+  // glm::vec3 translation(0.f), scale(1.f, 1.f, 1.f);
+  // glm::quat rotation(1.f, 0.f, 0.f, 0.f);
+
+  // const auto &node_matrix = skeleton_node.matrix;
+  // if (node_matrix.size() == 16)  // 4x4 matrix
+  //{
+  //  for (size_t i = 0; i < 4; ++i)
+  //    for (size_t j = 0; j < 4; ++j)
+  //      xform[i][j] = float(node_matrix[4 * i + j]);
+  //}
+
+  // const auto &node_translation = skeleton_node.translation;
+  // if (node_translation.size() == 3)  // 3D vector
+  //{
+  //  for (size_t i = 0; i < 3; ++i) translation[i] =
+  //  float(node_translation[i]);
+  //}
+
+  // const auto &node_scale = skeleton_node.scale;
+  // if (node_scale.size() == 3)  // 3D vector
+  //{
+  //  for (size_t i = 0; i < 3; ++i) scale[i] = node_scale[i];
+  //}
+
+  // const auto &node_rotation = skeleton_node.rotation;
+  // if (node_rotation.size() == 4)  // Quaternion
+  //{
+  //  rotation[0] = float(node_rotation[3]);
+  //  rotation[1] = float(node_rotation[0]);
+  //  rotation[2] = float(node_rotation[1]);
+  //  rotation[3] = float(node_rotation[2]);
+  //  glm::normalize(rotation);  // Be prudent
+  //}
+
+  // glm::mat4 rotation_matrix = glm::toMat4(rotation);
+  // glm::mat4 translation_matrix = glm::translate(glm::mat4(1.f), translation);
+  // glm::mat4 scale_matrix = glm::scale(glm::mat4(1.f), scale);
+
+  // glm::mat4 reconnstructed_matrix =
+  //    translation_matrix * rotation_matrix * scale_matrix;
+
+  // xform = xform * reconnstructed_matrix;
+
+  graph_root.add_child_bone(inverse_bind_matrix);
+  auto &new_bone = *graph_root.children.back().get();
+  new_bone.gltf_model_node_index = skeleton_index;
+
+  for (int child : skeleton_node.children) {
+    populate_gltf_skeleton_subgraph(
+        model, new_bone, child, inverse_bind_matrices, joint_ibm_assignements);
+  }
+}
+
+void draw_bones(gltf_node &root, GLuint shader, glm::mat4 view_matrix,
+                glm::mat4 projection_matrix) {
+  glUseProgram(shader);
+  glm::mat4 mvp = projection_matrix * view_matrix * root.world_xform;
+  glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
+                     glm::value_ptr(mvp));
+  glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
+  glPointSize(20);
+  glBegin(GL_POINTS);
+  glVertex4f(0, 0, 0, 1);
+  glEnd();
+  glUseProgram(0);
+
+  for (auto &child : root.children) {
+    draw_bones(*child, shader, view_matrix, projection_matrix);
+  }
+}
+
 int main(int argc, char **argv) {
   cxxopts::Options options("gltf-insignt", "glTF data insight tool");
 
@@ -660,8 +745,63 @@ int main(int argc, char **argv) {
 
   const auto &mesh_node = model.nodes[mesh_node_index];
   const auto &mesh = model.meshes[mesh_node.mesh];
+  const auto &skin = model.skins[mesh_node.skin];
+  const auto skeleton = skin.skeleton;
   const auto &primitives = mesh.primitives;
   const auto nb_submeshes = primitives.size();
+
+  const auto nb_joints = skin.joints.size();
+  std::map<int, int> joint_inverse_bind_matrix_map;
+  for (int i = 0; i < nb_joints; ++i)
+    joint_inverse_bind_matrix_map[skin.joints[i]] = i;
+
+  const auto &inverse_bind_matrices_accessor =
+      model.accessors[skin.inverseBindMatrices];
+  assert(inverse_bind_matrices_accessor.type == TINYGLTF_TYPE_MAT4);
+  assert(inverse_bind_matrices_accessor.count == nb_joints);
+
+  const auto &inverse_bind_matrices_bufferview =
+      model.bufferViews[inverse_bind_matrices_accessor.bufferView];
+  const auto &inverse_bind_matrices_buffer =
+      model.buffers[inverse_bind_matrices_bufferview.buffer];
+  const size_t inverse_bind_matrices_stride =
+      inverse_bind_matrices_accessor.ByteStride(
+          inverse_bind_matrices_bufferview);
+  const auto inverse_bind_matrices_data_start =
+      inverse_bind_matrices_buffer.data.data() +
+      inverse_bind_matrices_accessor.byteOffset +
+      inverse_bind_matrices_bufferview.byteOffset;
+  const size_t inverse_bind_matrices_component_size =
+      tinygltf::GetComponentSizeInBytes(
+          inverse_bind_matrices_accessor.componentType);
+  assert(sizeof(double) >= inverse_bind_matrices_component_size);
+
+  std::vector<glm::mat4> inverse_bind_matrices(nb_joints);
+
+  for (size_t i = 0; i < nb_joints; ++i) {
+    if (inverse_bind_matrices_component_size == sizeof(float)) {
+      memcpy(
+          glm::value_ptr(inverse_bind_matrices[i]),
+          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
+          inverse_bind_matrices_component_size * 16);
+    }
+    if (inverse_bind_matrices_component_size == sizeof(double)) {
+      double temp[16];
+      memcpy(
+          temp,
+          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
+          inverse_bind_matrices_component_size * 16);
+      for (int col = 0; col < 4; ++col)
+        for (int lin = 0; lin < 4; ++lin)
+          inverse_bind_matrices[i][col][lin] =
+              float(temp[i * lin + col]);  // downcast to float
+    }
+  }
+
+  gltf_node mesh_node_subgraph(gltf_node::node_type::mesh);
+  populate_gltf_skeleton_subgraph(model, mesh_node_subgraph, skeleton,
+                                  inverse_bind_matrices,
+                                  joint_inverse_bind_matrix_map);
 
   std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
   std::vector<GLuint> VAOs(nb_submeshes);
@@ -777,7 +917,7 @@ int main(int argc, char **argv) {
     }
 
     // VERTEX UV
-    {
+    if (textures.size() > 0) {
       const auto texture = primitive.attributes.at("TEXCOORD_0");
       const auto &texture_accessor = model.accessors[texture];
       const auto &texture_buffer_view =
@@ -800,8 +940,8 @@ int main(int argc, char **argv) {
           memcpy(&temp, texture_start_pointer + i * texture_stride,
                  byte_size_of_component * 2);
           for (size_t j = 0; j < 2; ++j) {
-            texture_coord[submesh][i * 2 + j] = float(temp[j]);  // downcast to
-                                                                 // float
+            texture_coord[submesh][i * 2 + j] = float(temp[j]);  // downcast
+                                                                 // to float
           }
         } else if (byte_size_of_component == sizeof(float)) {
           memcpy(&texture_coord[submesh][i * 2],
@@ -830,16 +970,16 @@ int main(int argc, char **argv) {
       glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(1);
-
-      // Layout "2" = vertex UV
-      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][2]);
-      glBufferData(GL_ARRAY_BUFFER,
-                   texture_coord[submesh].size() * sizeof(float),
-                   texture_coord[submesh].data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
-                            nullptr);
-      glEnableVertexAttribArray(2);
-
+      if (textures.size() > 0) {
+        // Layout "2" = vertex UV
+        glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][2]);
+        glBufferData(GL_ARRAY_BUFFER,
+                     texture_coord[submesh].size() * sizeof(float),
+                     texture_coord[submesh].data(), GL_STATIC_DRAW);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
+                              nullptr);
+        glEnableVertexAttribArray(2);
+      }
       // TODO Weight data needs to be accesible from the shader
 
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][3]);
@@ -850,16 +990,18 @@ int main(int argc, char **argv) {
     }
 
     const auto &material = model.materials[primitive.material];
-    draw_call_descriptor[submesh].main_texture =
-        textures[material.values.at("baseColorTexture").TextureIndex()];
+    if (textures.size() > 0)
+      draw_call_descriptor[submesh].main_texture =
+          textures[material.values.at("baseColorTexture").TextureIndex()];
   }
 
   // not doing this seems to break imgui in opengl2 mode...
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-  glm::mat4 model_matrix{1.f}, view_matrix{1.f}, projection_matrix{1.f}, mvp,
-      normal;
+  /*glm::mat4 model_matrix{1.f}*/
+  glm::mat4 &model_matrix = mesh_node_subgraph.local_xform;
+  glm::mat4 view_matrix{1.f}, projection_matrix{1.f}, mvp, normal;
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 3.F};
 
@@ -912,7 +1054,7 @@ int main(int argc, char **argv) {
 
   // TODO shader loader class
   const char *vertex_shader_source = R"glsl(
-#version 330 core
+#version 330
 
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
@@ -933,7 +1075,7 @@ void main()
 )glsl";
 
   const char *fragment_shader_source_textured = R"glsl(
-#version 330 core
+#version 330
 
 in vec2 interpolated_uv;
 in vec3 interpolated_normal;
@@ -948,21 +1090,43 @@ void main()
 }
 )glsl";
 
-  GLint vertex_shader, fragment_shader, program;
+  const char *fragment_shader_source_draw_debug_color = R"glsl(
+#version 330
+
+out vec4 output_color;
+
+uniform vec4 debug_color;
+
+void main()
+{
+  output_color = debug_color;
+}
+)glsl";
+
+  GLint vertex_shader, fragment_shader_textured, fragment_shader_debug_color,
+      program_textured, program_debug_color;
   vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-  program = glCreateProgram();
+  fragment_shader_textured = glCreateShader(GL_FRAGMENT_SHADER);
+  fragment_shader_debug_color = glCreateShader(GL_FRAGMENT_SHADER);
+  program_textured = glCreateProgram();
+  program_debug_color = glCreateProgram();
 
   glShaderSource(vertex_shader, 1,
                  static_cast<const GLchar *const *>(&vertex_shader_source),
                  nullptr);
   glShaderSource(
-      fragment_shader, 1,
+      fragment_shader_textured, 1,
       static_cast<const GLchar *const *>(&fragment_shader_source_textured),
       nullptr);
 
+  glShaderSource(fragment_shader_debug_color, 1,
+                 static_cast<const GLchar *const *>(
+                     &fragment_shader_source_draw_debug_color),
+                 nullptr);
+
   glCompileShader(vertex_shader);
-  glCompileShader(fragment_shader);
+  glCompileShader(fragment_shader_textured);
+  glCompileShader(fragment_shader_debug_color);
 
   // check shader compilation
   GLint success = 0;
@@ -974,20 +1138,40 @@ void main()
     std::cerr << info_log << '\n';
     return EXIT_FAILURE;
   }
-  glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
+  glGetShaderiv(fragment_shader_textured, GL_COMPILE_STATUS, &success);
   if (!success) {
-    glGetShaderInfoLog(fragment_shader, sizeof info_log, nullptr, info_log);
+    glGetShaderInfoLog(fragment_shader_textured, sizeof info_log, nullptr,
+                       info_log);
     std::cerr << info_log << '\n';
     return EXIT_FAILURE;
   }
 
-  glAttachShader(program, vertex_shader);
-  glAttachShader(program, fragment_shader);
-  glLinkProgram(program);
-
-  glGetProgramiv(program, GL_LINK_STATUS, &success);
+  glGetShaderiv(fragment_shader_debug_color, GL_COMPILE_STATUS, &success);
   if (!success) {
-    glGetProgramInfoLog(program, sizeof(info_log), nullptr, info_log);
+    glGetShaderInfoLog(fragment_shader_textured, sizeof info_log, nullptr,
+                       info_log);
+    std::cerr << info_log << '\n';
+    return EXIT_FAILURE;
+  }
+
+  glAttachShader(program_textured, vertex_shader);
+  glAttachShader(program_textured, fragment_shader_textured);
+  glLinkProgram(program_textured);
+
+  glAttachShader(program_debug_color, vertex_shader);
+  glAttachShader(program_debug_color, fragment_shader_debug_color);
+  glLinkProgram(program_debug_color);
+
+  glGetProgramiv(program_textured, GL_LINK_STATUS, &success);
+  if (!success) {
+    glGetProgramInfoLog(program_textured, sizeof(info_log), nullptr, info_log);
+    std::cerr << info_log << '\n';
+    return EXIT_FAILURE;
+  }
+  glGetProgramiv(program_debug_color, GL_LINK_STATUS, &success);
+  if (!success) {
+    glGetProgramInfoLog(program_debug_color, sizeof(info_log), nullptr,
+                        info_log);
     std::cerr << info_log << '\n';
     return EXIT_FAILURE;
   }
@@ -1020,7 +1204,8 @@ void main()
       ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
       if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
 
-      // ImGui::SliderFloat3("Camera position", glm::value_ptr(camera_position),
+      // ImGui::SliderFloat3("Camera position",
+      // glm::value_ptr(camera_position),
       //                    -10, 10);
 
       ImGui::End();
@@ -1031,51 +1216,54 @@ void main()
     model_info_window(model);
     animation_window(model);
 
-    {
-      // let's create the sequencer
-      static int selectedEntry = -1;
-      static int firstFrame = 0;
-      static bool expanded = true;
-      static int currentFrame = 120;
-      ImGui::SetNextWindowPos(ImVec2(10, 350));
-
-      ImGui::SetNextWindowSize(ImVec2(940, 480));
-      ImGui::Begin("Sequencer");
-
-      ImGui::PushItemWidth(130);
-      ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
-      ImGui::SameLine();
-      ImGui::InputInt("Frame ", &currentFrame);
-      ImGui::SameLine();
-      ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
-      ImGui::PopItemWidth();
-#if 0
-      Sequencer(
-          &mySequence, &currentFrame, &expanded, &selectedEntry, &firstFrame,
-          ImSequencer::SEQUENCER_EDIT_STARTEND | ImSequencer::SEQUENCER_ADD |
-              ImSequencer::SEQUENCER_DEL | ImSequencer::SEQUENCER_COPYPASTE |
-              ImSequencer::SEQUENCER_CHANGE_FRAME);
-#else
-      Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry,
-                &firstFrame, 0);
-#endif
-      // add a UI to edit that particular item
-      if (selectedEntry != -1) {
-        const gltf_insight::AnimSequence::AnimSequenceItem &item =
-            mySequence.myItems[selectedEntry];
-        ImGui::Text("I am a %s, please edit me",
-                    gltf_insight::SequencerItemTypeNames[item.mType]);
-        // switch (type) ....
-      }
-
-      ImGui::End();
-    }
+    //    {
+    //      // let's create the sequencer
+    //      static int selectedEntry = -1;
+    //      static int firstFrame = 0;
+    //      static bool expanded = true;
+    //      static int currentFrame = 120;
+    //      ImGui::SetNextWindowPos(ImVec2(10, 350));
+    //
+    //      ImGui::SetNextWindowSize(ImVec2(940, 480));
+    //      ImGui::Begin("Sequencer");
+    //
+    //      ImGui::PushItemWidth(130);
+    //      ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
+    //      ImGui::SameLine();
+    //      ImGui::InputInt("Frame ", &currentFrame);
+    //      ImGui::SameLine();
+    //      ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
+    //      ImGui::PopItemWidth();
+    //#if 0
+    //      Sequencer(
+    //          &mySequence, &currentFrame, &expanded, &selectedEntry,
+    //          &firstFrame, ImSequencer::SEQUENCER_EDIT_STARTEND |
+    //          ImSequencer::SEQUENCER_ADD |
+    //              ImSequencer::SEQUENCER_DEL |
+    //              ImSequencer::SEQUENCER_COPYPASTE |
+    //              ImSequencer::SEQUENCER_CHANGE_FRAME);
+    //#else
+    //      Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry,
+    //                &firstFrame, 0);
+    //#endif
+    //      // add a UI to edit that particular item
+    //      if (selectedEntry != -1) {
+    //        const gltf_insight::AnimSequence::AnimSequenceItem &item =
+    //            mySequence.myItems[selectedEntry];
+    //        ImGui::Text("I am a %s, please edit me",
+    //                    gltf_insight::SequencerItemTypeNames[item.mType]);
+    //        // switch (type) ....
+    //      }
+    //
+    //      ImGui::End();
+    //    }
 
     {
       // Rendering
       glfwGetFramebufferSize(window, &display_w, &display_h);
       glViewport(0, 0, display_w, display_h);
       glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+      glEnable(GL_DEPTH_TEST);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       projection_matrix = glm::perspective(
@@ -1127,11 +1315,11 @@ void main()
       glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
       glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
 
-      glUseProgram(program);
-      glUniformMatrix4fv(glGetUniformLocation(program, "mvp"), 1, GL_FALSE,
-                         glm::value_ptr(mvp));
-      glUniformMatrix3fv(glGetUniformLocation(program, "normal"), 1, GL_FALSE,
-                         glm::value_ptr(normal));
+      glUseProgram(program_textured);
+      glUniformMatrix4fv(glGetUniformLocation(program_textured, "mvp"), 1,
+                         GL_FALSE, glm::value_ptr(mvp));
+      glUniformMatrix3fv(glGetUniformLocation(program_textured, "normal"), 1,
+                         GL_FALSE, glm::value_ptr(normal));
 
       for (const auto &draw_call_to_perform : draw_call_descriptor) {
         glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
@@ -1139,7 +1327,15 @@ void main()
         glDrawElements(draw_call_to_perform.draw_mode,
                        draw_call_to_perform.count, GL_UNSIGNED_INT, 0);
       }
+
       glBindVertexArray(0);
+
+      glDisable(GL_DEPTH_TEST);
+
+      update_subgraph_transform(mesh_node_subgraph);
+      draw_bones(mesh_node_subgraph, program_debug_color, view_matrix,
+                 projection_matrix);
+
       glUseProgram(0);  // You may want this if using this code in an
       // OpenGL 3+ context where shaders may be bound, but prefer using the
       // GL3+ code.
