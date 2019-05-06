@@ -523,51 +523,50 @@ void populate_gltf_skeleton_subgraph(
   const auto &inverse_bind_matrix =
       inverse_bind_matrices[joint_ibm_assignements.at(skeleton_index)];
 
-  // glm::mat4 xform(1.f);
-  // glm::vec3 translation(0.f), scale(1.f, 1.f, 1.f);
-  // glm::quat rotation(1.f, 0.f, 0.f, 0.f);
+  glm::mat4 xform(1.f);
+  glm::vec3 translation(0.f), scale(1.f, 1.f, 1.f);
+  glm::quat rotation(1.f, 0.f, 0.f, 0.f);
 
-  // const auto &node_matrix = skeleton_node.matrix;
-  // if (node_matrix.size() == 16)  // 4x4 matrix
-  //{
-  //  for (size_t i = 0; i < 4; ++i)
-  //    for (size_t j = 0; j < 4; ++j)
-  //      xform[i][j] = float(node_matrix[4 * i + j]);
-  //}
+  const auto &node_matrix = skeleton_node.matrix;
+  if (node_matrix.size() == 16)  // 4x4 matrix
+  {
+    for (size_t i = 0; i < 4; ++i)
+      for (size_t j = 0; j < 4; ++j)
+        xform[i][j] = float(node_matrix[4 * i + j]);
+  }
 
-  // const auto &node_translation = skeleton_node.translation;
-  // if (node_translation.size() == 3)  // 3D vector
-  //{
-  //  for (size_t i = 0; i < 3; ++i) translation[i] =
-  //  float(node_translation[i]);
-  //}
+  const auto &node_translation = skeleton_node.translation;
+  if (node_translation.size() == 3)  // 3D vector
+  {
+    for (size_t i = 0; i < 3; ++i) translation[i] = float(node_translation[i]);
+  }
 
-  // const auto &node_scale = skeleton_node.scale;
-  // if (node_scale.size() == 3)  // 3D vector
-  //{
-  //  for (size_t i = 0; i < 3; ++i) scale[i] = node_scale[i];
-  //}
+  const auto &node_scale = skeleton_node.scale;
+  if (node_scale.size() == 3)  // 3D vector
+  {
+    for (size_t i = 0; i < 3; ++i) scale[i] = node_scale[i];
+  }
 
-  // const auto &node_rotation = skeleton_node.rotation;
-  // if (node_rotation.size() == 4)  // Quaternion
-  //{
-  //  rotation[0] = float(node_rotation[3]);
-  //  rotation[1] = float(node_rotation[0]);
-  //  rotation[2] = float(node_rotation[1]);
-  //  rotation[3] = float(node_rotation[2]);
-  //  glm::normalize(rotation);  // Be prudent
-  //}
+  const auto &node_rotation = skeleton_node.rotation;
+  if (node_rotation.size() == 4)  // Quaternion
+  {
+    rotation.w = float(node_rotation[3]);
+    rotation.x = float(node_rotation[0]);
+    rotation.y = float(node_rotation[1]);
+    rotation.z = float(node_rotation[2]);
+    glm::normalize(rotation);  // Be prudent
+  }
 
-  // glm::mat4 rotation_matrix = glm::toMat4(rotation);
-  // glm::mat4 translation_matrix = glm::translate(glm::mat4(1.f), translation);
-  // glm::mat4 scale_matrix = glm::scale(glm::mat4(1.f), scale);
+  glm::mat4 rotation_matrix = glm::toMat4(rotation);
+  glm::mat4 translation_matrix = glm::translate(glm::mat4(1.f), translation);
+  glm::mat4 scale_matrix = glm::scale(glm::mat4(1.f), scale);
 
-  // glm::mat4 reconnstructed_matrix =
-  //    translation_matrix * rotation_matrix * scale_matrix;
+  glm::mat4 reconnstructed_matrix =
+      translation_matrix * rotation_matrix * scale_matrix;
 
-  // xform = xform * reconnstructed_matrix;
+  xform = xform * reconnstructed_matrix;
 
-  graph_root.add_child_bone(inverse_bind_matrix);
+  graph_root.add_child_bone(inverse_bind_matrix, xform);
   auto &new_bone = *graph_root.children.back().get();
   new_bone.gltf_model_node_index = skeleton_index;
 
@@ -577,22 +576,87 @@ void populate_gltf_skeleton_subgraph(
   }
 }
 
+void draw_space_origin_point(float point_size) {
+  // set the size
+  glPointSize(point_size);
+
+  // Since we're not even drawing a polygon, it's probably simpler to do it with
+  // old-style opengl
+  glBegin(GL_POINTS);
+  glVertex4f(0, 0, 0, 1);
+  glEnd();
+}
+
+void draw_space_base(GLuint shader, const float line_width,
+                     const float axis_scale) {
+  glLineWidth(line_width);
+  glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
+  glBegin(GL_LINES);
+  glVertex4f(0, 0, 0, 1);
+  glVertex4f(axis_scale, 0, 0, 1);
+  glEnd();
+
+  glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 1, 0, 1);
+  glBegin(GL_LINES);
+  glVertex4f(0, 0, 0, 1);
+  glVertex4f(0, axis_scale, 0, 1);
+  glEnd();
+
+  glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 0, 1, 1);
+  glBegin(GL_LINES);
+  glVertex4f(0, 0, 0, 1);
+  glVertex4f(0, 0, axis_scale, 1);
+  glEnd();
+}
+
+bool draw_joint_point = true;
+bool draw_bone_segment = true;
+bool draw_mesh_anchor_point = true;
+bool draw_bone_axes = true;
+
+// TODO use this snipet in a fragment shader to draw a cirle instead of a square
+// vec2 coord = gl_PointCoord - vec2(0.5);  //from [0,1] to [-0.5,0.5]
+// if(length(coord) > 0.5)                  //outside of circle radius?
+//    discard;
 void draw_bones(gltf_node &root, GLuint shader, glm::mat4 view_matrix,
                 glm::mat4 projection_matrix) {
   glUseProgram(shader);
   glm::mat4 mvp = projection_matrix * view_matrix * root.world_xform;
   glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
                      glm::value_ptr(mvp));
-  glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
-  glPointSize(20);
-  glBegin(GL_POINTS);
-  glVertex4f(0, 0, 0, 1);
-  glEnd();
-  glUseProgram(0);
+
+  const float line_width = 2;
+  const float axis_scale = 0.125;
+
+  if (draw_bone_axes) draw_space_base(shader, line_width, axis_scale);
 
   for (auto &child : root.children) {
+    if (root.type != gltf_node::node_type::mesh && draw_bone_segment) {
+      glUseProgram(shader);
+      glLineWidth(8);
+      glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 0.5, 0.5, 1);
+      glBegin(GL_LINES);
+      glVertex4f(0, 0, 0, 1);
+      const auto child_position = child->local_xform[3];
+      glVertex4f(child_position.x, child_position.y, child_position.z, 1);
+      glEnd();
+    }
     draw_bones(*child, shader, view_matrix, projection_matrix);
   }
+
+  glUseProgram(shader);
+  glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
+                     glm::value_ptr(mvp));
+  if (draw_joint_point && root.type == gltf_node::node_type::bone) {
+    glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
+
+    draw_space_origin_point(10);
+  } else if (draw_mesh_anchor_point &&
+             root.type == gltf_node::node_type::mesh) {
+    glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 1, 0, 1);
+    draw_space_origin_point(10);
+  }
+  glUseProgram(0);
 }
 
 int main(int argc, char **argv) {
@@ -1333,6 +1397,15 @@ void main()
       glDisable(GL_DEPTH_TEST);
 
       update_subgraph_transform(mesh_node_subgraph);
+
+      if (ImGui::Begin("Skeleton drawing options")) {
+        ImGui::Checkbox("Draw joint points", &draw_joint_point);
+        ImGui::Checkbox("Draw Bone as segments", &draw_bone_segment);
+        ImGui::Checkbox("Draw Bone's base axes", &draw_bone_axes);
+        ImGui::Checkbox("Draw Skeleton's Mesh base", &draw_mesh_anchor_point);
+      }
+      ImGui::End();
+
       draw_bones(mesh_node_subgraph, program_debug_color, view_matrix,
                  projection_matrix);
 

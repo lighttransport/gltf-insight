@@ -20,9 +20,9 @@ struct gltf_node {
         gltf_model_node_index(-1),
         parent(p) {}
 
-  void add_child_bone(glm::mat4 inverse_bind_matrix) {
+  void add_child_bone(glm::mat4 inverse_bind_matrix, glm::mat4 local_xform) {
     gltf_node* child = new gltf_node(node_type::bone);
-    // child->local_xform = glm::inverse(local_xform) * inverse_bind_matrix;
+    child->local_xform = local_xform;
     child->inverse_bind_matrix = (inverse_bind_matrix);
     child->parent = this;
     children.emplace_back(child);
