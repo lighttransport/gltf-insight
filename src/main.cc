@@ -869,14 +869,15 @@ int main(int argc, char **argv) {
 
   std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
   std::vector<GLuint> VAOs(nb_submeshes);
-  std::vector<GLuint[4]> VBOs(nb_submeshes);
+  std::vector<GLuint[6]> VBOs(nb_submeshes);
   glGenVertexArrays(nb_submeshes, VAOs.data());
   for (auto &VBO : VBOs) {
-    glGenBuffers(4, VBO);
+    glGenBuffers(6, VBO);
   }
   std::vector<std::vector<unsigned>> indices(nb_submeshes);
   std::vector<std::vector<float>> vertex_coord(nb_submeshes),
-      texture_coord(nb_submeshes), normals(nb_submeshes);
+      texture_coord(nb_submeshes), normals(nb_submeshes), weights(nb_submeshes);
+  std::vector<std::vector<unsigned short>> joints(nb_submeshes);
 
   for (size_t submesh = 0; submesh < nb_submeshes; ++submesh) {
     const auto &primitive = primitives[submesh];
@@ -1015,6 +1016,71 @@ int main(int argc, char **argv) {
       }
     }
 
+    // VERTEX JOINTS ASSIGNEMENT
+    {
+      const auto joint = primitive.attributes.at("JOINTS_0");
+      const auto &joints_accessor = model.accessors[joint];
+      const auto &joints_buffer_view =
+          model.bufferViews[joints_accessor.bufferView];
+      const auto &joints_buffer = model.buffers[joints_buffer_view.buffer];
+      const auto joints_stride = joints_accessor.ByteStride(joints_buffer_view);
+      const auto joints_start_pointer = joints_buffer.data.data() +
+                                        joints_buffer_view.byteOffset +
+                                        joints_accessor.byteOffset;
+      const size_t byte_size_of_component =
+          tinygltf::GetComponentSizeInBytes(joints_accessor.componentType);
+      assert(joints_accessor.type == TINYGLTF_TYPE_VEC4);
+      assert(sizeof(unsigned short) >= byte_size_of_component);
+
+      joints[submesh].resize(4 * joints_accessor.count);
+
+      for (size_t i = 0; i < joints_accessor.count; ++i) {
+        memcpy(&joints[submesh][i * 4],
+               joints_start_pointer + i * joints_stride,
+               byte_size_of_component * 4);
+      }
+    }
+
+    // VERTEX BONE WEIGHTS
+    {
+      const auto weight = primitive.attributes.at("WEIGHTS_0");
+      const auto &weights_accessor = model.accessors[weight];
+      const auto &weights_buffer_view =
+          model.bufferViews[weights_accessor.bufferView];
+      const auto &weights_buffer = model.buffers[weights_buffer_view.buffer];
+      const auto weights_stride =
+          weights_accessor.ByteStride(weights_buffer_view);
+      const auto weights_start_pointer = weights_buffer.data.data() +
+                                         weights_buffer_view.byteOffset +
+                                         weights_accessor.byteOffset;
+      const size_t byte_size_of_component =
+          tinygltf::GetComponentSizeInBytes(weights_accessor.componentType);
+      assert(weights_accessor.type == TINYGLTF_TYPE_VEC4);
+      assert(sizeof(float) >= byte_size_of_component);
+
+      weights[submesh].resize(4 * weights_accessor.count);
+
+      for (size_t i = 0; i < weights_accessor.count; ++i) {
+        if (weights_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+          memcpy(&weights[submesh][i * 4],
+                 weights_start_pointer + i * weights_stride,
+                 byte_size_of_component * 4);
+        } else {
+          // Must convert normalized unsiged value to floating point
+          unsigned short temp = 0;
+          for (int j = 0; j < 4; j++) {
+            memcpy(&temp,
+                   weights_start_pointer + i * weights_stride +
+                       j * byte_size_of_component,
+                   byte_size_of_component);
+            weights[submesh][i * 4 + j] =
+                float(temp) /
+                (byte_size_of_component == 2 ? float(0xFFFF) : float(0xFF));
+          }
+        }
+      }
+    }
+
     {  // GPU upload and shader layout association
       glBindVertexArray(VAOs[submesh]);
 
@@ -1046,7 +1112,25 @@ int main(int argc, char **argv) {
       }
       // TODO Weight data needs to be accesible from the shader
 
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][3]);
+      // Layout "3" joints assignement vector
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][3]);
+      glBufferData(GL_ARRAY_BUFFER,
+                   joints[submesh].size() * sizeof(unsigned short),
+                   joints[submesh].data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(3, 4, GL_UNSIGNED_SHORT, GL_FALSE,
+                            4 * sizeof(unsigned short), nullptr);
+      glEnableVertexAttribArray(3);
+
+      // Layout "4" joints weights
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][4]);
+      glBufferData(GL_ARRAY_BUFFER, weights[submesh].size() * sizeof(float),
+                   joints[submesh].data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                            nullptr);
+      glEnableVertexAttribArray(4);
+
+      // EBO
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][5]);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                    indices[submesh].size() * sizeof(unsigned),
                    indices[submesh].data(), GL_STATIC_DRAW);
@@ -1123,6 +1207,8 @@ int main(int argc, char **argv) {
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
 layout (location = 2) in vec2 input_uv;
+layout (location = 4) in vec4 input_joints;
+layout (location = 5) in vec4 input_weights;
 
 uniform mat4 mvp;
 uniform mat3 normal;
