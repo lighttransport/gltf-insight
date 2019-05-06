@@ -17,8 +17,13 @@ gltf-insight uses TinyGLTF for load/save glTF model and ImGUI for GUI.
 
 ## Setup
 
-git submodule updat init:
+```bash
+git submodule init;
+git submodule update;
+```
 ## Build
+
+In the genral case, just run CMake to generate a build system for your own environemnet
 
 ### Windows + Visual Studio 2017
 
@@ -36,8 +41,12 @@ $ make
 
 ## TODO
 
+* bone display
 * keyframe display
+* glTF compliant keyframe interpolation code
 * Animation curve display : https://github.com/ocornut/imgui/issues/786
+* load morph target
+* morph target blending code
 
 ## License
 
@@ -48,6 +57,7 @@ MIT license
 * TinyGLTF : MIT license
 * json.hpp : MIT license
 * glad : MIT license
-* glfw : zlib/png licens
+* glfw : zlib/png license
+* glm : MIT license
 * ImGUI : MIT license
 * cxxopts : MIT license
