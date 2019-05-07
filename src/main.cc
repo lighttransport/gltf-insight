@@ -514,7 +514,8 @@ void asset_images_window(const std::vector<GLuint> &textures) {
 // skeleton_index is the first node that will be added as a child of
 // "graph_root" e.g: a gltf node has a mesh. That mesh has a skin, and that skin
 // as a node index as "skeleton". You need to pass that "skeleton" integer to
-// this function as skeleton_index
+// this function as skeleton_index. This returns a flat array of the bones to be
+// used by the skinning code
 void populate_gltf_skeleton_subgraph(
     const tinygltf::Model &model, gltf_node &graph_root, int skeleton_index,
     const std::vector<glm::mat4> &inverse_bind_matrices,
@@ -657,6 +658,28 @@ void draw_bones(gltf_node &root, GLuint shader, glm::mat4 view_matrix,
     draw_space_origin_point(10);
   }
   glUseProgram(0);
+}
+
+void create_flat_bone_array(gltf_node &root,
+                            std::vector<gltf_node *> &flat_array) {
+  if (root.type == gltf_node::node_type::bone)
+    flat_array.push_back(root.get_ptr());
+
+  for (auto &child : root.children) create_flat_bone_array(*child, flat_array);
+}
+
+void sort_bone_array(std::vector<gltf_node *> &bone_array,
+                     const tinygltf::Skin &skin_object) {
+  assert(bone_array.size() == skin_object.joints.size());
+  for (size_t counter = 0; counter < bone_array.size(); ++counter) {
+    int index_to_find = skin_object.joints[counter];
+    for (size_t bone_index = 0; bone_index < bone_array.size(); ++bone_index) {
+      if (bone_array[bone_index]->gltf_model_node_index == index_to_find) {
+        std::swap(bone_array[counter], bone_array[bone_index]);
+        break;
+      }
+    }
+  }
 }
 
 int main(int argc, char **argv) {
@@ -815,6 +838,8 @@ int main(int argc, char **argv) {
   const auto nb_submeshes = primitives.size();
 
   const auto nb_joints = skin.joints.size();
+  std::vector<glm::mat4> joint_matrices(nb_joints);
+
   std::map<int, int> joint_inverse_bind_matrix_map;
   for (int i = 0; i < nb_joints; ++i)
     joint_inverse_bind_matrix_map[skin.joints[i]] = i;
@@ -866,6 +891,14 @@ int main(int argc, char **argv) {
   populate_gltf_skeleton_subgraph(model, mesh_node_subgraph, skeleton,
                                   inverse_bind_matrices,
                                   joint_inverse_bind_matrix_map);
+  std::vector<gltf_node *> flatened_bone_list;
+  create_flat_bone_array(mesh_node_subgraph, flatened_bone_list);
+  sort_bone_array(flatened_bone_list, skin);
+  for (int i = 0; i < nb_joints; ++i) {
+    std::cout << flatened_bone_list[i]->gltf_model_node_index
+              << " and should be " << skin.joints[i] << '\n';
+  }
+  assert(flatened_bone_list.size() == nb_joints);
 
   std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
   std::vector<GLuint> VAOs(nb_submeshes);
@@ -1213,12 +1246,21 @@ layout (location = 5) in vec4 input_weights;
 uniform mat4 mvp;
 uniform mat3 normal;
 
+uniform mat4 joint_matrix[19]; //TODO replace that number wiht the actual number of bones in the skeleton
+
 out vec3 interpolated_normal;
 out vec2 interpolated_uv;
 
 void main()
 {
+  mat4 skin_matrix = input_weights.x * joint_matrix[int(input_joints.x)] 
+  + input_weights.y * joint_matrix[int(input_joints.y)]
+  + input_weights.z * joint_matrix[int(input_joints.z)]
+  + input_weights.w * joint_matrix[int(input_joints.w)];
+
+  gl_Position = mvp * skin_matrix * vec4(input_position, 1.0);
   gl_Position = mvp * vec4(input_position, 1.0);
+ 
   interpolated_normal = normal * input_normal;
   interpolated_uv = input_uv;
 }
@@ -1462,10 +1504,24 @@ void main()
                            mCurrentGizmoOperation, mCurrentGizmoMode,
                            glm::value_ptr(model_matrix), NULL, NULL);
 
+      flatened_bone_list[2]->local_xform =
+          glm::rotate(flatened_bone_list[2]->local_xform, glm::radians(1.F),
+                      glm::vec3(1.f, 0, 0));
+      update_subgraph_transform(mesh_node_subgraph);
+
+      for (size_t i = 0; i < joint_matrices.size(); ++i) {
+        joint_matrices[i] = glm::inverse(model_matrix) *
+                            flatened_bone_list[i]->world_xform *
+                            inverse_bind_matrices[i];
+      }
+
       glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
       glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
 
       glUseProgram(program_textured);
+
+      glUniformMatrix4fv(glGetUniformLocation(program_textured, "joint_matrix"),
+                         nb_joints, GL_FALSE, (GLfloat *)joint_matrices.data());
       glUniformMatrix4fv(glGetUniformLocation(program_textured, "mvp"), 1,
                          GL_FALSE, glm::value_ptr(mvp));
       glUniformMatrix3fv(glGetUniformLocation(program_textured, "normal"), 1,
@@ -1481,8 +1537,6 @@ void main()
       glBindVertexArray(0);
 
       glDisable(GL_DEPTH_TEST);
-
-      update_subgraph_transform(mesh_node_subgraph);
 
       if (ImGui::Begin("Skeleton drawing options")) {
         ImGui::Checkbox("Draw joint points", &draw_joint_point);

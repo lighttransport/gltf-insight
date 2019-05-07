@@ -27,6 +27,8 @@ struct gltf_node {
     child->parent = this;
     children.emplace_back(child);
   }
+
+  gltf_node* get_ptr() { return this; }
 };
 
 void update_subgraph_transform(gltf_node& node,
