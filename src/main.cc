@@ -420,8 +420,8 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
   // ignore non-significant error/warning codes
   if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
 
-  std::cout << "---------------" << std::endl;
-  std::cout << "Debug message (" << id << "): " << message << std::endl;
+  std::cout << "---------------" << '\n';
+  std::cout << "Debug message (" << id << "): " << message << '\n';
 
   switch (source) {
     case GL_DEBUG_SOURCE_API:
@@ -442,8 +442,10 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
     case GL_DEBUG_SOURCE_OTHER:
       std::cout << "Source: Other";
       break;
+    default:
+      std::cout << "Source: Unknown";
   }
-  std::cout << std::endl;
+  std::cout << '\n';
 
   switch (type) {
     case GL_DEBUG_TYPE_ERROR:
@@ -473,8 +475,10 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
     case GL_DEBUG_TYPE_OTHER:
       std::cout << "Type: Other";
       break;
+    default:
+      std::cout << "Type: Unknown";
   }
-  std::cout << std::endl;
+  std::cout << '\n';
 
   switch (severity) {
     case GL_DEBUG_SEVERITY_HIGH:
@@ -489,9 +493,10 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
     case GL_DEBUG_SEVERITY_NOTIFICATION:
       std::cout << "Severity: notification";
       break;
+    default:
+      std::cout << "Severity: Unknown";
   }
-  std::cout << std::endl;
-  std::cout << std::endl;
+  std::cout << "\n\n";
 }
 
 void asset_images_window(const std::vector<GLuint> &textures) {
@@ -558,11 +563,11 @@ void populate_gltf_skeleton_subgraph(
     glm::normalize(rotation);  // Be prudent
   }
 
-  glm::mat4 rotation_matrix = glm::toMat4(rotation);
-  glm::mat4 translation_matrix = glm::translate(glm::mat4(1.f), translation);
-  glm::mat4 scale_matrix = glm::scale(glm::mat4(1.f), scale);
-
-  glm::mat4 reconnstructed_matrix =
+  const glm::mat4 rotation_matrix = glm::toMat4(rotation);
+  const glm::mat4 translation_matrix =
+      glm::translate(glm::mat4(1.f), translation);
+  const glm::mat4 scale_matrix = glm::scale(glm::mat4(1.f), scale);
+  const glm::mat4 reconnstructed_matrix =
       translation_matrix * rotation_matrix * scale_matrix;
 
   xform = xform * reconnstructed_matrix;
@@ -716,21 +721,28 @@ int main(int argc, char **argv) {
 
   tinygltf::Model model;
   tinygltf::TinyGLTF gltf_ctx;
-  std::string err;
-  std::string warn;
-  std::string ext = GetFilePathExtension(input_filename);
+  {
+    std::string err;
+    std::string warn;
+    const std::string ext = GetFilePathExtension(input_filename);
 
-  bool ret = false;
-  if (ext.compare("glb") == 0) {
-    std::cout << "Reading binary glTF" << std::endl;
-    // assume binary glTF.
-    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn,
-                                      input_filename.c_str());
-  } else {
-    std::cout << "Reading ASCII glTF" << std::endl;
-    // assume ascii glTF.
-    ret =
-        gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+    bool ret = false;
+    if (ext.compare("glb") == 0) {
+      std::cout << "Reading binary glTF" << std::endl;
+      // assume binary glTF.
+      ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn,
+                                        input_filename.c_str());
+    } else {
+      std::cout << "Reading ASCII glTF" << std::endl;
+      // assume ascii glTF.
+      ret = gltf_ctx.LoadASCIIFromFile(&model, &err, &warn,
+                                       input_filename.c_str());
+    }
+
+    if (ret) {
+      std::cerr << "Problem while loading gltf:\n"
+                << "error: " << err << "\nwarning: " << warn << '\n';
+    }
   }
 
   // Setup window
@@ -778,7 +790,7 @@ int main(int argc, char **argv) {
 
   const auto nb_textures = model.images.size();
   std::vector<GLuint> textures(nb_textures);
-  glGenTextures(nb_textures, textures.data());
+  glGenTextures(GLsizei(nb_textures), textures.data());
 
   for (size_t i = 0; i < textures.size(); ++i) {
     glBindTexture(GL_TEXTURE_2D, textures[i]);
@@ -903,7 +915,7 @@ int main(int argc, char **argv) {
   std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
   std::vector<GLuint> VAOs(nb_submeshes);
   std::vector<GLuint[6]> VBOs(nb_submeshes);
-  glGenVertexArrays(nb_submeshes, VAOs.data());
+  glGenVertexArrays(GLsizei(nb_submeshes), VAOs.data());
   for (auto &VBO : VBOs) {
     glGenBuffers(6, VBO);
   }
@@ -1182,24 +1194,24 @@ int main(int argc, char **argv) {
 
   /*glm::mat4 model_matrix{1.f}*/
   glm::mat4 &model_matrix = mesh_node_subgraph.local_xform;
-  glm::mat4 view_matrix{1.f}, projection_matrix{1.f}, mvp, normal;
+  glm::mat4 view_matrix{1.f}, projection_matrix{1.f};
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 3.F};
 
-  struct aplication_parameters {
+  struct application_parameters {
     glm::vec3 &camera_position;
     bool button_states[3]{false};
     double last_mouse_x{0}, last_mouse_y{0};
-    double rot_pitch, rot_yaw;
+    double rot_pitch{0}, rot_yaw{0};
     double rotation_scale = 0.2;
-    aplication_parameters(glm::vec3 &cam_pos) : camera_position(cam_pos) {}
+    application_parameters(glm::vec3 &cam_pos) : camera_position(cam_pos) {}
   } my_user_pointer{camera_position};
 
   glfwSetWindowUserPointer(window, &my_user_pointer);
 
   glfwSetMouseButtonCallback(
       window, [](GLFWwindow *window, int button, int action, int mods) {
-        auto *param = reinterpret_cast<aplication_parameters *>(
+        auto *param = reinterpret_cast<application_parameters *>(
             glfwGetWindowUserPointer(window));
 
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
@@ -1218,7 +1230,7 @@ int main(int argc, char **argv) {
 
   glfwSetCursorPosCallback(window, [](GLFWwindow *window, double mouse_x,
                                       double mouse_y) {
-    auto *param = reinterpret_cast<aplication_parameters *>(
+    auto *param = reinterpret_cast<application_parameters *>(
         glfwGetWindowUserPointer(window));
 
     // mouse left pressed
@@ -1512,7 +1524,6 @@ void main()
                                               matrixScale,
                                               glm::value_ptr(model_matrix));
 
-      ImGuiIO &io = ImGui::GetIO();
       ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
       ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
                            glm::value_ptr(projection_matrix),
@@ -1536,7 +1547,8 @@ void main()
       glUseProgram(program_textured);
 
       glUniformMatrix4fv(glGetUniformLocation(program_textured, "joint_matrix"),
-                         nb_joints, GL_FALSE, (GLfloat *)joint_matrices.data());
+                         GLsizei(nb_joints), GL_FALSE,
+                         (GLfloat *)joint_matrices.data());
       glUniformMatrix4fv(glGetUniformLocation(program_textured, "mvp"), 1,
                          GL_FALSE, glm::value_ptr(mvp));
       glUniformMatrix3fv(glGetUniformLocation(program_textured, "normal"), 1,
@@ -1546,7 +1558,7 @@ void main()
         glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
         glBindVertexArray(draw_call_to_perform.VAO);
         glDrawElements(draw_call_to_perform.draw_mode,
-                       draw_call_to_perform.count, GL_UNSIGNED_INT, 0);
+                       GLsizei(draw_call_to_perform.count), GL_UNSIGNED_INT, 0);
       }
 
       glBindVertexArray(0);
