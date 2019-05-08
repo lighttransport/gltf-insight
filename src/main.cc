@@ -508,7 +508,7 @@ void asset_images_window(const std::vector<GLuint> &textures) {
       auto &texture = textures[i];
       std::string name = "texture [" + std::to_string(i) + "]";
       if (ImGui::CollapsingHeader(name.c_str())) {
-        ImGui::Image(ImTextureID(texture), ImVec2(256, 256));
+        ImGui::Image(ImTextureID(size_t(texture)), ImVec2(256.f, 256.f));
       }
     }
     ImGui::EndChild();
@@ -550,7 +550,7 @@ void populate_gltf_skeleton_subgraph(
   const auto &node_scale = skeleton_node.scale;
   if (node_scale.size() == 3)  // 3D vector
   {
-    for (size_t i = 0; i < 3; ++i) scale[i] = node_scale[i];
+    for (size_t i = 0; i < 3; ++i) scale[i] = float(node_scale[i]);
   }
 
   const auto &node_rotation = skeleton_node.rotation;
