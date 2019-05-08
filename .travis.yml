@@ -26,6 +26,9 @@ matrix:
         - ubuntu-toolchain-r-test
         packages:
         - g++-4.9
+        - libxrender-dev
+        - xorg-dev
+        - libglu1-mesa-dev
     compiler: gcc
     env: COMPILER_VERSION=4.9 BUILD_TYPE=Debug EXTRA_CXXFLAGS="-fsanitize=address"
   - addons: *2
