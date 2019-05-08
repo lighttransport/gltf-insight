@@ -12,6 +12,8 @@ matrix:
         - g++-4.9
         - clang-3.9
         - libxrender-dev
+        - xorg-dev
+        - libglu1-mesa-dev
     compiler: clang
     env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug
   - addons: *1
