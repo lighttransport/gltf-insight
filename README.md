@@ -1,4 +1,4 @@
-# Simple C++11 based glTF 2.0 data insight tool
+# Simple C++11 based glTF 2.0 data insight tool [![Build Status](https://travis-ci.org/lighttransport/gltf-insight.svg?branch=devel)](https://travis-ci.org/lighttransport/gltf-insight)
 
 gltf-insight is a C++11 based data insight tool for glTF 2.0 model.
 gltf-insight uses TinyGLTF for load/save glTF model and ImGUI for GUI.
