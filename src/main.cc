@@ -1234,7 +1234,7 @@ int main(int argc, char **argv) {
   });
 
   // TODO shader loader class
-  const char *vertex_shader_source = R"glsl(
+  std::string vertex_shader_source_str = R"glsl(
 #version 330
 
 layout (location = 0) in vec3 input_position;
@@ -1246,7 +1246,7 @@ layout (location = 5) in vec4 input_weights;
 uniform mat4 mvp;
 uniform mat3 normal;
 
-uniform mat4 joint_matrix[19]; //TODO replace that number wiht the actual number of bones in the skeleton
+uniform mat4 joint_matrix[$nb_joints]; 
 
 out vec3 interpolated_normal;
 out vec2 interpolated_uv;
@@ -1259,12 +1259,25 @@ void main()
   + input_weights.w * joint_matrix[int(input_joints.w)];
 
   gl_Position = mvp * skin_matrix * vec4(input_position, 1.0);
-  gl_Position = mvp * vec4(input_position, 1.0);
+  gl_Position = mvp * vec4(input_position, 1.0);//<-- uncoment for no skining
  
   interpolated_normal = normal * input_normal;
   interpolated_uv = input_uv;
 }
 )glsl";
+
+  // Write in shader source code the value of `nb_joints`
+  size_t index = vertex_shader_source_str.find("$nb_joints");
+  if (index == std::string::npos) {
+    std::cerr << "The skinned mesh vertex shader doesn't have the $nb_joints "
+                 "token in it's source code anywhere. We cannot do skinning on "
+                 "a shader that cannot receive the joint list.\n";
+    return EXIT_FAILURE;
+  }
+
+  vertex_shader_source_str.replace(index, strlen("$nb_joints"),
+                                   std::to_string(nb_joints));
+  const char *vertex_shader_source = vertex_shader_source_str.c_str();
 
   const char *fragment_shader_source_textured = R"glsl(
 #version 330
