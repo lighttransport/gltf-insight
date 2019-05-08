@@ -56,6 +56,7 @@ MIT license
 
 * TinyGLTF : MIT license
 * json.hpp : MIT license
+* stb_image libraries : Public domain
 * glad : MIT license
 * glfw : zlib/png license
 * glm : MIT license
