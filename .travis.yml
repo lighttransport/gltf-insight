@@ -11,6 +11,7 @@ matrix:
         packages:
         - g++-4.9
         - clang-3.9
+        - x11-xserver-utils
     compiler: clang
     env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug
   - addons: *1
