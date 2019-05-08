@@ -1192,7 +1192,9 @@ int main(int argc, char **argv) {
     double last_mouse_x{0}, last_mouse_y{0};
     double rot_pitch, rot_yaw;
     double rotation_scale = 0.2;
+    aplication_parameters(glm::vec3 &cam_pos) : camera_position(cam_pos) {}
   } my_user_pointer{camera_position};
+
   glfwSetWindowUserPointer(window, &my_user_pointer);
 
   glfwSetMouseButtonCallback(
