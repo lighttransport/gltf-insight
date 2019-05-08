@@ -86,13 +86,13 @@ static void mouseButtonCallback(int button, int state, float x, float y) {
     retturn
 #endif
 
-static int find_mesh_with_node_in_children(const tinygltf::Model &model,
+static int find_node_with_mesh_in_children(const tinygltf::Model &model,
                                            int root) {
   const auto &root_node = model.nodes[root];
   if (root_node.mesh >= 0) return root;
 
   for (auto child : root_node.children) {
-    const auto result = find_mesh_with_node_in_children(model, child);
+    const auto result = find_node_with_mesh_in_children(model, child);
     if (result > 0 && model.nodes[result].mesh >= 0) return result;
   }
 
@@ -104,7 +104,7 @@ static int find_main_mesh_node(const tinygltf::Model &model) {
       model.scenes[model.defaultScene >= 0 ? model.defaultScene : 0].nodes;
 
   for (auto node : node_list) {
-    const auto mesh_node = find_mesh_with_node_in_children(model, node);
+    const auto mesh_node = find_node_with_mesh_in_children(model, node);
     if (mesh_node >= 0) return mesh_node;
   }
 
