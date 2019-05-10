@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <unordered_map>
 #include <vector>
 
 // For OpenGL, we always include loader library first
@@ -1261,21 +1262,21 @@ layout (location = 5) in vec4 input_weights;
 uniform mat4 mvp;
 uniform mat3 normal;
 
-uniform mat4 joint_matrix[$nb_joints]; 
+uniform mat4 joint_matrix[$nb_joints];
 
 out vec3 interpolated_normal;
 out vec2 interpolated_uv;
 
 void main()
 {
-  mat4 skin_matrix = input_weights.x * joint_matrix[int(input_joints.x)] 
+  mat4 skin_matrix = input_weights.x * joint_matrix[int(input_joints.x)]
   + input_weights.y * joint_matrix[int(input_joints.y)]
   + input_weights.z * joint_matrix[int(input_joints.z)]
   + input_weights.w * joint_matrix[int(input_joints.w)];
 
   gl_Position = mvp * skin_matrix * vec4(input_position, 1.0);
   //gl_Position = mvp * vec4(input_position, 1.0);//<-- uncoment for no skining
- 
+
   interpolated_normal = normal * input_normal;
   interpolated_uv = input_uv;
 }
@@ -1323,94 +1324,14 @@ void main()
 }
 )glsl";
 
-  std::map<std::string, shader> shaders;
-  shaders["textured"] = std::move(shader("textured", vertex_shader_source,
-                                         fragment_shader_source_textured));
-
-  GLint vertex_shader, fragment_shader_textured, fragment_shader_debug_color,
-      program_textured, program_debug_color;
-  vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  fragment_shader_textured = glCreateShader(GL_FRAGMENT_SHADER);
-  fragment_shader_debug_color = glCreateShader(GL_FRAGMENT_SHADER);
-  program_textured = glCreateProgram();
-  program_debug_color = glCreateProgram();
-
-  glShaderSource(vertex_shader, 1,
-                 static_cast<const GLchar *const *>(&vertex_shader_source),
-                 nullptr);
-  glShaderSource(
-      fragment_shader_textured, 1,
-      static_cast<const GLchar *const *>(&fragment_shader_source_textured),
-      nullptr);
-
-  glShaderSource(fragment_shader_debug_color, 1,
-                 static_cast<const GLchar *const *>(
-                     &fragment_shader_source_draw_debug_color),
-                 nullptr);
-
-  glCompileShader(vertex_shader);
-  glCompileShader(fragment_shader_textured);
-  glCompileShader(fragment_shader_debug_color);
-
-  // check shader compilation
-  GLint success = 0;
-  GLchar info_log[512];
-
-  glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
-  if (!success) {
-    glGetShaderInfoLog(vertex_shader, sizeof info_log, nullptr, info_log);
-    std::cerr << info_log << '\n';
-    return EXIT_FAILURE;
-  }
-  glGetShaderiv(fragment_shader_textured, GL_COMPILE_STATUS, &success);
-  if (!success) {
-    glGetShaderInfoLog(fragment_shader_textured, sizeof info_log, nullptr,
-                       info_log);
-    std::cerr << info_log << '\n';
-    return EXIT_FAILURE;
-  }
-
-  glGetShaderiv(fragment_shader_debug_color, GL_COMPILE_STATUS, &success);
-  if (!success) {
-    glGetShaderInfoLog(fragment_shader_textured, sizeof info_log, nullptr,
-                       info_log);
-    std::cerr << info_log << '\n';
-    return EXIT_FAILURE;
-  }
-
-  glAttachShader(program_textured, vertex_shader);
-  glAttachShader(program_textured, fragment_shader_textured);
-  glLinkProgram(program_textured);
-
-  glAttachShader(program_debug_color, vertex_shader);
-  glAttachShader(program_debug_color, fragment_shader_debug_color);
-  glLinkProgram(program_debug_color);
-
-  glGetProgramiv(program_textured, GL_LINK_STATUS, &success);
-  if (!success) {
-    glGetProgramInfoLog(program_textured, sizeof(info_log), nullptr, info_log);
-    std::cerr << info_log << '\n';
-    return EXIT_FAILURE;
-  }
-  glGetProgramiv(program_debug_color, GL_LINK_STATUS, &success);
-  if (!success) {
-    glGetProgramInfoLog(program_debug_color, sizeof(info_log), nullptr,
-                        info_log);
-    std::cerr << info_log << '\n';
-    return EXIT_FAILURE;
-  }
+  std::unordered_map<std::string, shader> shaders;
+  shaders["textured"] =
+      shader("textured", vertex_shader_source, fragment_shader_source_textured);
+  shaders["debug_color"] = shader("debug_color", vertex_shader_source,
+                                  fragment_shader_source_draw_debug_color);
 
   // Main loop
   while (!glfwWindowShouldClose(window)) {
-    // Poll and handle events (inputs, window resize, etc.)
-    // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to
-    // tell if dear imgui wants to use your inputs.
-    // - When io.WantCaptureMouse is true, do not dispatch mouse input data to
-    // your main application.
-    // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input
-    // data to your main application. Generally you may always pass all inputs
-    // to dear imgui, and hide them from your application based on those two
-    // flags.
     glfwPollEvents();
 
     ImGui_ImplOpenGL2_NewFrame();
@@ -1549,15 +1470,10 @@ void main()
       glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
       glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
 
-      glUseProgram(program_textured);
-
-      glUniformMatrix4fv(glGetUniformLocation(program_textured, "joint_matrix"),
-                         GLsizei(nb_joints), GL_FALSE,
-                         (GLfloat *)joint_matrices.data());
-      glUniformMatrix4fv(glGetUniformLocation(program_textured, "mvp"), 1,
-                         GL_FALSE, glm::value_ptr(mvp));
-      glUniformMatrix3fv(glGetUniformLocation(program_textured, "normal"), 1,
-                         GL_FALSE, glm::value_ptr(normal));
+      shaders["textured"].use();
+      shaders["textured"].set_uniform("joint_matrix", joint_matrices);
+      shaders["textured"].set_uniform("mvp", mvp);
+      shaders["textured"].set_uniform("normal", normal);
 
       for (const auto &draw_call_to_perform : draw_call_descriptor) {
         glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
@@ -1578,8 +1494,8 @@ void main()
       }
       ImGui::End();
 
-      draw_bones(mesh_node_subgraph, program_debug_color, view_matrix,
-                 projection_matrix);
+      draw_bones(mesh_node_subgraph, shaders["debug_color"].get_program(),
+                 view_matrix, projection_matrix);
 
       glUseProgram(0);  // You may want this if using this code in an
       // OpenGL 3+ context where shaders may be bound, but prefer using the

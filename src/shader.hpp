@@ -30,7 +30,7 @@ class shader {
     // TODO cleanup here
   }
 
-  shader(){}
+  shader() {}
   shader(const char* shader_name, const char* vertex_shader_source_code,
          const char* fragment_shader_source_code)
       : shader_name_(shader_name) {
@@ -86,13 +86,24 @@ class shader {
   const char* get_name() const { return shader_name_.c_str(); }
 
   void set_uniform(const char* name, const glm::vec4& v) const {
-    use();
     glUniform4f(glGetUniformLocation(program_, name), v.x, v.y, v.z, v.w);
   }
 
-  void set_uniform(const char* name, const glm::mat4& m) {
-    use();
+  void set_uniform(const char* name, const glm::mat4& m) const {
     glUniformMatrix4fv(glGetUniformLocation(program_, name), 1, GL_FALSE,
                        glm::value_ptr(m));
   }
+
+  void set_uniform(const char* name, const glm::mat3& m) const {
+    glUniformMatrix3fv(glGetUniformLocation(program_, name), 1, GL_FALSE,
+                       glm::value_ptr(m));
+  }
+
+  void set_uniform(const char* name,
+                   const std::vector<glm::mat4>& matrices) const {
+    glUniformMatrix4fv(glGetUniformLocation(program_, name), matrices.size(),
+                       GL_FALSE, glm::value_ptr(matrices[0]));
+  }
+
+  GLuint get_program() const { return program_; }
 };
