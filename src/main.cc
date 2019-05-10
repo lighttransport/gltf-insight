@@ -1,7 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
-#include <unordered_map>
+#include <map>
 #include <vector>
 
 // For OpenGL, we always include loader library first
@@ -1324,11 +1324,42 @@ void main()
 }
 )glsl";
 
-  std::unordered_map<std::string, shader> shaders;
+  const char *fragment_shader_source_uv = R"glsl(
+#version 330
+
+out vec4 output_color;
+
+in vec2 interpolated_uv;
+
+void main()
+{
+  output_color = vec4(interpolated_uv, 0, 1);
+}
+)glsl";
+
+  const char *fragment_shader_source_normals = R"glsl(
+#version 330
+
+in vec3 interpolated_normal;
+
+out vec4 output_color;
+
+void main()
+{
+  output_color = vec4(interpolated_normal, 1);
+}
+
+)glsl";
+
+  std::map<std::string, shader> shaders;
   shaders["textured"] =
       shader("textured", vertex_shader_source, fragment_shader_source_textured);
   shaders["debug_color"] = shader("debug_color", vertex_shader_source,
                                   fragment_shader_source_draw_debug_color);
+  shaders["debug_uv"] =
+      shader("debug_uv", vertex_shader_source, fragment_shader_source_uv);
+  shaders["debug_normals"] = shader("debug_normals", vertex_shader_source,
+                                    fragment_shader_source_normals);
 
   // Main loop
   while (!glfwWindowShouldClose(window)) {
@@ -1338,6 +1369,7 @@ void main()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGuizmo::BeginFrame();
+    std::string shader_to_use;
 
     {
       ImGui::Begin("Hello, world!");  // Create a window called "Hello,
@@ -1353,6 +1385,23 @@ void main()
       // glm::value_ptr(camera_position),
       //                    -10, 10);
 
+      ImGui::End();
+
+      ImGui::Begin("Shader mode");
+      std::vector<std::string> selections;
+      static int selected_shader = 0;
+      static bool first = true;
+      int i = 0;
+      for (const auto &shader : shaders) {
+        selections.push_back(shader.first);
+        if (first && shader.first == "textured") {
+          selected_shader = i;
+          first = false;
+        }
+        ++i;
+      }
+      ImGuiCombo("Choose shader", &selected_shader, selections);
+      shader_to_use = selections[selected_shader];
       ImGui::End();
     }
 
@@ -1470,10 +1519,11 @@ void main()
       glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
       glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
 
-      shaders["textured"].use();
-      shaders["textured"].set_uniform("joint_matrix", joint_matrices);
-      shaders["textured"].set_uniform("mvp", mvp);
-      shaders["textured"].set_uniform("normal", normal);
+      shaders[shader_to_use].use();
+      shaders[shader_to_use].set_uniform("joint_matrix", joint_matrices);
+      shaders[shader_to_use].set_uniform("mvp", mvp);
+      shaders[shader_to_use].set_uniform("normal", normal);
+      shaders[shader_to_use].set_uniform("debug_color", glm::vec4(0.5f,0.5f,0.f,1.f));
 
       for (const auto &draw_call_to_perform : draw_call_descriptor) {
         glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
@@ -1500,8 +1550,6 @@ void main()
       glUseProgram(0);  // You may want this if using this code in an
       // OpenGL 3+ context where shaders may be bound, but prefer using the
       // GL3+ code.
-
-      // TODO render overlays on top of the meshes (bones...)
 
       ImGui::Render();
       ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
