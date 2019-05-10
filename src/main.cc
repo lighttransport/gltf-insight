@@ -1,4 +1,3 @@
-
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -38,6 +37,8 @@
 #include "gltf-graph.hh"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
+
+#include "shader.hpp"
 
 static bool ImGuiCombo(const char *label, int *current_item,
                        const std::vector<std::string> &items) {
@@ -1016,7 +1017,7 @@ int main(int argc, char **argv) {
                  byte_size_of_component * 3);
           for (size_t j = 0; j < 3; ++j) {
             normals[submesh][i * 3 + j] = float(temp[j]);  // downcast to
-                                                           // float
+            // float
           }
         } else if (byte_size_of_component == sizeof(float)) {
           memcpy(&normals[submesh][i * 3],
@@ -1051,7 +1052,7 @@ int main(int argc, char **argv) {
                  byte_size_of_component * 2);
           for (size_t j = 0; j < 2; ++j) {
             texture_coord[submesh][i * 2 + j] = float(temp[j]);  // downcast
-                                                                 // to float
+            // to float
           }
         } else if (byte_size_of_component == sizeof(float)) {
           memcpy(&texture_coord[submesh][i * 2],
@@ -1273,7 +1274,7 @@ void main()
   + input_weights.w * joint_matrix[int(input_joints.w)];
 
   gl_Position = mvp * skin_matrix * vec4(input_position, 1.0);
-  gl_Position = mvp * vec4(input_position, 1.0);//<-- uncoment for no skining
+  //gl_Position = mvp * vec4(input_position, 1.0);//<-- uncoment for no skining
  
   interpolated_normal = normal * input_normal;
   interpolated_uv = input_uv;
@@ -1321,6 +1322,10 @@ void main()
   output_color = debug_color;
 }
 )glsl";
+
+  std::map<std::string, shader> shaders;
+  shaders["textured"] = std::move(shader("textured", vertex_shader_source,
+                                         fragment_shader_source_textured));
 
   GLint vertex_shader, fragment_shader_textured, fragment_shader_debug_color,
       program_textured, program_debug_color;
@@ -1415,10 +1420,10 @@ void main()
 
     {
       ImGui::Begin("Hello, world!");  // Create a window called "Hello,
-                                      // world!" and append into it.
+      // world!" and append into it.
 
       ImGui::Text("This is some useful text.");  // Display some text (you can
-                                                 // use a format strings too)
+      // use a format strings too)
 
       ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
       if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
