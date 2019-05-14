@@ -398,11 +398,13 @@ static void animation_window(const tinygltf::Model &model) {
   ImGui::End();
 }
 
-void skining_data_window(const std::vector<float> &weights,
-                         const std::vector<unsigned short> &joints) {
+void skinning_data_window(size_t submesh_id, const std::vector<float> &weights,
+                          const std::vector<unsigned short> &joints) {
   ImGui::Begin("Skining data", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+  ImGui::Text("Submesh[%d]", submesh_id);
   ImGui::BeginChild("##scrollable_data_region", ImVec2(600, 800), false,
-                    ImGuiWindowFlags_AlwaysVerticalScrollbar);
+                    ImGuiWindowFlags_AlwaysVerticalScrollbar),
+      submesh_id;
   const auto vertex_count = weights.size() / 4;
   assert(vertex_count == joints.size() / 4);
 
@@ -560,13 +562,10 @@ void asset_images_window(const std::vector<GLuint> &textures) {
 // as a node index as "skeleton". You need to pass that "skeleton" integer to
 // this function as skeleton_index. This returns a flat array of the bones to be
 // used by the skinning code
-void populate_gltf_skeleton_subgraph(
-    const tinygltf::Model &model, gltf_node &graph_root, int skeleton_index,
-    const std::vector<glm::mat4> &inverse_bind_matrices,
-    const std::map<int, int> &joint_ibm_assignements) {
+void populate_gltf_skeleton_subgraph(const tinygltf::Model &model,
+                                     gltf_node &graph_root,
+                                     int skeleton_index) {
   const auto &skeleton_node = model.nodes[skeleton_index];
-  const auto &inverse_bind_matrix =
-      inverse_bind_matrices[joint_ibm_assignements.at(skeleton_index)];
 
   glm::mat4 xform(1.f);
   glm::vec3 translation(0.f), scale(1.f, 1.f, 1.f);
@@ -616,13 +615,12 @@ void populate_gltf_skeleton_subgraph(
 
   xform = xform * reconnstructed_matrix;
 
-  graph_root.add_child_bone(inverse_bind_matrix, xform);
+  graph_root.add_child_bone(xform);
   auto &new_bone = *graph_root.children.back().get();
   new_bone.gltf_model_node_index = skeleton_index;
 
   for (int child : skeleton_node.children) {
-    populate_gltf_skeleton_subgraph(
-        model, new_bone, child, inverse_bind_matrices, joint_ibm_assignements);
+    populate_gltf_skeleton_subgraph(model, new_bone, child);
   }
 }
 
@@ -728,6 +726,18 @@ void sort_bone_array(std::vector<gltf_node *> &bone_array,
         break;
       }
     }
+  }
+}
+
+void create_flat_bone_list(const tinygltf::Skin &skin,
+                           const std::vector<int>::size_type nb_joints,
+                           gltf_node mesh_skeleton_graph,
+                           std::vector<gltf_node *> flatened_bone_list) {
+  create_flat_bone_array(mesh_skeleton_graph, flatened_bone_list);
+  sort_bone_array(flatened_bone_list, skin);
+  for (int i = 0; i < nb_joints; ++i) {
+    std::cout << flatened_bone_list[i]->gltf_model_node_index
+              << " and should be " << skin.joints[i] << '\n';
   }
 }
 
@@ -880,26 +890,35 @@ int main(int argc, char **argv) {
 
   bool show_imgui_demo = false;
 
+  // We are bypassing the actual glTF scene here, we are interested in a file
+  // that only represent a character with animations. Find the scene node that
+  // has a mesh attached to it:
   const auto mesh_node_index = find_main_mesh_node(model);
   if (mesh_node_index < 0) {
     std::cerr << "The loaded gltf file doesn't have any findable mesh";
     return EXIT_SUCCESS;
   }
 
+  // Get access to the data
   const auto &mesh_node = model.nodes[mesh_node_index];
   const auto &mesh = model.meshes[mesh_node.mesh];
   const auto &skin = model.skins[mesh_node.skin];
   const auto skeleton = skin.skeleton;
   const auto &primitives = mesh.primitives;
+  // I tend to call a "primitive" here a submesh, not to confond with what
+  // OpenGL actually call a "primitive" (point, line, triangle, strip, fan...)
   const auto nb_submeshes = primitives.size();
 
   const auto nb_joints = skin.joints.size();
   std::vector<glm::mat4> joint_matrices(nb_joints);
 
+  // One : We need to know, for each joint, what is it's inverse bind matrix
   std::map<int, int> joint_inverse_bind_matrix_map;
   for (int i = 0; i < nb_joints; ++i)
     joint_inverse_bind_matrix_map[skin.joints[i]] = i;
 
+  // Two :  we need to get the inverse bind matrix array, as it is necessary for
+  // skinning
   const auto &inverse_bind_matrices_accessor =
       model.accessors[skin.inverseBindMatrices];
   assert(inverse_bind_matrices_accessor.type == TINYGLTF_TYPE_MAT4);
@@ -932,6 +951,12 @@ int main(int argc, char **argv) {
           inverse_bind_matrices_component_size * 16);
       inverse_bind_matrices[i] = glm::make_mat4(temp);
     }
+    // TODO actually, in the glTF spec supports using doubles.
+    // We are doing this here becuse in the tiny_gltf API, it's implied we could
+    // have stored doubles.
+    // This is unrelated with the fact that numbers in the JSON are read as
+    // doubles. Here we are talking about the format where the data is stored
+    // inside the binary buffers that comes with the glTF JSON part
     if (inverse_bind_matrices_component_size == sizeof(double)) {
       double temp[16], tempf[16];
       memcpy(
@@ -943,31 +968,39 @@ int main(int argc, char **argv) {
     }
   }
 
-  gltf_node mesh_node_subgraph(gltf_node::node_type::mesh);
-  populate_gltf_skeleton_subgraph(model, mesh_node_subgraph, skeleton,
-                                  inverse_bind_matrices,
-                                  joint_inverse_bind_matrix_map);
-  std::vector<gltf_node *> flatened_bone_list;
-  create_flat_bone_array(mesh_node_subgraph, flatened_bone_list);
-  sort_bone_array(flatened_bone_list, skin);
-  for (int i = 0; i < nb_joints; ++i) {
-    std::cout << flatened_bone_list[i]->gltf_model_node_index
-              << " and should be " << skin.joints[i] << '\n';
-  }
-  assert(flatened_bone_list.size() == nb_joints);
+  // Three : Load the skeleton graph. We need this to calculate the bones world
+  // transform
+  gltf_node mesh_skeleton_graph(gltf_node::node_type::mesh);
+  populate_gltf_skeleton_subgraph(model, mesh_skeleton_graph, skeleton);
 
+  // Four : Get an array thta is in the same order as the bones in the glTF to
+  // represent the whole skeletons. This is important for the joint matrix
+  // calculation
+  std::vector<gltf_node *> flat_bone_list;
+  create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_bone_list);
+  assert(flat_bone_list.size() == nb_joints);
+
+  // For each submesh, we need to know the draw operation, the VAO to bind, the
+  // textures to use and the element count. This array store all of these
   std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
+
+  // Create opengl objects
   std::vector<GLuint> VAOs(nb_submeshes);
+
+  // We have 5 vertex attributes per vertex and one element array buffer
   std::vector<GLuint[6]> VBOs(nb_submeshes);
   glGenVertexArrays(GLsizei(nb_submeshes), VAOs.data());
   for (auto &VBO : VBOs) {
     glGenBuffers(6, VBO);
   }
+
+  // CPU sise storage for all vertex attributes
   std::vector<std::vector<unsigned>> indices(nb_submeshes);
   std::vector<std::vector<float>> vertex_coord(nb_submeshes),
       texture_coord(nb_submeshes), normals(nb_submeshes), weights(nb_submeshes);
   std::vector<std::vector<unsigned short>> joints(nb_submeshes);
 
+  // For each submes of the mesh, load the data
   for (size_t submesh = 0; submesh < nb_submeshes; ++submesh) {
     const auto &primitive = primitives[submesh];
 
@@ -1213,7 +1246,7 @@ int main(int argc, char **argv) {
       // Layout "4" joints weights
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][4]);
       glBufferData(GL_ARRAY_BUFFER, weights[submesh].size() * sizeof(float),
-                   joints[submesh].data(), GL_STATIC_DRAW);
+                   weights[submesh].data(), GL_STATIC_DRAW);
       glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(4);
@@ -1237,7 +1270,7 @@ int main(int argc, char **argv) {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
   /*glm::mat4 model_matrix{1.f}*/
-  glm::mat4 &model_matrix = mesh_node_subgraph.local_xform;
+  glm::mat4 &model_matrix = mesh_skeleton_graph.local_xform;
   glm::mat4 view_matrix{1.f}, projection_matrix{1.f};
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 3.F};
@@ -1297,8 +1330,8 @@ int main(int argc, char **argv) {
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
 layout (location = 2) in vec2 input_uv;
-layout (location = 4) in vec4 input_joints;
-layout (location = 5) in vec4 input_weights;
+layout (location = 3) in vec4 input_joints;
+layout (location = 4) in vec4 input_weights;
 
 uniform mat4 mvp;
 uniform mat3 normal;
@@ -1307,6 +1340,7 @@ uniform mat4 joint_matrix[$nb_joints];
 
 out vec3 interpolated_normal;
 out vec2 interpolated_uv;
+out vec4 interpolated_weights;
 
 void main()
 {
@@ -1320,6 +1354,7 @@ void main()
 
   interpolated_normal = normal * input_normal;
   interpolated_uv = input_uv;
+  interpolated_weights = input_weights;
 }
 )glsl";
 
@@ -1329,8 +1364,8 @@ void main()
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
 layout (location = 2) in vec2 input_uv;
-layout (location = 4) in vec4 input_joints;
-layout (location = 5) in vec4 input_weights;
+layout (location = 3) in vec4 input_joints;
+layout (location = 4) in vec4 input_weights;
 
 uniform mat4 mvp;
 uniform mat3 normal;
@@ -1365,9 +1400,7 @@ void main()
 
 in vec2 interpolated_uv;
 in vec3 interpolated_normal;
-
 out vec4 output_color;
-
 uniform sampler2D diffuse_texture;
 
 void main()
@@ -1380,7 +1413,6 @@ void main()
 #version 330
 
 out vec4 output_color;
-
 uniform vec4 debug_color;
 
 void main()
@@ -1393,7 +1425,6 @@ void main()
 #version 330
 
 out vec4 output_color;
-
 in vec2 interpolated_uv;
 
 void main()
@@ -1406,12 +1437,25 @@ void main()
 #version 330
 
 in vec3 interpolated_normal;
-
 out vec4 output_color;
 
 void main()
 {
   output_color = vec4(interpolated_normal, 1);
+}
+
+)glsl";
+
+  const char *fragment_shader_weights = R"glsl(
+#version 330
+
+in vec4 interpolated_weights;
+
+out vec4 output_color;
+
+void main()
+{
+  output_color = interpolated_weights;
 }
 
 )glsl";
@@ -1425,6 +1469,11 @@ void main()
       shader("debug_uv", vertex_shader_source, fragment_shader_source_uv);
   shaders["debug_normals"] = shader("debug_normals", vertex_shader_source,
                                     fragment_shader_source_normals);
+  shaders["no_skinning_tex"] =
+      shader("no_skinning_tex", vertex_shader_no_skinnig,
+             fragment_shader_source_textured);
+  shaders["weights"] =
+      shader("weights", vertex_shader_source, fragment_shader_weights);
 
   // Main loop
   while (!glfwWindowShouldClose(window)) {
@@ -1474,8 +1523,8 @@ void main()
 
     model_info_window(model);
     animation_window(model);
-    for (int i = 0; i < nb_submeshes; ++i) {
-      skining_data_window(weights[i], joints[i]);
+    for (size_t i = 0; i < nb_submeshes; ++i) {
+      skinning_data_window(i, weights[i], joints[i]);
     }
 
     //    {
@@ -1573,14 +1622,15 @@ void main()
                            mCurrentGizmoOperation, mCurrentGizmoMode,
                            glm::value_ptr(model_matrix), NULL, NULL);
 
-      flatened_bone_list[2]->local_xform =
-          glm::rotate(flatened_bone_list[2]->local_xform, glm::radians(1.F),
+      const int bone = 5;
+      flat_bone_list[bone]->local_xform =
+          glm::rotate(flat_bone_list[bone]->local_xform, glm::radians(1.F),
                       glm::vec3(1.f, 0, 0));
-      update_subgraph_transform(mesh_node_subgraph);
 
+      update_subgraph_transform(mesh_skeleton_graph);
+      glm::mat4 inverse_model = glm::inverse(model_matrix);
       for (size_t i = 0; i < joint_matrices.size(); ++i) {
-        joint_matrices[i] = glm::inverse(model_matrix) *
-                            flatened_bone_list[i]->world_xform *
+        joint_matrices[i] = inverse_model * flat_bone_list[i]->world_xform *
                             inverse_bind_matrices[i];
       }
 
@@ -1619,7 +1669,7 @@ void main()
       ImGui::End();
 
       shaders["debug_color"].use();
-      draw_bones(mesh_node_subgraph, shaders["debug_color"].get_program(),
+      draw_bones(mesh_skeleton_graph, shaders["debug_color"].get_program(),
                  view_matrix, projection_matrix);
 
       glUseProgram(0);  // You may want this if using this code in an

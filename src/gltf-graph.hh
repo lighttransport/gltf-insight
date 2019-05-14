@@ -7,7 +7,7 @@
 struct gltf_node {
   enum class node_type { mesh, bone };
   const node_type type;
-  glm::mat4 local_xform, world_xform, inverse_bind_matrix;
+  glm::mat4 local_xform, world_xform;
   std::vector<std::unique_ptr<gltf_node>> children;
   int gltf_model_node_index;
   gltf_node* parent;
@@ -16,14 +16,12 @@ struct gltf_node {
       : type(t),
         local_xform(1.f),
         world_xform(1.f),
-        inverse_bind_matrix(1.f),
         gltf_model_node_index(-1),
         parent(p) {}
 
-  void add_child_bone(glm::mat4 inverse_bind_matrix, glm::mat4 local_xform) {
+  void add_child_bone(glm::mat4 local_xform) {
     gltf_node* child = new gltf_node(node_type::bone);
     child->local_xform = local_xform;
-    child->inverse_bind_matrix = (inverse_bind_matrix);
     child->parent = this;
     children.emplace_back(child);
   }
