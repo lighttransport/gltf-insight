@@ -1622,10 +1622,10 @@ void main()
                            mCurrentGizmoOperation, mCurrentGizmoMode,
                            glm::value_ptr(model_matrix), NULL, NULL);
 
-      const int bone = 5;
-      flat_bone_list[bone]->local_xform =
-          glm::rotate(flat_bone_list[bone]->local_xform, glm::radians(1.F),
-                      glm::vec3(1.f, 0, 0));
+      // This is for testing the actual skinning, but it will break with some
+      // glTFs const int bone = 5; flat_bone_list[bone]->local_xform =
+      //    glm::rotate(flat_bone_list[bone]->local_xform, glm::radians(1.F),
+      //                glm::vec3(1.f, 0, 0));
 
       update_subgraph_transform(mesh_skeleton_graph);
       glm::mat4 inverse_model = glm::inverse(model_matrix);
