@@ -399,6 +399,44 @@ static void animation_window(const tinygltf::Model &model) {
   ImGui::End();
 }
 
+void skining_data_window(const std::vector<float> &weights,
+                         const std::vector<unsigned short> &joints) {
+  ImGui::Begin("Skining data", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+  ImGui::BeginChild("##scrollable_data_region", ImVec2(600, 800), false,
+                    ImGuiWindowFlags_AlwaysVerticalScrollbar);
+  const auto vertex_count = weights.size() / 4;
+  assert(vertex_count == joints.size() / 4);
+
+  ImGui::Columns(5);
+  ImGui::Text("Vertex Index");
+  ImGui::NextColumn();
+  ImGui::Text("0");
+  ImGui::NextColumn();
+  ImGui::Text("1");
+  ImGui::NextColumn();
+  ImGui::Text("2");
+  ImGui::NextColumn();
+  ImGui::Text("3");
+  ImGui::NextColumn();
+  ImGui::Separator();
+  for (size_t i = 0; i < vertex_count; ++i) {
+    ImGui::Text("%d", i);
+    ImGui::NextColumn();
+    ImGui::Text("%f * %d", weights[i * 4], joints[i * 4]);
+    ImGui::NextColumn();
+    ImGui::Text("%f * %d", weights[i * 4 + 1], joints[i * 4 + 1]);
+    ImGui::NextColumn();
+    ImGui::Text("%f * %d", weights[i * 4 + 2], joints[i * 4 + 2]);
+    ImGui::NextColumn();
+    ImGui::Text("%f * %d", weights[i * 4 + 3], joints[i * 4 + 3]);
+    ImGui::NextColumn();
+    ImGui::Separator();
+  }
+  ImGui::Columns();
+  ImGui::EndChild();
+  ImGui::End();
+}
+
 static bool BuildAnimationSequencer(const tinygltf::Model &model,
                                     gltf_insight::AnimSequence *seq) {
   return true;
@@ -883,21 +921,21 @@ int main(int argc, char **argv) {
 
   for (size_t i = 0; i < nb_joints; ++i) {
     if (inverse_bind_matrices_component_size == sizeof(float)) {
-      memcpy(
-          glm::value_ptr(inverse_bind_matrices[i]),
-          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
-          inverse_bind_matrices_component_size * 16);
-    }
-    if (inverse_bind_matrices_component_size == sizeof(double)) {
-      double temp[16];
+      float temp[16];
       memcpy(
           temp,
           inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
           inverse_bind_matrices_component_size * 16);
-      for (int col = 0; col < 4; ++col)
-        for (int lin = 0; lin < 4; ++lin)
-          inverse_bind_matrices[i][col][lin] =
-              float(temp[i * lin + col]);  // downcast to float
+      inverse_bind_matrices[i] = glm::make_mat4(temp);
+    }
+    if (inverse_bind_matrices_component_size == sizeof(double)) {
+      double temp[16], tempf[16];
+      memcpy(
+          temp,
+          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
+          inverse_bind_matrices_component_size * 16);
+      for (int j = 0; j < 16; ++j) tempf[j] = float(temp[j]);
+      inverse_bind_matrices[i] = glm::make_mat4(tempf);
     }
   }
 
@@ -1147,6 +1185,7 @@ int main(int argc, char **argv) {
       glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(1);
+
       if (textures.size() > 0) {
         // Layout "2" = vertex UV
         glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][2]);
@@ -1157,7 +1196,6 @@ int main(int argc, char **argv) {
                               nullptr);
         glEnableVertexAttribArray(2);
       }
-      // TODO Weight data needs to be accesible from the shader
 
       // Layout "3" joints assignement vector
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][3]);
@@ -1249,7 +1287,6 @@ int main(int argc, char **argv) {
     param->last_mouse_y = mouse_y;
   });
 
-  // TODO shader loader class
   std::string vertex_shader_source_str = R"glsl(
 #version 330
 
@@ -1269,13 +1306,37 @@ out vec2 interpolated_uv;
 
 void main()
 {
-  mat4 skin_matrix = input_weights.x * joint_matrix[int(input_joints.x)]
+  mat4 skin_matrix =
+    input_weights.x * joint_matrix[int(input_joints.x)]
   + input_weights.y * joint_matrix[int(input_joints.y)]
   + input_weights.z * joint_matrix[int(input_joints.z)]
   + input_weights.w * joint_matrix[int(input_joints.w)];
 
   gl_Position = mvp * skin_matrix * vec4(input_position, 1.0);
-  //gl_Position = mvp * vec4(input_position, 1.0);//<-- uncoment for no skining
+
+  interpolated_normal = normal * input_normal;
+  interpolated_uv = input_uv;
+}
+)glsl";
+
+  const char *vertex_shader_no_skinnig = R"glsl(
+#version 330
+
+layout (location = 0) in vec3 input_position;
+layout (location = 1) in vec3 input_normal;
+layout (location = 2) in vec2 input_uv;
+layout (location = 4) in vec4 input_joints;
+layout (location = 5) in vec4 input_weights;
+
+uniform mat4 mvp;
+uniform mat3 normal;
+
+out vec3 interpolated_normal;
+out vec2 interpolated_uv;
+
+void main()
+{
+  gl_Position = mvp * vec4(input_position, 1.0);
 
   interpolated_normal = normal * input_normal;
   interpolated_uv = input_uv;
@@ -1354,7 +1415,7 @@ void main()
   std::map<std::string, shader> shaders;
   shaders["textured"] =
       shader("textured", vertex_shader_source, fragment_shader_source_textured);
-  shaders["debug_color"] = shader("debug_color", vertex_shader_source,
+  shaders["debug_color"] = shader("debug_color", vertex_shader_no_skinnig,
                                   fragment_shader_source_draw_debug_color);
   shaders["debug_uv"] =
       shader("debug_uv", vertex_shader_source, fragment_shader_source_uv);
@@ -1409,6 +1470,9 @@ void main()
 
     model_info_window(model);
     animation_window(model);
+    for (int i = 0; i < nb_submeshes; ++i) {
+      skining_data_window(weights[i], joints[i]);
+    }
 
     //    {
     //      // let's create the sequencer
@@ -1516,6 +1580,12 @@ void main()
                             inverse_bind_matrices[i];
       }
 
+      std::vector<float> joint_matrix_data(nb_joints * 16);
+      for (size_t i = 0; i < nb_joints; i++) {
+        memcpy(&joint_matrix_data[i * 16], glm::value_ptr(joint_matrices[i]),
+               16 * sizeof(float));
+      }
+
       glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
       glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
 
@@ -1523,7 +1593,8 @@ void main()
       shaders[shader_to_use].set_uniform("joint_matrix", joint_matrices);
       shaders[shader_to_use].set_uniform("mvp", mvp);
       shaders[shader_to_use].set_uniform("normal", normal);
-      shaders[shader_to_use].set_uniform("debug_color", glm::vec4(0.5f,0.5f,0.f,1.f));
+      shaders[shader_to_use].set_uniform("debug_color",
+                                         glm::vec4(0.5f, 0.5f, 0.f, 1.f));
 
       for (const auto &draw_call_to_perform : draw_call_descriptor) {
         glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
@@ -1533,7 +1604,6 @@ void main()
       }
 
       glBindVertexArray(0);
-
       glDisable(GL_DEPTH_TEST);
 
       if (ImGui::Begin("Skeleton drawing options")) {
@@ -1544,6 +1614,7 @@ void main()
       }
       ImGui::End();
 
+      shaders["debug_color"].use();
       draw_bones(mesh_node_subgraph, shaders["debug_color"].get_program(),
                  view_matrix, projection_matrix);
 

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 #include "glad/include/glad/glad.h"
 
 #include "glm/glm.hpp"
@@ -34,6 +35,7 @@ class shader {
   shader(const char* shader_name, const char* vertex_shader_source_code,
          const char* fragment_shader_source_code)
       : shader_name_(shader_name) {
+    std::cout << "Creating " << shader_name << "\n";
     // Create GL objects
     GLint vertex_shader, fragment_shader;
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
@@ -103,6 +105,11 @@ class shader {
                    const std::vector<glm::mat4>& matrices) const {
     glUniformMatrix4fv(glGetUniformLocation(program_, name), matrices.size(),
                        GL_FALSE, glm::value_ptr(matrices[0]));
+  }
+
+  void set_uniform(const char* name, size_t number_of_matrices, float* data) const {
+    glUniformMatrix4fv(glGetUniformLocation(program_, name), number_of_matrices,
+                       GL_FALSE, data);
   }
 
   GLuint get_program() const { return program_; }
