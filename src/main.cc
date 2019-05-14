@@ -36,10 +36,9 @@
 #include "glm/gtx/quaternion.hpp"
 #include "glm/matrix.hpp"
 #include "gltf-graph.hh"
+#include "shader.hpp"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
-
-#include "shader.hpp"
 
 static bool ImGuiCombo(const char *label, int *current_item,
                        const std::vector<std::string> &items) {
@@ -576,9 +575,14 @@ void populate_gltf_skeleton_subgraph(
   const auto &node_matrix = skeleton_node.matrix;
   if (node_matrix.size() == 16)  // 4x4 matrix
   {
-    for (size_t i = 0; i < 4; ++i)
-      for (size_t j = 0; j < 4; ++j)
-        xform[i][j] = float(node_matrix[4 * i + j]);
+    double tmp[16];
+    float tmpf[16];
+    memcpy(tmp, skeleton_node.matrix.data(), 16 * sizeof(double));
+    for (int i = 0; i < 16; ++i) {
+      tmpf[i] = float(tmp[i]);
+    }
+
+    xform = glm::make_mat4(tmpf);
   }
 
   const auto &node_translation = skeleton_node.translation;
