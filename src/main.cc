@@ -40,6 +40,8 @@
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
 
+#include "animation.hh"
+
 static bool ImGuiCombo(const char *label, int *current_item,
                        const std::vector<std::string> &items) {
   return ImGui::Combo(
@@ -919,6 +921,17 @@ int main(int argc, char **argv) {
       model.accessors[skin.inverseBindMatrices];
   assert(inverse_bind_matrices_accessor.type == TINYGLTF_TYPE_MAT4);
   assert(inverse_bind_matrices_accessor.count == nb_joints);
+
+  const auto nb_animations = model.animations.size();
+  std::vector<animation> animations(nb_animations);
+  for (int i = 0; i < nb_animations; ++i) {
+    // TODO load animation data
+    const auto& gltf_animation = model.animations[i];
+    animations[i].samplers.resize(gltf_animation.samplers.size());
+    animations[i].channels.resize(gltf_animation.channels.size());
+
+
+  }
 
   const auto &inverse_bind_matrices_bufferview =
       model.bufferViews[inverse_bind_matrices_accessor.bufferView];
