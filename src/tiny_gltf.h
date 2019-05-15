@@ -418,7 +418,6 @@ struct AnimationSampler {
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
   bool operator==(const AnimationSampler &) const;
-
 };
 
 struct Animation {
@@ -459,7 +458,7 @@ struct Sampler {
   Sampler()
       : wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
-        wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT){}
+        wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
   bool operator==(const Sampler &) const;
 };
 
@@ -539,10 +538,12 @@ struct Accessor {
                    // are not supported
   std::string name;
   size_t byteOffset = 0;
-  bool normalized = false;    // optinal.
-  int componentType = TINYGLTF_COMPONENT_TYPE_INVALID;  // (required) One of TINYGLTF_COMPONENT_TYPE_***
-  size_t count = 0;       // required
-  int type = TINYGLTF_TYPE_INVALID;           // (required) One of TINYGLTF_TYPE_***   ..
+  bool normalized = false;  // optinal.
+  int componentType =
+      TINYGLTF_COMPONENT_TYPE_INVALID;  // (required) One of
+                                        // TINYGLTF_COMPONENT_TYPE_***
+  size_t count = 0;                     // required
+  int type = TINYGLTF_TYPE_INVALID;  // (required) One of TINYGLTF_TYPE_***   ..
   Value extras;
 
   std::vector<double> minValues;  // optional
@@ -590,7 +591,6 @@ struct Accessor {
   Accessor() { bufferView = -1; }
   bool operator==(const tinygltf::Accessor &) const;
 };
-
 
 struct PerspectiveCamera {
   double aspectRatio;  // min > 0
@@ -646,7 +646,7 @@ struct Primitive {
                  // when rendering.
   int indices;   // The index of the accessor that contains the indices.
   int mode;      // one of TINYGLTF_MODE_***
-  std::vector<std::map<std::string, int> > targets;  // array of morph targets,
+  std::vector<std::map<std::string, int>> targets;  // array of morph targets,
   // where each target is a dict with attribues in ["POSITION, "NORMAL",
   // "TANGENT"] pointing
   // to their corresponding accessors
@@ -663,7 +663,7 @@ struct Mesh {
   std::string name;
   std::vector<Primitive> primitives;
   std::vector<double> weights;  // weights to be applied to the Morph Targets
-  std::vector<std::map<std::string, int> > targets;
+  std::vector<std::map<std::string, int>> targets;
   ExtensionMap extensions;
   Value extras;
 
@@ -784,8 +784,9 @@ class Model {
 /// Returns nullptr for invalid parameter or invalid data.
 /// Assume `buffer` parameter = model.buffers[bufferViewObject.buffer]
 ///
-const uint8_t *GetBufferAddress(const int i, const Accessor &accessor, const BufferView &bufferViewObject, const Buffer &buffer);
-
+const uint8_t *GetBufferAddress(const int i, const Accessor &accessor,
+                                const BufferView &bufferViewObject,
+                                const Buffer &buffer);
 
 enum SectionCheck {
   NO_REQUIRE = 0x00,
@@ -935,10 +936,8 @@ class TinyGLTF {
   /// Write glTF to file.
   ///
   bool WriteGltfSceneToFile(Model *model, const std::string &filename,
-                            bool embedImages,
-                            bool embedBuffers,
-                            bool prettyPrint,
-                            bool writeBinary);
+                            bool embedImages, bool embedBuffers,
+                            bool prettyPrint, bool writeBinary);
 
   ///
   /// Set callback to use for loading image data
@@ -1135,8 +1134,8 @@ static bool Equals(const tinygltf::Value &one, const tinygltf::Value &other) {
     case STRING_TYPE:
       return one.Get<std::string>() == other.Get<std::string>();
     case BINARY_TYPE:
-      return one.Get<std::vector<unsigned char> >() ==
-             other.Get<std::vector<unsigned char> >();
+      return one.Get<std::vector<unsigned char>>() ==
+             other.Get<std::vector<unsigned char>>();
     default: {
       // unhandled type
       return false;
@@ -2020,8 +2019,9 @@ bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
   return true;
 }
 
-const uint8_t *GetBufferAddress(const int i, const Accessor &accessor, const BufferView &bufferViewObject, const Buffer &buffer) {
-
+const uint8_t *GetBufferAddress(const int i, const Accessor &accessor,
+                                const BufferView &bufferViewObject,
+                                const Buffer &buffer) {
   if (i >= int(accessor.count)) return nullptr;
 
   int byte_stride = accessor.ByteStride(bufferViewObject);
@@ -2030,7 +2030,8 @@ const uint8_t *GetBufferAddress(const int i, const Accessor &accessor, const Buf
   }
 
   // TODO(syoyo): Bounds check.
-  const uint8_t *base_addr = buffer.data.data() + bufferViewObject.byteOffset + accessor.byteOffset;
+  const uint8_t *base_addr =
+      buffer.data.data() + bufferViewObject.byteOffset + accessor.byteOffset;
   const uint8_t *addr = base_addr + i * byte_stride;
   return addr;
 }
@@ -2375,12 +2376,13 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
   json::const_iterator extIt = it.value().begin();
   for (; extIt != it.value().end(); extIt++) {
     if (!extIt.value().is_object()) continue;
-	if (!ParseJsonAsValue(&extensions[extIt.key()], extIt.value())) {
+    if (!ParseJsonAsValue(&extensions[extIt.key()], extIt.value())) {
       if (!extIt.key().empty()) {
-        // create empty object so that an extension object is still of type object
-        extensions[extIt.key()] = Value{ Value::Object{} };
+        // create empty object so that an extension object is still of type
+        // object
+        extensions[extIt.key()] = Value{Value::Object{}};
       }
-	}
+    }
   }
   if (ret) {
     (*ret) = extensions;
@@ -3509,22 +3511,24 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   // Assign missing bufferView target types
   // - Look for missing Mesh indices
   // - Look for missing bufferView targets
-  for (auto &mesh : model->meshes)
-  {
-    for (auto &primitive : mesh.primitives)
-    {
-      if (primitive.indices > -1) // has indices from parsing step, must be Element Array Buffer
+  for (auto &mesh : model->meshes) {
+    for (auto &primitive : mesh.primitives) {
+      if (primitive.indices >
+          -1)  // has indices from parsing step, must be Element Array Buffer
       {
-        model->bufferViews[size_t(model->accessors[size_t(primitive.indices)].bufferView)]
+        model
+            ->bufferViews[size_t(
+                model->accessors[size_t(primitive.indices)].bufferView)]
             .target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
-        // we could optionally check if acessors' bufferView type is Scalar, as it should be
+        // we could optionally check if acessors' bufferView type is Scalar, as
+        // it should be
       }
     }
   }
-  // find any missing targets, must be an array buffer type if not fulfilled from previous check
-  for (auto &bufferView : model->bufferViews)
-  {
-    if (bufferView.target == 0) // missing target type
+  // find any missing targets, must be an array buffer type if not fulfilled
+  // from previous check
+  for (auto &bufferView : model->bufferViews) {
+    if (bufferView.target == 0)  // missing target type
     {
       bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
     }
@@ -4131,7 +4135,7 @@ static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
 static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
                                     const std::string &binFilename) {
   std::ofstream output(binFilename.c_str(), std::ofstream::binary);
-  if(!output.is_open()) return false;
+  if (!output.is_open()) return false;
   output.write(reinterpret_cast<const char *>(&data[0]),
                std::streamsize(data.size()));
   output.close();
@@ -4180,9 +4184,10 @@ static void SerializeExtensionMap(ExtensionMap &extensions, json &o) {
     if (ValueToJson(extIt->second, &ret)) {
       extMap[extIt->first] = ret;
     }
-    if(ret.is_null()) {
-      if (!(extIt->first.empty())) { // name should not be empty, but for sure
-        // create empty object so that an extension name is still included in json.
+    if (ret.is_null()) {
+      if (!(extIt->first.empty())) {  // name should not be empty, but for sure
+        // create empty object so that an extension name is still included in
+        // json.
         extMap[extIt->first] = json({});
       }
     }
@@ -4313,7 +4318,7 @@ static void SerializeGltfBuffer(Buffer &buffer, json &o) {
 static bool SerializeGltfBuffer(Buffer &buffer, json &o,
                                 const std::string &binFilename,
                                 const std::string &binBaseFilename) {
-  if(!SerializeGltfBufferData(buffer.data, binFilename)) return false;
+  if (!SerializeGltfBufferData(buffer.data, binFilename)) return false;
   SerializeNumberProperty("byteLength", buffer.data.size(), o);
   SerializeStringProperty("uri", binBaseFilename, o);
 
@@ -4601,9 +4606,10 @@ static void WriteBinaryGltfFile(const std::string &output,
   const int version = 2;
   const int padding_size = content.size() % 4;
 
-  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info, padding
+  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info,
+  // padding
   const int length = 12 + 8 + int(content.size()) + padding_size;
-  
+
   gltfFile.write(header.c_str(), std::streamsize(header.size()));
   gltfFile.write(reinterpret_cast<const char *>(&version), sizeof(version));
   gltfFile.write(reinterpret_cast<const char *>(&length), sizeof(length));
@@ -4611,8 +4617,10 @@ static void WriteBinaryGltfFile(const std::string &output,
   // JSON chunk info, then JSON data
   const int model_length = int(content.size()) + padding_size;
   const int model_format = 0x4E4F534A;
-  gltfFile.write(reinterpret_cast<const char *>(&model_length), sizeof(model_length));
-  gltfFile.write(reinterpret_cast<const char *>(&model_format), sizeof(model_format));
+  gltfFile.write(reinterpret_cast<const char *>(&model_length),
+                 sizeof(model_length));
+  gltfFile.write(reinterpret_cast<const char *>(&model_format),
+                 sizeof(model_format));
   gltfFile.write(content.c_str(), std::streamsize(content.size()));
 
   // Chunk must be multiplies of 4, so pad with spaces
@@ -4658,7 +4666,8 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
 
   std::string defaultBinFilename = GetBaseFilename(filename);
   std::string defaultBinFileExt = ".bin";
-  std::string::size_type pos = defaultBinFilename.rfind('.', defaultBinFilename.length());
+  std::string::size_type pos =
+      defaultBinFilename.rfind('.', defaultBinFilename.length());
 
   if (pos != std::string::npos) {
     defaultBinFilename = defaultBinFilename.substr(0, pos);
@@ -4678,28 +4687,27 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     } else {
       std::string binSavePath;
       std::string binUri;
-      if (!model->buffers[i].uri.empty()
-        && !IsDataURI(model->buffers[i].uri)) {
+      if (!model->buffers[i].uri.empty() && !IsDataURI(model->buffers[i].uri)) {
         binUri = model->buffers[i].uri;
-      }
-      else {
+      } else {
         binUri = defaultBinFilename + defaultBinFileExt;
         bool inUse = true;
         int numUsed = 0;
-        while(inUse) {
+        while (inUse) {
           inUse = false;
-          for (const std::string& usedName : usedUris) {
+          for (const std::string &usedName : usedUris) {
             if (binUri.compare(usedName) != 0) continue;
             inUse = true;
-            binUri = defaultBinFilename + std::to_string(numUsed++) + defaultBinFileExt;
+            binUri = defaultBinFilename + std::to_string(numUsed++) +
+                     defaultBinFileExt;
             break;
           }
         }
       }
       usedUris.push_back(binUri);
-	  binSavePath = JoinPath(baseDir, binUri);
-      if(!SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
-                          binUri)) {
+      binSavePath = JoinPath(baseDir, binUri);
+      if (!SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
+                               binUri)) {
         return false;
       }
     }

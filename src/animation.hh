@@ -1,12 +1,11 @@
 #pragma once
 
-#include <utility>
-#include <vector>
-
+#include <cstring>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-
-#include <cstring>
+#include <string>
+#include <utility>
+#include <vector>
 
 struct animation {
   struct channel {
@@ -18,22 +17,34 @@ struct animation {
         float weight;
       } motion;
 
-      enum class path : uint8_t { not_assigned, translation, scale, rotation, weight };
-      path mode;
-      int target;
-
       keyframe_content() { std::memset(this, 0, sizeof(keyframe_content)); }
     };
 
+    enum class path : uint8_t {
+      not_assigned,
+      translation,
+      scale,
+      rotation,
+      weight
+    };
+
     std::vector<std::pair<int, keyframe_content>> keyframes;
+    int sampler_index;
+    int target_node;
+    path mode;
   };
 
   struct sampler {
-    enum class interpolation : uint8_t { not_assigned, step, linear, cubic_spline };
+    enum class interpolation : uint8_t {
+      not_assigned,
+      step,
+      linear,
+      cubic_spline
+    };
     std::vector<std::pair<int, float>> keyframes;
-    int input, output;
     interpolation mode;
-    sampler() : input(0), output(0), mode(interpolation::not_assigned) {}
+    float min_v, max_v;
+    sampler() : mode(interpolation::not_assigned), min_v(0), max_v(0) {}
   };
 
   std::vector<channel> channels;
@@ -43,6 +54,8 @@ struct animation {
   float min_time, max_time;
 
   bool playing;
+
+  std::string name;
 
   void add_time(float delta) {
     current_time += delta;
@@ -54,5 +67,13 @@ struct animation {
     }
   }
 
-  animation() : current_time(0), min_time(0), max_time(0), playing(false) {}
+  void compute_time_boundaries() {
+    for (const auto& sampler : samplers) {
+      min_time = std::min(min_time, sampler.min_v);
+      max_time = std::max(max_time, sampler.max_v);
+    }
+  }
+
+  animation()
+      : current_time(0), min_time(0), max_time(0), playing(false), name() {}
 };

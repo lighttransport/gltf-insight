@@ -29,6 +29,7 @@
 #pragma clang diagnostic pop
 #endif
 
+#include "animation.hh"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/quaternion.hpp"
@@ -39,8 +40,6 @@
 #include "shader.hpp"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
-
-#include "animation.hh"
 
 static bool ImGuiCombo(const char *label, int *current_item,
                        const std::vector<std::string> &items) {
@@ -926,11 +925,142 @@ int main(int argc, char **argv) {
   std::vector<animation> animations(nb_animations);
   for (int i = 0; i < nb_animations; ++i) {
     // TODO load animation data
-    const auto& gltf_animation = model.animations[i];
+    const auto &gltf_animation = model.animations[i];
+
+    animations[i].name = !gltf_animation.name.empty()
+                             ? gltf_animation.name
+                             : "animation_" + std::to_string(i);
+
     animations[i].samplers.resize(gltf_animation.samplers.size());
+
+    for (int sampler_index = 0; sampler_index < animations[i].samplers.size();
+         ++sampler_index) {
+      animations[i].samplers[sampler_index].mode = [&] {
+        if (gltf_animation.samplers[sampler_index].interpolation == "LINEAR")
+          return animation::sampler::interpolation::linear;
+        if (gltf_animation.samplers[sampler_index].interpolation == "STEP")
+          return animation::sampler::interpolation::step;
+        if (gltf_animation.samplers[sampler_index].interpolation ==
+            "CUBICSPLINE")
+          return animation::sampler::interpolation::cubic_spline;
+        return animation::sampler::interpolation::not_assigned;
+      }();
+
+      float min_v, max_v;
+      tinygltf::util::GetAnimationSamplerInputMinMax(
+          gltf_animation.samplers[sampler_index], model, &min_v, &max_v);
+      animations[i].samplers[sampler_index].min_v = min_v;
+      animations[i].samplers[sampler_index].max_v = max_v;
+
+      const auto nb_frames = tinygltf::util::GetAnimationSamplerInputCount(
+          gltf_animation.samplers[sampler_index], model);
+      animations[i].samplers[sampler_index].keyframes.resize(nb_frames);
+
+      float value = 0;
+      for (int keyframe = 0; keyframe < nb_frames; ++keyframe) {
+        tinygltf::util::DecodeScalarAnimationValue(
+            size_t(keyframe),
+            model.accessors[gltf_animation.samplers[sampler_index].input],
+            model, &value);
+        animations[i].samplers[sampler_index].keyframes[keyframe] =
+            std::make_pair(keyframe, value);
+      }
+    }
+
     animations[i].channels.resize(gltf_animation.channels.size());
+    for (int channel_index = 0; channel_index < animations[i].channels.size();
+         ++channel_index) {
+      animations[i].channels[channel_index].target_node =
+          gltf_animation.channels[channel_index].target_node;
 
+      animations[i].channels[channel_index].sampler_index =
+          gltf_animation.channels[channel_index].sampler;
 
+      const auto &sampler =
+          gltf_animation
+              .samplers[gltf_animation.channels[channel_index].sampler];
+
+      const auto nb_frames =
+          tinygltf::util::GetAnimationSamplerOutputCount(sampler, model);
+      animations[i].channels[channel_index].keyframes.resize(nb_frames);
+      const auto &accessor = model.accessors[sampler.output];
+
+      if (gltf_animation.channels[channel_index].target_path == "weights") {
+        animations[i].channels[channel_index].mode =
+            animation::channel::path::weight;
+
+        float value;
+
+        for (int frame = 0; frame < nb_frames; ++frame) {
+          tinygltf::util::DecodeScalarAnimationValue(size_t(frame), accessor,
+                                                     model, &value);
+          animations[i].channels[channel_index].keyframes[frame].first = frame;
+          animations[i]
+              .channels[channel_index]
+              .keyframes[frame]
+              .second.motion.weight = value;
+        }
+      }
+
+      if (gltf_animation.channels[channel_index].target_path == "translation") {
+        animations[i].channels[channel_index].mode =
+            animation::channel::path::translation;
+
+        float xyz[3];
+
+        for (int frame = 0; frame < nb_frames; ++frame) {
+          tinygltf::util::DecodeTranslationAnimationValue(size_t(frame),
+                                                          accessor, model, xyz);
+          animations[i].channels[channel_index].keyframes[frame].first = frame;
+          animations[i]
+              .channels[channel_index]
+              .keyframes[frame]
+              .second.motion.translation = glm::make_vec3(xyz);
+        }
+      }
+
+      if (gltf_animation.channels[channel_index].target_path == "rotation") {
+        animations[i].channels[channel_index].mode =
+            animation::channel::path::rotation;
+
+        float xyzw[4];
+
+        for (int frame = 0; frame < nb_frames; ++frame) {
+          tinygltf::util::DecodeScaleAnimationValue(size_t(frame), accessor,
+                                                    model, xyzw);
+
+          glm::quat q;
+          q.w = xyzw[3];
+          q.x = xyzw[0];
+          q.y = xyzw[1];
+          q.z = xyzw[2];
+
+          animations[i].channels[channel_index].keyframes[frame].first = frame;
+          animations[i]
+              .channels[channel_index]
+              .keyframes[frame]
+              .second.motion.rotation = glm::normalize(q);
+        }
+      }
+
+      if (gltf_animation.channels[channel_index].target_path == "scale") {
+        animations[i].channels[channel_index].mode =
+            animation::channel::path::scale;
+        float xyz[3];
+
+        for (int frame = 0; frame < nb_frames; ++frame) {
+          tinygltf::util::DecodeScaleAnimationValue(size_t(frame), accessor,
+                                                    model, xyz);
+          animations[i].channels[channel_index].keyframes[frame].first = frame;
+          animations[i]
+              .channels[channel_index]
+              .keyframes[frame]
+              .second.motion.scale = glm::make_vec3(xyz);
+        }
+      }
+    }
+
+    animations[i].compute_time_boundaries();
   }
 
   const auto &inverse_bind_matrices_bufferview =
@@ -961,11 +1091,11 @@ int main(int argc, char **argv) {
       inverse_bind_matrices[i] = glm::make_mat4(temp);
     }
     // TODO actually, in the glTF spec supports using doubles.
-    // We are doing this here becuse in the tiny_gltf API, it's implied we could
-    // have stored doubles.
-    // This is unrelated with the fact that numbers in the JSON are read as
-    // doubles. Here we are talking about the format where the data is stored
-    // inside the binary buffers that comes with the glTF JSON part
+    // We are doing this here becuse in the tiny_gltf API, it's implied we
+    // could have stored doubles. This is unrelated with the fact that
+    // numbers in the JSON are read as doubles. Here we are talking about
+    // the format where the data is stored inside the binary buffers that
+    // comes with the glTF JSON part
     if (inverse_bind_matrices_component_size == sizeof(double)) {
       double temp[16], tempf[16];
       memcpy(
@@ -977,20 +1107,21 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Three : Load the skeleton graph. We need this to calculate the bones world
-  // transform
+  // Three : Load the skeleton graph. We need this to calculate the bones
+  // world transform
   gltf_node mesh_skeleton_graph(gltf_node::node_type::mesh);
   populate_gltf_skeleton_subgraph(model, mesh_skeleton_graph, skeleton);
 
-  // Four : Get an array thta is in the same order as the bones in the glTF to
-  // represent the whole skeletons. This is important for the joint matrix
-  // calculation
+  // Four : Get an array thta is in the same order as the bones in the glTF
+  // to represent the whole skeletons. This is important for the joint
+  // matrix calculation
   std::vector<gltf_node *> flat_bone_list;
   create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_bone_list);
   assert(flat_bone_list.size() == nb_joints);
 
-  // For each submesh, we need to know the draw operation, the VAO to bind, the
-  // textures to use and the element count. This array store all of these
+  // For each submesh, we need to know the draw operation, the VAO to bind,
+  // the textures to use and the element count. This array store all of
+  // these
   std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
 
   // Create opengl objects
@@ -1631,9 +1762,10 @@ void main()
                            mCurrentGizmoOperation, mCurrentGizmoMode,
                            glm::value_ptr(model_matrix), NULL, NULL);
 
-      // This is for testing the actual skinning, but it will break with some
-      // glTFs const int bone = 5; flat_bone_list[bone]->local_xform =
-      //    glm::rotate(flat_bone_list[bone]->local_xform, glm::radians(1.F),
+      // This is for testing the actual skinning, but it will break with
+      // some glTFs const int bone = 5; flat_bone_list[bone]->local_xform =
+      //    glm::rotate(flat_bone_list[bone]->local_xform,
+      //    glm::radians(1.F),
       //                glm::vec3(1.f, 0, 0));
 
       update_subgraph_transform(mesh_skeleton_graph);
