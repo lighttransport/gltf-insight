@@ -10,7 +10,7 @@ struct gltf_node {
   enum class node_type { mesh, bone };
   const node_type type;
   glm::mat4 local_xform, world_xform;
-  std::vector<std::unique_ptr<gltf_node>> children;
+  std::vector<std::shared_ptr<gltf_node>> children;
   int gltf_model_node_index;
   gltf_node* parent;
 
