@@ -732,7 +732,7 @@ void sort_bone_array(std::vector<gltf_node *> &bone_array,
 void create_flat_bone_list(const tinygltf::Skin &skin,
                            const std::vector<int>::size_type nb_joints,
                            gltf_node mesh_skeleton_graph,
-                           std::vector<gltf_node *> flatened_bone_list) {
+                           std::vector<gltf_node *> &flatened_bone_list) {
   create_flat_bone_array(mesh_skeleton_graph, flatened_bone_list);
   sort_bone_array(flatened_bone_list, skin);
   for (int i = 0; i < nb_joints; ++i) {
