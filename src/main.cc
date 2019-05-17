@@ -1767,7 +1767,7 @@ void main()
                            mCurrentGizmoOperation, mCurrentGizmoMode,
                            glm::value_ptr(model_matrix), NULL, NULL);
 
-      update_subgraph_transform(mesh_skeleton_graph);
+      update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
       glm::mat4 inverse_model = glm::inverse(model_matrix);
       for (size_t i = 0; i < joint_matrices.size(); ++i) {
         joint_matrices[i] = inverse_model * flat_bone_list[i]->world_xform *
