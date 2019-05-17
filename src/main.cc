@@ -1087,6 +1087,24 @@ int main(int argc, char **argv) {
   create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_bone_list);
   assert(flat_bone_list.size() == nb_joints);
 
+  // Five : For each animation loaded that is supposed to move the skeleton,
+  // associate the animation channel targets with their gltf "node" here:
+  for (auto &animation : animations) {
+    animation.set_gltf_graph_targets(&mesh_skeleton_graph);
+
+#if defined(DEBUG) || defined(_DEBUG)
+    // Animation playing depend on these values being absolutely consistent:
+    for (auto &channel : animation.channels) {
+      // if this pointer is not null, it means that this channel is moving a
+      // node we are displaying:
+      if (channel.target_graph_node) {
+        assert(channel.target_node ==
+               channel.target_graph_node->gltf_model_node_index);
+      }
+    }
+#endif
+  }
+
   // For each submesh, we need to know the draw operation, the VAO to
   // bind, the textures to use and the element count. This array store all
   // of these

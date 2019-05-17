@@ -19,6 +19,8 @@ struct gltf_node {
   void add_child_bone(glm::mat4 local_xform);
 
   gltf_node* get_ptr();
+
+  gltf_node* get_node_with_index(int index);
 };
 
 static void update_subgraph_transform(

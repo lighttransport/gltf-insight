@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+#include "gltf-graph.hh"
+
 struct animation {
   struct channel {
     struct keyframe_content {
@@ -31,7 +33,14 @@ struct animation {
     std::vector<std::pair<int, keyframe_content>> keyframes;
     int sampler_index;
     int target_node;
+    gltf_node* target_graph_node;
     path mode;
+
+    channel()
+        : sampler_index(0),
+          target_node(-1),
+          target_graph_node(nullptr),
+          mode(path::not_assigned) {}
   };
 
   struct sampler {
@@ -76,4 +85,12 @@ struct animation {
 
   animation()
       : current_time(0), min_time(0), max_time(0), playing(false), name() {}
+
+  void set_gltf_graph_targets(gltf_node* root_node) {
+    for (auto& channel : channels)
+      if (channel.target_node >= 0) {
+        gltf_node* node = root_node->get_node_with_index(channel.target_node);
+        if (node) channel.target_graph_node = node;
+      }
+  }
 };
