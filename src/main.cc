@@ -157,12 +157,10 @@ static void model_info_window(const tinygltf::Model &model) {
   ImGui::End();
 }
 
-static void animation_window(const tinygltf::Model &model) {
-  // TODO(syoyo): Cache values
-
+static void animation_window(const std::vector<animation> &animations) {
   ImGui::Begin("Animations");
 
-  if (model.animations.size() == 0) {
+  if (animations.size() == 0) {
     ImGui::Text("No animations in glTF");
     ImGui::End();
     return;
@@ -170,53 +168,45 @@ static void animation_window(const tinygltf::Model &model) {
 
   std::vector<std::string> animation_names;
 
-  for (size_t i = 0; i < model.animations.size(); i++) {
-    const tinygltf::Animation &animation = model.animations[i];
-    std::string name = animation.name;
-    if (name.empty()) {
-      name = "animation_" + std::to_string(i);
-    }
-    animation_names.push_back(name);
-  }
+  for (const auto &input_animation : animations)
+    animation_names.push_back(input_animation.name);
 
   static int idx = 0;
   ImGuiCombo("animations", &idx, animation_names);
 
-  const tinygltf::Animation &animation = model.animations[size_t(idx)];
+  // const tinygltf::Animation &animation = model.animations[size_t(idx)];
+  const auto &animation = animations[idx];
 
   //
   // channels
   //
-  if (ImGui::TreeNode("channels")) {
-    std::vector<std::string> channel_names;
+  if (ImGui::CollapsingHeader("channels")) {
+    ImGui::Text("Animation has [%d] channels", animation.channels.size());
+    static int channel_idx = 0;
+    ImGui::InputInt("channel", &channel_idx, 1, 1);
+    channel_idx = std::max<int>(
+        std::min<int>(channel_idx, animation.channels.size() - 1), 0);
+    const auto &channel = animation.channels[channel_idx];
 
-    for (size_t i = 0; i < animation.channels.size(); i++) {
-      std::string name = "channel_" + std::to_string(i);
-      channel_names.push_back(name);
-    }
+    // ImGui::Text("sampler [%d]", channel.sampler);
+    ImGui::Text("target node [%d] path [%s]", channel.target_node, [channel] {
+      switch (channel.mode) {
+        case animation::channel::path::translation:
+          return "translation";
+        case animation::channel::path::rotation:
+          return "rotation";
+        case animation::channel::path::scale:
+          return "scale";
+        case animation::channel::path::weight:
+          return "weight";
+        case animation::channel::path::not_assigned:
+        default:
+          return "ERROR";
+      }
+    }());
 
-    if (channel_names.empty()) {
-      ImGui::Text("??? no channels in animation.");
-    } else {
-      static int channel_idx = 0;
-      ImGuiCombo("channels", &channel_idx, channel_names);
-
-      const tinygltf::AnimationChannel &channel =
-          animation.channels[channel_idx];
-
-      ImGui::Text("sampler [%d]", channel.sampler);
-      ImGui::Text("target node [%d] path [%s]", channel.target_node,
-                  channel.target_path.c_str());
-
-      const tinygltf::AnimationSampler &sampler =
-          animation.samplers[channel.sampler];
-      ImGui::Text("interpolation mode [%s]", sampler.interpolation.c_str());
-
-      const tinygltf::Accessor &accessor = model.accessors[sampler.output];
-      int count =
-          tinygltf::util::GetAnimationSamplerOutputCount(sampler, model);
-
-      if (channel.target_path.compare("weights") == 0) {
+    switch (channel.mode) {
+      case animation::channel::path::weight:
         ImGui::Columns(2);
         ImGui::Separator();
         ImGui::Text("Frame");
@@ -224,19 +214,18 @@ static void animation_window(const tinygltf::Model &model) {
         ImGui::Text("Weight Value");
         ImGui::NextColumn();
         ImGui::Separator();
-        for (int k = 0; k < count; k++) {
-          float value;
-          if (tinygltf::util::DecodeScalarAnimationValue(size_t(k), accessor,
-                                                         model, &value)) {
-            ImGui::Text("%d", k);
+        for (auto keyframe : channel.keyframes) {
+          {
+            ImGui::Text("%d", keyframe.first);
             ImGui::NextColumn();
-            ImGui::Text("%f", value);
+            ImGui::Text("%f", keyframe.second.motion.weight);
             ImGui::NextColumn();
             ImGui::Separator();
           }
         }
         ImGui::Columns();
-      } else if (channel.target_path.compare("translation") == 0) {
+        break;
+      case animation::channel::path::translation:
         ImGui::Columns(4);
         ImGui::Separator();
         ImGui::Text("Frame");
@@ -248,23 +237,21 @@ static void animation_window(const tinygltf::Model &model) {
         ImGui::Text("Z");
         ImGui::NextColumn();
         ImGui::Separator();
-        for (int k = 0; k < count; k++) {
-          float xyz[3];
-          if (tinygltf::util::DecodeTranslationAnimationValue(
-                  size_t(k), accessor, model, xyz)) {
-            ImGui::Text("%d", k);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyz[0]);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyz[1]);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyz[2]);
-            ImGui::NextColumn();
-            ImGui::Separator();
-          }
+        for (auto keyframe : channel.keyframes) {
+          ImGui::Text("%d", keyframe.first);
+          ImGui::NextColumn();
+          auto v = keyframe.second.motion.translation;
+          ImGui::Text("%f", v.x);
+          ImGui::NextColumn();
+          ImGui::Text("%f", v.y);
+          ImGui::NextColumn();
+          ImGui::Text("%f", v.z);
+          ImGui::NextColumn();
+          ImGui::Separator();
         }
         ImGui::Columns();
-      } else if (channel.target_path.compare("scale") == 0) {
+        break;
+      case animation::channel::path::scale:
         ImGui::Columns(4);
         ImGui::Separator();
         ImGui::Text("Frame");
@@ -276,23 +263,21 @@ static void animation_window(const tinygltf::Model &model) {
         ImGui::Text("Z");
         ImGui::NextColumn();
         ImGui::Separator();
-        for (int k = 0; k < count; k++) {
-          float xyz[3];
-          if (tinygltf::util::DecodeScaleAnimationValue(size_t(k), accessor,
-                                                        model, xyz)) {
-            ImGui::Text("%d", k);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyz[0]);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyz[1]);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyz[2]);
-            ImGui::NextColumn();
-            ImGui::Separator();
-          }
+        for (auto keyframe : channel.keyframes) {
+          ImGui::Text("%d", keyframe.first);
+          ImGui::NextColumn();
+          auto v = keyframe.second.motion.scale;
+          ImGui::Text("%f", v.x);
+          ImGui::NextColumn();
+          ImGui::Text("%f", v.y);
+          ImGui::NextColumn();
+          ImGui::Text("%f", v.z);
+          ImGui::NextColumn();
+          ImGui::Separator();
         }
         ImGui::Columns();
-      } else if (channel.target_path.compare("rotation") == 0) {
+        break;
+      case animation::channel::path::rotation:
         ImGui::Columns(5);
         ImGui::Separator();
         ImGui::Text("Frame");
@@ -306,94 +291,73 @@ static void animation_window(const tinygltf::Model &model) {
         ImGui::Text("W");
         ImGui::NextColumn();
         ImGui::Separator();
-        for (int k = 0; k < count; k++) {
-          float xyzw[4];
-          if (tinygltf::util::DecodeRotationAnimationValue(size_t(k), accessor,
-                                                           model, xyzw)) {
-            ImGui::Text("%d", k);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyzw[0]);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyzw[1]);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyzw[2]);
-            ImGui::NextColumn();
-            ImGui::Text("%f", xyzw[3]);
-            ImGui::NextColumn();
-            ImGui::Separator();
-          }
+        for (auto keyframe : channel.keyframes) {
+          ImGui::Text("%d", keyframe.first);
+          ImGui::NextColumn();
+          auto quat = keyframe.second.motion.rotation;
+          ImGui::Text("%f", quat.x);
+          ImGui::NextColumn();
+          ImGui::Text("%f", quat.y);
+          ImGui::NextColumn();
+          ImGui::Text("%f", quat.z);
+          ImGui::NextColumn();
+          ImGui::Text("%f", quat.w);
+          ImGui::NextColumn();
+          ImGui::Separator();
         }
         ImGui::Columns();
-      } else {
+        break;
+      case animation::channel::path::not_assigned:
+      default:
         ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.1f, 1.0f),
-                           "??? Unknown target path name [%s]",
-                           channel.target_path.c_str());
-      }
+                           "ERROR Unknown target path name");
     }
-
-    ImGui::TreePop();
   }
 
   //
   // samplers
   //
-  if (ImGui::TreeNode("samplers")) {
+  if (ImGui::CollapsingHeader("samplers")) {
     std::vector<std::string> sampler_names;
 
-    for (size_t i = 0; i < animation.samplers.size(); i++) {
-      std::string name = "sampler_" + std::to_string(i);
-      sampler_names.push_back(name);
-    }
+    ImGui::Text("Animation has [%d] samplers", animation.samplers.size());
+    static int sampler_idx = 0;
+    ImGui::InputInt("sampler", &sampler_idx, 1, 1);
+    sampler_idx = std::max<int>(
+        std::min<int>(sampler_idx, animation.samplers.size() - 1), 0);
+    const auto &sampler = animation.samplers[sampler_idx];
 
-    if (sampler_names.empty()) {
-      ImGui::Text("??? no samplers in animation.");
-    } else {
-      static int sampler_idx = 0;
-      ImGuiCombo("samplers", &sampler_idx, sampler_names);
-
-      const tinygltf::AnimationSampler &sampler =
-          animation.samplers[sampler_idx];
-
-      ImGui::Text("input  [%d]", sampler.input);
-      ImGui::Text("output [%d]", sampler.output);
-      ImGui::Text("Interpolation method [%s]", sampler.interpolation.c_str());
-
-      float min_v, max_v;
-      if (tinygltf::util::GetAnimationSamplerInputMinMax(sampler, model, &min_v,
-                                                         &max_v)) {
-        ImGui::Text("Keyframe range : %f, %f [secs]", min_v, max_v);
-
-        int count =
-            tinygltf::util::GetAnimationSamplerInputCount(sampler, model);
-        ImGui::Text("# of key frames : %d", count);
-
-        const tinygltf::Accessor &accessor = model.accessors[sampler.input];
-        ImGui::Columns(2);
-        ImGui::Text("Frame Number");
-        ImGui::NextColumn();
-        ImGui::Text("Timestamp");
-        ImGui::NextColumn();
-        ImGui::Separator();
-        for (int k = 0; k < count; k++) {
-          float value;
-          if (tinygltf::util::DecodeScalarAnimationValue(size_t(k), accessor,
-                                                         model, &value)) {
-            ImGui::Text("%d", k);
-            ImGui::NextColumn();
-            ImGui::Text("%f", value);
-            ImGui::NextColumn();
-            ImGui::Separator();
-          }
-        }
-        ImGui::Columns();
-
-      } else {
-        ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.1f, 1.0f),
-                           "input accessor must have min/max property");
+    ImGui::Text("Interpolation method [%s]", [sampler] {
+      switch (sampler.mode) {
+        case animation::sampler::interpolation::linear:
+          return "linear";
+        case animation::sampler::interpolation::step:
+          return "step";
+        case animation::sampler::interpolation::cubic_spline:
+          return "cubicspline";
+        case animation::sampler::interpolation::not_assigned:
+        default:
+          return "ERROR";
       }
-    }
+    }());
 
-    ImGui::TreePop();
+    ImGui::Text("Keyframe range : %f, %f [secs]", sampler.min_v, sampler.max_v);
+    ImGui::Text("# of key frames : %d", sampler.keyframes.size());
+
+    ImGui::Columns(2);
+    ImGui::Text("Frame Number");
+    ImGui::NextColumn();
+    ImGui::Text("Timestamp");
+    ImGui::NextColumn();
+    ImGui::Separator();
+    for (auto keyframe : sampler.keyframes) {
+      ImGui::Text("%d", keyframe.first);
+      ImGui::NextColumn();
+      ImGui::Text("%f", keyframe.second);
+      ImGui::NextColumn();
+      ImGui::Separator();
+    }
+    ImGui::Columns();
   }
 
   ImGui::End();
@@ -559,10 +523,10 @@ void asset_images_window(const std::vector<GLuint> &textures) {
 }
 
 // skeleton_index is the first node that will be added as a child of
-// "graph_root" e.g: a gltf node has a mesh. That mesh has a skin, and that skin
-// as a node index as "skeleton". You need to pass that "skeleton" integer to
-// this function as skeleton_index. This returns a flat array of the bones to be
-// used by the skinning code
+// "graph_root" e.g: a gltf node has a mesh. That mesh has a skin, and that
+// skin as a node index as "skeleton". You need to pass that "skeleton"
+// integer to this function as skeleton_index. This returns a flat array of
+// the bones to be used by the skinning code
 void populate_gltf_skeleton_subgraph(const tinygltf::Model &model,
                                      gltf_node &graph_root,
                                      int skeleton_index) {
@@ -629,8 +593,8 @@ void draw_space_origin_point(float point_size) {
   // set the size
   glPointSize(point_size);
 
-  // Since we're not even drawing a polygon, it's probably simpler to do it with
-  // old-style opengl
+  // Since we're not even drawing a polygon, it's probably simpler to do
+  // it with old-style opengl
   glBegin(GL_POINTS);
   glVertex4f(0, 0, 0, 1);
   glEnd();
@@ -663,9 +627,10 @@ bool draw_bone_segment = true;
 bool draw_mesh_anchor_point = true;
 bool draw_bone_axes = true;
 
-// TODO use this snipet in a fragment shader to draw a cirle instead of a square
-// vec2 coord = gl_PointCoord - vec2(0.5);  //from [0,1] to [-0.5,0.5]
-// if(length(coord) > 0.5)                  //outside of circle radius?
+// TODO use this snipet in a fragment shader to draw a cirle instead of a
+// square vec2 coord = gl_PointCoord - vec2(0.5);  //from [0,1] to
+// [-0.5,0.5] if(length(coord) > 0.5)                  //outside of circle
+// radius?
 //    discard;
 void draw_bones(gltf_node &root, GLuint shader, glm::mat4 view_matrix,
                 glm::mat4 projection_matrix) {
@@ -857,9 +822,10 @@ int main(int argc, char **argv) {
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
   (void)io;
-  // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard
-  // Controls io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable
-  // Gamepad Controls
+  // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable
+  // Keyboard Controls io.ConfigFlags |=
+  // ImGuiConfigFlags_NavEnableGamepad;
+  // // Enable Gamepad Controls
 
   // Setup Platform/Renderer bindings
   ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -887,9 +853,9 @@ int main(int argc, char **argv) {
 
   bool show_imgui_demo = false;
 
-  // We are bypassing the actual glTF scene here, we are interested in a file
-  // that only represent a character with animations. Find the scene node that
-  // has a mesh attached to it:
+  // We are bypassing the actual glTF scene here, we are interested in a
+  // file that only represent a character with animations. Find the scene
+  // node that has a mesh attached to it:
   const auto mesh_node_index = find_main_mesh_node(model);
   if (mesh_node_index < 0) {
     std::cerr << "The loaded gltf file doesn't have any findable mesh";
@@ -903,19 +869,21 @@ int main(int argc, char **argv) {
   const auto skeleton = skin.skeleton;
   const auto &primitives = mesh.primitives;
   // I tend to call a "primitive" here a submesh, not to confond with what
-  // OpenGL actually call a "primitive" (point, line, triangle, strip, fan...)
+  // OpenGL actually call a "primitive" (point, line, triangle, strip,
+  // fan...)
   const auto nb_submeshes = primitives.size();
 
   const auto nb_joints = skin.joints.size();
   std::vector<glm::mat4> joint_matrices(nb_joints);
 
-  // One : We need to know, for each joint, what is it's inverse bind matrix
+  // One : We need to know, for each joint, what is it's inverse bind
+  // matrix
   std::map<int, int> joint_inverse_bind_matrix_map;
   for (int i = 0; i < nb_joints; ++i)
     joint_inverse_bind_matrix_map[skin.joints[i]] = i;
 
-  // Two :  we need to get the inverse bind matrix array, as it is necessary for
-  // skinning
+  // Two :  we need to get the inverse bind matrix array, as it is
+  // necessary for skinning
   const auto &inverse_bind_matrices_accessor =
       model.accessors[skin.inverseBindMatrices];
   assert(inverse_bind_matrices_accessor.type == TINYGLTF_TYPE_MAT4);
@@ -1112,16 +1080,16 @@ int main(int argc, char **argv) {
   gltf_node mesh_skeleton_graph(gltf_node::node_type::mesh);
   populate_gltf_skeleton_subgraph(model, mesh_skeleton_graph, skeleton);
 
-  // Four : Get an array thta is in the same order as the bones in the glTF
-  // to represent the whole skeletons. This is important for the joint
-  // matrix calculation
+  // Four : Get an array thta is in the same order as the bones in the
+  // glTF to represent the whole skeletons. This is important for the
+  // joint matrix calculation
   std::vector<gltf_node *> flat_bone_list;
   create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_bone_list);
   assert(flat_bone_list.size() == nb_joints);
 
-  // For each submesh, we need to know the draw operation, the VAO to bind,
-  // the textures to use and the element count. This array store all of
-  // these
+  // For each submesh, we need to know the draw operation, the VAO to
+  // bind, the textures to use and the element count. This array store all
+  // of these
   std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
 
   // Create opengl objects
@@ -1146,8 +1114,8 @@ int main(int argc, char **argv) {
 
     // We have one VAO per "submesh" (= gltf primitive)
     draw_call_descriptor[submesh].VAO = VAOs[submesh];
-    // Primitive uses their own draw mode (eg: lines (for hairs?), triangle
-    // fan/strip/list?)
+    // Primitive uses their own draw mode (eg: lines (for hairs?),
+    // triangle fan/strip/list?)
     draw_call_descriptor[submesh].draw_mode = primitive.mode;
 
     // INDEX BUFFER
@@ -1662,7 +1630,7 @@ void main()
     asset_images_window(textures);
 
     model_info_window(model);
-    animation_window(model);
+    animation_window(animations);
     for (size_t i = 0; i < nb_submeshes; ++i) {
       skinning_data_window(i, weights[i], joints[i]);
     }
@@ -1694,7 +1662,8 @@ void main()
     //              ImSequencer::SEQUENCER_COPYPASTE |
     //              ImSequencer::SEQUENCER_CHANGE_FRAME);
     //#else
-    //      Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry,
+    //      Sequencer(&mySequence, &currentFrame, &expanded,
+    //      &selectedEntry,
     //                &firstFrame, 0);
     //#endif
     //      // add a UI to edit that particular item
@@ -1763,7 +1732,8 @@ void main()
                            glm::value_ptr(model_matrix), NULL, NULL);
 
       // This is for testing the actual skinning, but it will break with
-      // some glTFs const int bone = 5; flat_bone_list[bone]->local_xform =
+      // some glTFs const int bone = 5; flat_bone_list[bone]->local_xform
+      // =
       //    glm::rotate(flat_bone_list[bone]->local_xform,
       //    glm::radians(1.F),
       //                glm::vec3(1.f, 0, 0));
@@ -1814,8 +1784,8 @@ void main()
                  view_matrix, projection_matrix);
 
       glUseProgram(0);  // You may want this if using this code in an
-      // OpenGL 3+ context where shaders may be bound, but prefer using the
-      // GL3+ code.
+      // OpenGL 3+ context where shaders may be bound, but prefer using
+      // the GL3+ code.
 
       ImGui::Render();
       ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
