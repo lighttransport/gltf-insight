@@ -703,195 +703,9 @@ void create_flat_bone_list(const tinygltf::Skin &skin,
   sort_bone_array(flatened_bone_list, skin);
 }
 
-int main(int argc, char **argv) {
-  cxxopts::Options options("gltf-insignt", "glTF data insight tool");
-
-  bool debug_output = false;
-
-  options.add_options()("d,debug", "Enable debugging",
-                        cxxopts::value<bool>(debug_output))(
-      "i,input", "Input glTF filename", cxxopts::value<std::string>())(
-      "h,help", "Show help");
-
-  options.parse_positional({"input", "output"});
-
-  if (argc < 2) {
-    std::cout << options.help({"", "group"}) << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  auto result = options.parse(argc, argv);
-
-  if (result.count("help")) {
-    std::cout << options.help({"", "group"}) << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  if (!result.count("input")) {
-    std::cerr << "Input file not specified." << std::endl;
-    std::cout << options.help({"", "group"}) << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  std::string input_filename = result["input"].as<std::string>();
-
-  tinygltf::Model model;
-  tinygltf::TinyGLTF gltf_ctx;
-  {
-    std::string err;
-    std::string warn;
-    const std::string ext = GetFilePathExtension(input_filename);
-
-    bool ret = false;
-    if (ext.compare("glb") == 0) {
-      std::cout << "Reading binary glTF" << std::endl;
-      // assume binary glTF.
-      ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn,
-                                        input_filename.c_str());
-    } else {
-      std::cout << "Reading ASCII glTF" << std::endl;
-      // assume ascii glTF.
-      ret = gltf_ctx.LoadASCIIFromFile(&model, &err, &warn,
-                                       input_filename.c_str());
-    }
-
-    if (ret) {
-      std::cerr << "Problem while loading gltf:\n"
-                << "error: " << err << "\nwarning: " << warn << '\n';
-    }
-  }
-
-  // Setup window
-  glfwSetErrorCallback(error_callback);
-  if (!glfwInit()) {
-    return EXIT_FAILURE;
-  }
-
-#ifdef _DEBUG
-  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-#endif
-
-  GLFWwindow *window =
-      glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
-  glfwMakeContextCurrent(window);
-  glfwSwapInterval(1);  // Enable vsync
-
-  glfwSetKeyCallback(window, key_callback);
-
-  // glad must be called after glfwMakeContextCurrent()
-
-  if (!gladLoadGL()) {
-    std::cerr << "Failed to initialize OpenGL context." << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  if (((GLVersion.major == 2) && (GLVersion.minor >= 1)) ||
-      (GLVersion.major >= 3)) {
-    // ok
-  } else {
-    std::cerr << "OpenGL 2.1 is not available." << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
-
-#ifdef _DEBUG
-  glEnable(GL_DEBUG_OUTPUT);
-  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-  glDebugMessageCallback((GLDEBUGPROC)glDebugOutput, nullptr);
-  glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr,
-                        GL_TRUE);
-#endif
-  glEnable(GL_DEPTH_TEST);
-
-  const auto nb_textures = model.images.size();
-  std::vector<GLuint> textures(nb_textures);
-  glGenTextures(GLsizei(nb_textures), textures.data());
-
-  for (size_t i = 0; i < textures.size(); ++i) {
-    glBindTexture(GL_TEXTURE_2D, textures[i]);
-    glTexImage2D(GL_TEXTURE_2D, 0,
-                 model.images[i].component == 4 ? GL_RGBA : GL_RGB,
-                 model.images[i].width, model.images[i].height, 0,
-                 model.images[i].component == 4 ? GL_RGBA : GL_RGB,
-                 GL_UNSIGNED_BYTE, model.images[i].image.data());
-    glGenerateMipmap(GL_TEXTURE_2D);
-  }
-
-  // Setup Dear ImGui context
-  ImGui::CreateContext();
-  ImGuiIO &io = ImGui::GetIO();
-  (void)io;
-  // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable
-  // Keyboard Controls io.ConfigFlags |=
-  // ImGuiConfigFlags_NavEnableGamepad;
-  // // Enable Gamepad Controls
-
-  // Setup Platform/Renderer bindings
-  ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL2_Init();
-
-  // Setup Style
-  ImGui::StyleColorsDark();
-
-  ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-  // sequence with default values
-  gltf_insight::AnimSequence mySequence;
-  mySequence.mFrameMin = -100;
-  mySequence.mFrameMax = 1000;
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{0, 10, 30, false});
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{1, 20, 30, false});
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{3, 12, 60, false});
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{2, 61, 90, false});
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{4, 90, 99, false});
-
-  bool show_imgui_demo = false;
-
-  // We are bypassing the actual glTF scene here, we are interested in a
-  // file that only represent a character with animations. Find the scene
-  // node that has a mesh attached to it:
-  const auto mesh_node_index = find_main_mesh_node(model);
-  if (mesh_node_index < 0) {
-    std::cerr << "The loaded gltf file doesn't have any findable mesh";
-    return EXIT_SUCCESS;
-  }
-
-  // TODO (ybalrid) : refactor loading code outside of int main()
-  // Get access to the data
-  const auto &mesh_node = model.nodes[mesh_node_index];
-  const auto &mesh = model.meshes[mesh_node.mesh];
-  const auto &skin = model.skins[mesh_node.skin];
-  const auto skeleton = skin.skeleton;
-  const auto &primitives = mesh.primitives;
-  // I tend to call a "primitive" here a submesh, not to mix them with what
-  // OpenGL actually call a "primitive" (point, line, triangle, strip,
-  // fan...)
-  const auto nb_submeshes = primitives.size();
-
-  const auto nb_joints = skin.joints.size();
-  std::vector<glm::mat4> joint_matrices(nb_joints);
-
-  // One : We need to know, for each joint, what is it's inverse bind
-  // matrix
-  std::map<int, int> joint_inverse_bind_matrix_map;
-  for (int i = 0; i < nb_joints; ++i)
-    joint_inverse_bind_matrix_map[skin.joints[i]] = i;
-
-  // Two :  we need to get the inverse bind matrix array, as it is
-  // necessary for skinning
-  const auto &inverse_bind_matrices_accessor =
-      model.accessors[skin.inverseBindMatrices];
-  assert(inverse_bind_matrices_accessor.type == TINYGLTF_TYPE_MAT4);
-  assert(inverse_bind_matrices_accessor.count == nb_joints);
-
-  const auto nb_animations = model.animations.size();
-  std::vector<animation> animations(nb_animations);
+void load_animations(const tinygltf::Model &model,
+                     std::vector<animation> &animations) {
+  const auto nb_animations = animations.size();
   for (int i = 0; i < nb_animations; ++i) {
     const auto &gltf_animation = model.animations[i];
 
@@ -1030,103 +844,20 @@ int main(int argc, char **argv) {
 
     animations[i].compute_time_boundaries();
   }
+}
 
-  const auto &inverse_bind_matrices_bufferview =
-      model.bufferViews[inverse_bind_matrices_accessor.bufferView];
-  const auto &inverse_bind_matrices_buffer =
-      model.buffers[inverse_bind_matrices_bufferview.buffer];
-  const size_t inverse_bind_matrices_stride =
-      inverse_bind_matrices_accessor.ByteStride(
-          inverse_bind_matrices_bufferview);
-  const auto inverse_bind_matrices_data_start =
-      inverse_bind_matrices_buffer.data.data() +
-      inverse_bind_matrices_accessor.byteOffset +
-      inverse_bind_matrices_bufferview.byteOffset;
-  const size_t inverse_bind_matrices_component_size =
-      tinygltf::GetComponentSizeInBytes(
-          inverse_bind_matrices_accessor.componentType);
-  assert(sizeof(double) >= inverse_bind_matrices_component_size);
-
-  std::vector<glm::mat4> inverse_bind_matrices(nb_joints);
-
-  for (size_t i = 0; i < nb_joints; ++i) {
-    if (inverse_bind_matrices_component_size == sizeof(float)) {
-      float temp[16];
-      memcpy(
-          temp,
-          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
-          inverse_bind_matrices_component_size * 16);
-      inverse_bind_matrices[i] = glm::make_mat4(temp);
-    }
-    // TODO actually, in the glTF spec supports using doubles.
-    // We are doing this here because in the tiny_gltf API, it's implied we
-    // could have stored doubles. This is unrelated with the fact that
-    // numbers in the JSON are read as doubles. Here we are talking about
-    // the format where the data is stored inside the binary buffers that
-    // comes with the glTF JSON part
-    if (inverse_bind_matrices_component_size == sizeof(double)) {
-      double temp[16], tempf[16];
-      memcpy(
-          temp,
-          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
-          inverse_bind_matrices_component_size * 16);
-      for (int j = 0; j < 16; ++j) tempf[j] = float(temp[j]);
-      inverse_bind_matrices[i] = glm::make_mat4(tempf);
-    }
-  }
-
-  // Three : Load the skeleton graph. We need this to calculate the bones
-  // world transform
-  gltf_node mesh_skeleton_graph(gltf_node::node_type::mesh);
-  populate_gltf_skeleton_subgraph(model, mesh_skeleton_graph, skeleton);
-
-  // Four : Get an array that is in the same order as the bones in the
-  // glTF to represent the whole skeletons. This is important for the
-  // joint matrix calculation
-  std::vector<gltf_node *> flat_bone_list;
-  create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_bone_list);
-  assert(flat_bone_list.size() == nb_joints);
-
-  // Five : For each animation loaded that is supposed to move the skeleton,
-  // associate the animation channel targets with their gltf "node" here:
-  for (auto &animation : animations) {
-    animation.set_gltf_graph_targets(&mesh_skeleton_graph);
-
-#if defined(DEBUG) || defined(_DEBUG)
-    // Animation playing depend on these values being absolutely consistent:
-    for (auto &channel : animation.channels) {
-      // if this pointer is not null, it means that this channel is moving a
-      // node we are displaying:
-      if (channel.target_graph_node) {
-        assert(channel.target_node ==
-               channel.target_graph_node->gltf_model_node_index);
-      }
-    }
-#endif
-  }
-
-  // For each submesh, we need to know the draw operation, the VAO to
-  // bind, the textures to use and the element count. This array store all
-  // of these
-  std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
-
-  // Create opengl objects
-  std::vector<GLuint> VAOs(nb_submeshes);
-
-  // We have 5 vertex attributes per vertex and one element array buffer
-  std::vector<GLuint[6]> VBOs(nb_submeshes);
-  glGenVertexArrays(GLsizei(nb_submeshes), VAOs.data());
-  for (auto &VBO : VBOs) {
-    glGenBuffers(6, VBO);
-  }
-
-  // CPU sise storage for all vertex attributes
-  std::vector<std::vector<unsigned>> indices(nb_submeshes);
-  std::vector<std::vector<float>> vertex_coord(nb_submeshes),
-      texture_coord(nb_submeshes), normals(nb_submeshes), weights(nb_submeshes);
-  std::vector<std::vector<unsigned short>> joints(nb_submeshes);
-
-  // For each submesh of the mesh, load the data
+void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
+                   const std::vector<tinygltf::Primitive> &primitives,
+                   std::vector<draw_call_submesh> &draw_call_descriptor,
+                   const std::vector<GLuint> &VAOs,
+                   const std::vector<GLuint[6]> &VBOs,
+                   std::vector<std::vector<unsigned>> &indices,
+                   std::vector<std::vector<float>> &vertex_coord,
+                   std::vector<std::vector<float>> &texture_coord,
+                   std::vector<std::vector<float>> &normals,
+                   std::vector<std::vector<float>> &weights,
+                   std::vector<std::vector<unsigned short>> &joints) {
+  const auto nb_submeshes = primitives.size();
   for (size_t submesh = 0; submesh < nb_submeshes; ++submesh) {
     const auto &primitive = primitives[submesh];
 
@@ -1390,6 +1121,298 @@ int main(int argc, char **argv) {
       draw_call_descriptor[submesh].main_texture =
           textures[material.values.at("baseColorTexture").TextureIndex()];
   }
+}
+
+int main(int argc, char **argv) {
+  cxxopts::Options options("gltf-insignt", "glTF data insight tool");
+
+  bool debug_output = false;
+
+  options.add_options()("d,debug", "Enable debugging",
+                        cxxopts::value<bool>(debug_output))(
+      "i,input", "Input glTF filename", cxxopts::value<std::string>())(
+      "h,help", "Show help");
+
+  options.parse_positional({"input", "output"});
+
+  if (argc < 2) {
+    std::cout << options.help({"", "group"}) << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  auto result = options.parse(argc, argv);
+
+  if (result.count("help")) {
+    std::cout << options.help({"", "group"}) << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  if (!result.count("input")) {
+    std::cerr << "Input file not specified." << std::endl;
+    std::cout << options.help({"", "group"}) << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  std::string input_filename = result["input"].as<std::string>();
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF gltf_ctx;
+  {
+    std::string err;
+    std::string warn;
+    const std::string ext = GetFilePathExtension(input_filename);
+
+    bool ret = false;
+    if (ext.compare("glb") == 0) {
+      std::cout << "Reading binary glTF" << std::endl;
+      // assume binary glTF.
+      ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn,
+                                        input_filename.c_str());
+    } else {
+      std::cout << "Reading ASCII glTF" << std::endl;
+      // assume ascii glTF.
+      ret = gltf_ctx.LoadASCIIFromFile(&model, &err, &warn,
+                                       input_filename.c_str());
+    }
+
+    if (ret) {
+      std::cerr << "Problem while loading gltf:\n"
+                << "error: " << err << "\nwarning: " << warn << '\n';
+    }
+  }
+
+  // Setup window
+  glfwSetErrorCallback(error_callback);
+  if (!glfwInit()) {
+    return EXIT_FAILURE;
+  }
+
+#ifdef _DEBUG
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
+
+  GLFWwindow *window =
+      glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
+  glfwMakeContextCurrent(window);
+  glfwSwapInterval(1);  // Enable vsync
+
+  glfwSetKeyCallback(window, key_callback);
+
+  // glad must be called after glfwMakeContextCurrent()
+
+  if (!gladLoadGL()) {
+    std::cerr << "Failed to initialize OpenGL context." << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  if (((GLVersion.major == 2) && (GLVersion.minor >= 1)) ||
+      (GLVersion.major >= 3)) {
+    // ok
+  } else {
+    std::cerr << "OpenGL 2.1 is not available." << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
+
+#ifdef _DEBUG
+  glEnable(GL_DEBUG_OUTPUT);
+  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+  glDebugMessageCallback((GLDEBUGPROC)glDebugOutput, nullptr);
+  glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr,
+                        GL_TRUE);
+#endif
+  glEnable(GL_DEPTH_TEST);
+
+  const auto nb_textures = model.images.size();
+  std::vector<GLuint> textures(nb_textures);
+  glGenTextures(GLsizei(nb_textures), textures.data());
+
+  for (size_t i = 0; i < textures.size(); ++i) {
+    glBindTexture(GL_TEXTURE_2D, textures[i]);
+    glTexImage2D(GL_TEXTURE_2D, 0,
+                 model.images[i].component == 4 ? GL_RGBA : GL_RGB,
+                 model.images[i].width, model.images[i].height, 0,
+                 model.images[i].component == 4 ? GL_RGBA : GL_RGB,
+                 GL_UNSIGNED_BYTE, model.images[i].image.data());
+    glGenerateMipmap(GL_TEXTURE_2D);
+  }
+
+  // Setup Dear ImGui context
+  ImGui::CreateContext();
+  ImGuiIO &io = ImGui::GetIO();
+  (void)io;
+  // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable
+  // Keyboard Controls io.ConfigFlags |=
+  // ImGuiConfigFlags_NavEnableGamepad;
+  // // Enable Gamepad Controls
+
+  // Setup Platform/Renderer bindings
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplOpenGL2_Init();
+
+  // Setup Style
+  ImGui::StyleColorsDark();
+
+  ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+  // sequence with default values
+  gltf_insight::AnimSequence mySequence;
+  mySequence.mFrameMin = -100;
+  mySequence.mFrameMax = 1000;
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{0, 10, 30, false});
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{1, 20, 30, false});
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{3, 12, 60, false});
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{2, 61, 90, false});
+  mySequence.myItems.push_back(
+      gltf_insight::AnimSequence::AnimSequenceItem{4, 90, 99, false});
+
+  bool show_imgui_demo = false;
+
+  // We are bypassing the actual glTF scene here, we are interested in a
+  // file that only represent a character with animations. Find the scene
+  // node that has a mesh attached to it:
+  const auto mesh_node_index = find_main_mesh_node(model);
+  if (mesh_node_index < 0) {
+    std::cerr << "The loaded gltf file doesn't have any findable mesh";
+    return EXIT_SUCCESS;
+  }
+
+  // TODO (ybalrid) : refactor loading code outside of int main()
+  // Get access to the data
+  const auto &mesh_node = model.nodes[mesh_node_index];
+  const auto &mesh = model.meshes[mesh_node.mesh];
+  const auto &skin = model.skins[mesh_node.skin];
+  const auto skeleton = skin.skeleton;
+  const auto &primitives = mesh.primitives;
+  // I tend to call a "primitive" here a submesh, not to mix them with what
+  // OpenGL actually call a "primitive" (point, line, triangle, strip,
+  // fan...)
+  const auto nb_submeshes = primitives.size();
+
+  const auto nb_joints = skin.joints.size();
+  std::vector<glm::mat4> joint_matrices(nb_joints);
+
+  // One : We need to know, for each joint, what is it's inverse bind
+  // matrix
+  std::map<int, int> joint_inverse_bind_matrix_map;
+  for (int i = 0; i < nb_joints; ++i)
+    joint_inverse_bind_matrix_map[skin.joints[i]] = i;
+
+  // Two :  we need to get the inverse bind matrix array, as it is
+  // necessary for skinning
+  const auto &inverse_bind_matrices_accessor =
+      model.accessors[skin.inverseBindMatrices];
+  assert(inverse_bind_matrices_accessor.type == TINYGLTF_TYPE_MAT4);
+  assert(inverse_bind_matrices_accessor.count == nb_joints);
+
+  const auto nb_animations = model.animations.size();
+  std::vector<animation> animations(nb_animations);
+
+  load_animations(model, animations);
+
+  const auto &inverse_bind_matrices_bufferview =
+      model.bufferViews[inverse_bind_matrices_accessor.bufferView];
+  const auto &inverse_bind_matrices_buffer =
+      model.buffers[inverse_bind_matrices_bufferview.buffer];
+  const size_t inverse_bind_matrices_stride =
+      inverse_bind_matrices_accessor.ByteStride(
+          inverse_bind_matrices_bufferview);
+  const auto inverse_bind_matrices_data_start =
+      inverse_bind_matrices_buffer.data.data() +
+      inverse_bind_matrices_accessor.byteOffset +
+      inverse_bind_matrices_bufferview.byteOffset;
+  const size_t inverse_bind_matrices_component_size =
+      tinygltf::GetComponentSizeInBytes(
+          inverse_bind_matrices_accessor.componentType);
+  assert(sizeof(double) >= inverse_bind_matrices_component_size);
+
+  std::vector<glm::mat4> inverse_bind_matrices(nb_joints);
+
+  for (size_t i = 0; i < nb_joints; ++i) {
+    if (inverse_bind_matrices_component_size == sizeof(float)) {
+      float temp[16];
+      memcpy(
+          temp,
+          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
+          inverse_bind_matrices_component_size * 16);
+      inverse_bind_matrices[i] = glm::make_mat4(temp);
+    }
+    // TODO actually, in the glTF spec supports using doubles.
+    // We are doing this here because in the tiny_gltf API, it's implied we
+    // could have stored doubles. This is unrelated with the fact that
+    // numbers in the JSON are read as doubles. Here we are talking about
+    // the format where the data is stored inside the binary buffers that
+    // comes with the glTF JSON part
+    if (inverse_bind_matrices_component_size == sizeof(double)) {
+      double temp[16], tempf[16];
+      memcpy(
+          temp,
+          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
+          inverse_bind_matrices_component_size * 16);
+      for (int j = 0; j < 16; ++j) tempf[j] = float(temp[j]);
+      inverse_bind_matrices[i] = glm::make_mat4(tempf);
+    }
+  }
+
+  // Three : Load the skeleton graph. We need this to calculate the bones
+  // world transform
+  gltf_node mesh_skeleton_graph(gltf_node::node_type::mesh);
+  populate_gltf_skeleton_subgraph(model, mesh_skeleton_graph, skeleton);
+
+  // Four : Get an array that is in the same order as the bones in the
+  // glTF to represent the whole skeletons. This is important for the
+  // joint matrix calculation
+  std::vector<gltf_node *> flat_bone_list;
+  create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_bone_list);
+  assert(flat_bone_list.size() == nb_joints);
+
+  // Five : For each animation loaded that is supposed to move the skeleton,
+  // associate the animation channel targets with their gltf "node" here:
+  for (auto &animation : animations) {
+    animation.set_gltf_graph_targets(&mesh_skeleton_graph);
+
+#if defined(DEBUG) || defined(_DEBUG)
+    // Animation playing depend on these values being absolutely consistent:
+    for (auto &channel : animation.channels) {
+      // if this pointer is not null, it means that this channel is moving a
+      // node we are displaying:
+      if (channel.target_graph_node) {
+        assert(channel.target_node ==
+               channel.target_graph_node->gltf_model_node_index);
+      }
+    }
+#endif
+  }
+
+  // For each submesh, we need to know the draw operation, the VAO to
+  // bind, the textures to use and the element count. This array store all
+  // of these
+  std::vector<draw_call_submesh> draw_call_descriptor(nb_submeshes);
+
+  // Create opengl objects
+  std::vector<GLuint> VAOs(nb_submeshes);
+
+  // We have 5 vertex attributes per vertex and one element array buffer
+  std::vector<GLuint[6]> VBOs(nb_submeshes);
+  glGenVertexArrays(GLsizei(nb_submeshes), VAOs.data());
+  for (auto &VBO : VBOs) {
+    glGenBuffers(6, VBO);
+  }
+
+  // CPU sise storage for all vertex attributes
+  std::vector<std::vector<unsigned>> indices(nb_submeshes);
+  std::vector<std::vector<float>> vertex_coord(nb_submeshes),
+      texture_coord(nb_submeshes), normals(nb_submeshes), weights(nb_submeshes);
+  std::vector<std::vector<unsigned short>> joints(nb_submeshes);
+
+  // For each submesh of the mesh, load the data
+  load_geometry(model, textures, primitives, draw_call_descriptor, VAOs, VBOs,
+                indices, vertex_coord, texture_coord, normals, weights, joints);
 
   // not doing this seems to break imgui in opengl2 mode...
   glBindBuffer(GL_ARRAY_BUFFER, 0);
