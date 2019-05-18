@@ -4,6 +4,7 @@
 #include <cstring>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/spline.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -83,9 +84,22 @@ struct animation {
 
   void compute_time_boundaries() {
     for (const auto& sampler : samplers) {
-      min_time = std::min(min_time, sampler.min_v);
-      max_time = std::max(max_time, sampler.max_v);
+      min_time = std::max(min_time, sampler.min_v);
+      max_time = std::min(max_time, sampler.max_v);
     }
+
+    // TODO I think I've read something about time not starting at zero for
+    // animations. Find how we are supposed to actually handle this
+    // if (min_time != 0) {
+    //  const auto delta = min_time;
+    //  min_time -= delta;
+    //  max_time -= delta;
+    //  for (auto& sampler : samplers) {
+    //    sampler.min_v -= delta;
+    //    sampler.max_v -= delta;
+    //    for (auto& frame : sampler.keyframes) frame.second -= delta;
+    //  }
+    //}
   }
 
   // just apply the lower keyframe state
@@ -149,6 +163,9 @@ struct animation {
     }
   }
 
+  void apply_cubic_spline(float interpolation_value, int lower_frame,
+                          int upper_frame, const channel& chan) {}
+
   void apply_channel_target_for_interpolation_value(float interpolation_value,
                                                     sampler::interpolation mode,
                                                     int lower_frame,
@@ -177,7 +194,7 @@ struct animation {
       // https://github.com/KhronosGroup/glTF/issues/1597
 
       // check that current time is indeed findable somewhere in this sampler
-      assert(current_time >= sampler.min_v && current_time <= sampler.max_v);
+      // assert(current_time >= sampler.min_v && current_time <= sampler.max_v);
 
       std::array<std::pair<int, float>, 2> keyframe_interval;
       bool found = false;

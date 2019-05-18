@@ -147,8 +147,8 @@ static void model_info_window(const tinygltf::Model &model) {
       ImGui::Text("Skin [%d] skeleton root node [%d]", main_node.skin,
                   skin.skeleton);
       ImGui::Text("Skin joint count [%d]", skin.joints.size());
-      if (ImGui::CollapsingHeader("Skeleton topology"))
-        describe_node_topology_in_imgui_tree(model, skin.skeleton);
+      // if (ImGui::CollapsingHeader("Skeleton topology"))
+      //  describe_node_topology_in_imgui_tree(model, skin.skeleton);
     }
 
     // TODO check if the found node with a mesh has morph targets, and
@@ -1123,6 +1123,26 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
   }
 }
 
+int find_skeleton_root(const tinygltf::Model &model,
+                       const std::vector<int> &joints, int start_node = 0) {
+  // Get the node to get the children
+  const auto &node = model.nodes[start_node];
+
+  for (int child : node.children) {
+    // If we are part of the skeleton, return our parent
+    for (int joint : joints) {
+      if (joint == child) return joint;
+    }
+    // try to find in children, if found return the child's child's parent (so,
+    // here, the retunred value by find_skeleton_root)
+    const int result = find_skeleton_root(model, joints, child);
+    if (result != -1) return result;
+  }
+
+  // Here it means we found nothing, return "nothing"
+  return -1;
+}
+
 int main(int argc, char **argv) {
   cxxopts::Options options("gltf-insignt", "glTF data insight tool");
 
@@ -1287,7 +1307,18 @@ int main(int argc, char **argv) {
   const auto &mesh_node = model.nodes[mesh_node_index];
   const auto &mesh = model.meshes[mesh_node.mesh];
   const auto &skin = model.skins[mesh_node.skin];
-  const auto skeleton = skin.skeleton;
+  auto skeleton = skin.skeleton;
+
+  while (skeleton == -1) {
+    for (int node : model.scenes[0].nodes) {
+      skeleton = find_skeleton_root(model, skin.joints, node);
+      if (skeleton != -1) {
+        // todo check skeleton root
+        break;
+      }
+    }
+  }
+
   const auto &primitives = mesh.primitives;
   // I tend to call a "primitive" here a submesh, not to mix them with what
   // OpenGL actually call a "primitive" (point, line, triangle, strip,
