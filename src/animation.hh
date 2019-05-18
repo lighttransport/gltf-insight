@@ -90,7 +90,22 @@ struct animation {
 
   // just apply the lower keyframe state
   void apply_step(const channel& chan, int lower_keyframe) {
-    switch (chan.mode) {}
+    switch (chan.mode) {
+      case channel::path::weight:
+        break;
+      case channel::path::translation:
+        chan.target_graph_node->pose.translation =
+            chan.keyframes[lower_keyframe].second.motion.translation;
+        break;
+      case channel::path::scale:
+        chan.target_graph_node->pose.scale =
+            chan.keyframes[lower_keyframe].second.motion.scale;
+      case channel::path::rotation:
+        chan.target_graph_node->pose.rotation =
+            chan.keyframes[lower_keyframe].second.motion.rotation;
+      default:
+        break;
+    }
   }
 
   // just glm::mix all of the components for vectors, and slerp for quaternions?
