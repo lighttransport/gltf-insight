@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstring>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -72,8 +73,12 @@ struct animation {
       current_time = min_time + current_time - max_time;
 
     if (playing) {
-      // TODO apply animation pose
+      apply_pose();
     }
+  }
+
+  void set_time(float time) {
+    current_time = glm::clamp(time, min_time, max_time);
   }
 
   void compute_time_boundaries() {
@@ -82,6 +87,120 @@ struct animation {
       max_time = std::max(max_time, sampler.max_v);
     }
   }
+
+  // just apply the lower keyframe state
+  void apply_step(const channel& chan, int lower_keyframe) {
+    switch (chan.mode) {}
+  }
+
+  // just glm::mix all of the components for vectors, and slerp for quaternions?
+  void apply_linear(const channel& chan, int lower_keyframe, int upper_keyframe,
+                    float mix) {
+    switch (chan.mode) {
+      case channel::path::weight:
+        // TODO weight
+        break;
+      case channel::path::translation: {
+        glm::vec3 lower_translation =
+            chan.keyframes[lower_keyframe].second.motion.translation;
+        glm::vec3 upper_translation =
+            chan.keyframes[upper_keyframe].second.motion.translation;
+        glm::vec3 result = glm::mix(lower_translation, upper_translation, mix);
+
+        chan.target_graph_node->pose.translation = result;
+      } break;
+      case channel::path::scale: {
+        glm::vec3 lower_scale =
+            chan.keyframes[lower_keyframe].second.motion.scale;
+        glm::vec3 upper_scale =
+            chan.keyframes[upper_keyframe].second.motion.scale;
+        glm::vec3 result = glm::mix(lower_scale, upper_scale, mix);
+
+        chan.target_graph_node->pose.scale = result;
+      } break;
+      case channel::path::rotation: {
+        glm::quat lower_rotation =
+            chan.keyframes[lower_keyframe].second.motion.rotation;
+        glm::quat upper_rotation =
+            chan.keyframes[upper_keyframe].second.motion.rotation;
+        glm::quat result = glm::slerp(lower_rotation, upper_rotation, mix);
+
+        chan.target_graph_node->pose.rotation = glm::normalize(result);
+
+      } break;
+      // nothing to do here for us in this case...
+      default:
+        break;
+    }
+  }
+
+  void apply_channel_target_for_interpolation_value(float interpolation_value,
+                                                    sampler::interpolation mode,
+                                                    int lower_frame,
+                                                    int upper_frame,
+                                                    const channel& chan) {
+    if (!chan.target_graph_node) return;
+    switch (mode) {
+      case sampler::interpolation::step:
+        apply_step(chan, lower_frame);
+        break;
+      case sampler::interpolation::linear:
+        apply_linear(chan, lower_frame, upper_frame, interpolation_value);
+        break;
+      case sampler::interpolation::cubic_spline:
+        // TODO implement cubic spline...
+      default:
+        break;
+    }
+  }
+
+  void apply_pose() {
+    for (auto& channel : channels) {
+      const auto& sampler = samplers[channel.sampler_index];
+
+      // TODO probably a special case when animation has only one keyframe : see
+      // https://github.com/KhronosGroup/glTF/issues/1597
+
+      // check that current time is indeed findable somewhere in this sampler
+      assert(current_time >= sampler.min_v && current_time <= sampler.max_v);
+
+      std::array<std::pair<int, float>, 2> keyframe_interval;
+      bool found = false;
+
+      for (size_t frame = 0; frame < sampler.keyframes.size() - 1; frame++) {
+        keyframe_interval[0] = sampler.keyframes[frame];
+        keyframe_interval[1] = sampler.keyframes[frame + 1];
+
+        if (keyframe_interval[0].second <= current_time &&
+            keyframe_interval[1].second >= current_time) {
+          found = true;
+          break;
+        }
+      }
+
+      if (found) {
+        const int lower_frame = keyframe_interval[0].first;
+        const int upper_frame = keyframe_interval[1].first;
+        const float lower_time = keyframe_interval[0].second;
+        const float upper_time = keyframe_interval[1].second;
+
+        // current_time is a value between [lower_time; upper_time]
+        // we want to get a value between 0 and 1
+        const float interpolation_value =
+            (current_time - lower_time) / (upper_time - lower_time);
+
+        // knowing what to interpolate, the interpolation method to use, the 2
+        // keyframe index and the interpolation value, we can then calculate
+        // and apply the channel target
+
+        apply_channel_target_for_interpolation_value(interpolation_value,
+                                                     sampler.mode, lower_frame,
+                                                     upper_frame, channel);
+      }
+    }
+  }
+
+  void set_playing_state(bool state = true) { playing = state; }
 
   animation()
       : current_time(0), min_time(0), max_time(0), playing(false), name() {}

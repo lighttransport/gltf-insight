@@ -1624,6 +1624,12 @@ void main()
       shader("weights", vertex_shader_source, fragment_shader_weights);
 
   // Main loop
+  double last_frame_time = glfwGetTime();
+  size_t active_animation = 0;
+  bool playing_state = true;
+  if (animations.size() > 0)
+    animations[active_animation].set_playing_state(playing_state);
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
 
@@ -1632,6 +1638,13 @@ void main()
     ImGui::NewFrame();
     ImGuizmo::BeginFrame();
     std::string shader_to_use;
+
+    if (ImGui::Begin("Animation Player")) {
+      ImGui::Text("Has %d animation%s", animations.size(),
+                  animations.size() > 1 ? "s" : "");
+      ImGui::Checkbox("playing_state", &playing_state);
+    }
+    ImGui::End();
 
     {
       ImGui::Begin("Hello, world!");  // Create a window called "Hello,
@@ -1766,6 +1779,19 @@ void main()
                            glm::value_ptr(projection_matrix),
                            mCurrentGizmoOperation, mCurrentGizmoMode,
                            glm::value_ptr(model_matrix), NULL, NULL);
+
+      double current_time = glfwGetTime();
+      animations[active_animation].set_playing_state(playing_state);
+      animations[active_animation].add_time(current_time - last_frame_time);
+      last_frame_time = glfwGetTime();
+
+      if (!playing_state) {
+        for (auto *bone : flat_bone_list) {
+          bone->pose.translation = glm::vec3(0.f, 0.f, 0.f);
+          bone->pose.scale = glm::vec3(1.f, 1.f, 1.f);
+          bone->pose.rotation = glm::quat(1.f, 0.f, 0.f, 0.f);
+        }
+      }
 
       update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
       glm::mat4 inverse_model = glm::inverse(model_matrix);

@@ -2,6 +2,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
@@ -64,21 +65,36 @@ static void update_mesh_skeleton_graph_transforms(
   glm::mat4 pose_scale = glm::scale(glm::mat4(1.f), node.pose.scale);
   glm::mat4 pose_matrix = pose_translation * pose_rotation * pose_scale;
 
+  // The calculated "pose_matrix" is actually the absolute position on the local
+  // space. I prefer to keep the "binding pose" of the skeleton, and reference
+  // key frames as a "delta" from these ones. If that pose_matrix is "identity"
+  // it means that the node hasn't been moved.
+
+  // Set the transform as a "delta" from the local transform
+  if (glm::mat4(1.f) == pose_matrix) {
+    pose_matrix = node.local_xform;
+  } else {
+    pose_matrix = glm::inverse(node.local_xform) * pose_matrix;
+  }
+
   /* This will accumulate the parent/child matrices to get everything in the
    * referential of `node`
    *
    * The node's "local" transform is the natural (binding) pose of the node
-   * relative to it's parent. The calculated "pose_matrix" is how much the node
-   * needs to be moved in space, relative to it's parent from this binding pose
-   * to be in the correct transform the animation wants it to be. The
-   * parent_matrix is the "world_transform" of the parent node, recusively
-   * passed down along the graph.
+   * relative to it's parent. The calculated "pose_matrix" is how much the
+   * node needs to be moved in space, relative to it's parent from this
+   * binding pose to be in the correct transform the animation wants it to
+   * be. The parent_matrix is the "world_transform" of the parent node,
+   * recusively passed down along the graph.
    *
-   * The content of the node's "pose" structure used here will be updated by the
-   * animation playing system in accordance to it's current clock, interpolating
-   * between key frames (see class defined in animation.hh)
+   * The content of the node's "pose" structure used here will be updated by
+   * the animation playing system in accordance to it's current clock,
+   * interpolating between key frames (see class defined in animation.hh)
    */
-  node.world_xform = parent_matrix * pose_matrix * node.local_xform;
+
+  node.world_xform =
+      parent_matrix * node.local_xform *
+      (node.type != gltf_node::node_type::mesh ? pose_matrix : glm::mat4(1.f));
 
   // recursively call itself until you reach a node with no children
   for (auto& child : node.children)
