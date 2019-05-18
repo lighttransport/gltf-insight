@@ -808,20 +808,20 @@ void load_animations(const tinygltf::Model &model,
         float xyzw[4];
 
         for (int frame = 0; frame < nb_frames; ++frame) {
-          tinygltf::util::DecodeScaleAnimationValue(size_t(frame), accessor,
-                                                    model, xyzw);
-
+          tinygltf::util::DecodeRotationAnimationValue(size_t(frame), accessor,
+                                                       model, xyzw);
           glm::quat q;
           q.w = xyzw[3];
           q.x = xyzw[0];
           q.y = xyzw[1];
           q.z = xyzw[2];
+          q = glm::normalize(q);
 
           animations[i].channels[channel_index].keyframes[frame].first = frame;
           animations[i]
               .channels[channel_index]
               .keyframes[frame]
-              .second.motion.rotation = glm::normalize(q);
+              .second.motion.rotation = q;
         }
       }
 
