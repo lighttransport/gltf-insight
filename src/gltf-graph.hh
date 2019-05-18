@@ -73,8 +73,6 @@ static void update_mesh_skeleton_graph_transforms(
   // Set the transform as a "delta" from the local transform
   if (glm::mat4(1.f) == pose_matrix) {
     pose_matrix = node.local_xform;
-  } else {
-    pose_matrix = glm::inverse(node.local_xform) * pose_matrix;
   }
 
   /* This will accumulate the parent/child matrices to get everything in the
@@ -92,9 +90,10 @@ static void update_mesh_skeleton_graph_transforms(
    * interpolating between key frames (see class defined in animation.hh)
    */
 
-  node.world_xform =
-      parent_matrix * node.local_xform *
-      (node.type != gltf_node::node_type::mesh ? pose_matrix : glm::mat4(1.f));
+  node.world_xform = parent_matrix * node.local_xform *
+                     (node.type != gltf_node::node_type::mesh
+                          ? glm::inverse(node.local_xform) * pose_matrix
+                          : glm::mat4(1.f));
 
   // recursively call itself until you reach a node with no children
   for (auto& child : node.children)
