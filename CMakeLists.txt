@@ -61,6 +61,9 @@ list(APPEND EXT_LIBRARIES glfw)
 # [glm]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glm)
 
+# [tinygltf]
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf)
+
 add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES})
 
 target_link_libraries(

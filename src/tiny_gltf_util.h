@@ -129,6 +129,23 @@ static inline float DecodeAnimationChannelValue(uint16_t c) {
   return float(c) / 65525.0f;
 }
 
+const uint8_t *GetBufferAddress(const int i, const Accessor &accessor,
+                                const BufferView &bufferViewObject,
+                                const Buffer &buffer) {
+  if (i >= int(accessor.count)) return nullptr;
+
+  int byte_stride = accessor.ByteStride(bufferViewObject);
+  if (byte_stride == -1) {
+    return nullptr;
+  }
+
+  // TODO(syoyo): Bounds check.
+  const uint8_t *base_addr =
+      buffer.data.data() + bufferViewObject.byteOffset + accessor.byteOffset;
+  const uint8_t *addr = base_addr + i * byte_stride;
+  return addr;
+}
+
 static bool DecodeScalarAnimationValue(const size_t i,
                                        const tinygltf::Accessor &accessor,
                                        const tinygltf::Model &model,
