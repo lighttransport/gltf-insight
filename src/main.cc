@@ -1429,6 +1429,7 @@ int main(int argc, char **argv) {
     std::vector<float> position, normal /*, tangent*/;
   };
 
+  // TODO refactor that
   std::vector<morph_target> morph_targets(nb_morph_targets);
   for (size_t i = 0; i < nb_morph_targets; ++i) {
     const auto &target = mesh.targets[i];
@@ -1456,7 +1457,48 @@ int main(int argc, char **argv) {
         memcpy(&morph_targets[i].position[3 * vertex],
                position_data_start + vertex * stride, sizeof(float) * 3);
       }
+
+      if (position_accessor.sparse.isSparse) {
+        const auto sparse_indices = position_accessor.sparse.indices;
+        const auto indices_component_size = tinygltf::GetComponentSizeInBytes(
+            position_accessor.sparse.indices.componentType);
+        const auto &indices_buffer_view =
+            model.bufferViews[sparse_indices.bufferView];
+        const auto &indices_buffer = model.buffers[indices_buffer_view.buffer];
+        const auto indices_data = indices_buffer.data.data() +
+                                  indices_buffer_view.byteOffset +
+                                  sparse_indices.byteOffset;
+
+        assert(sizeof(unsigned int) >= indices_component_size);
+
+        const auto sparse_values = position_accessor.sparse.values;
+        const auto &values_buffer_view =
+            model.bufferViews[sparse_values.bufferView];
+        const auto &values_buffer = model.buffers[values_buffer_view.buffer];
+        const float *values_data = reinterpret_cast<const float *>(
+            values_buffer.data.data() + values_buffer_view.byteOffset +
+            sparse_values.byteOffset);
+
+        std::vector<unsigned int> indices(position_accessor.sparse.count);
+        std::vector<float> values(3 * position_accessor.sparse.count);
+
+        for (size_t sparse_index = 0; sparse_index < indices.size();
+             ++sparse_index) {
+          memcpy(&indices[sparse_index],
+                 indices_data + sparse_index * indices_component_size,
+                 indices_component_size);
+          memcpy(&values[3 * sparse_index], &values_data[3 * sparse_index],
+                 3 * sizeof(float));
+        }
+
+        // Patch the loaded sparse data into the morph target vertex attribute
+        for (size_t sparse_index = 0; sparse_index < indices.size(); ++i) {
+          memcpy(&morph_targets[i].position[indices[sparse_index]],
+                 &values[sparse_index * 3], 3 * sizeof(float));
+        }
+      }
     }
+
     if (normal_it != target.end()) {
       const auto &normal_accessor = model.accessors[normal_it->second];
       const auto &normal_buffer_view =
@@ -1474,6 +1516,46 @@ int main(int argc, char **argv) {
       for (size_t vertex = 0; vertex < normal_accessor.count; ++vertex) {
         memcpy(&morph_targets[i].normal[3 * vertex],
                normal_data_start + vertex * stride, sizeof(float) * 3);
+      }
+
+      if (normal_accessor.sparse.isSparse) {
+        const auto sparse_indices = normal_accessor.sparse.indices;
+        const auto indices_component_size = tinygltf::GetComponentSizeInBytes(
+            normal_accessor.sparse.indices.componentType);
+        const auto &indices_buffer_view =
+            model.bufferViews[sparse_indices.bufferView];
+        const auto &indices_buffer = model.buffers[indices_buffer_view.buffer];
+        const auto indices_data = indices_buffer.data.data() +
+                                  indices_buffer_view.byteOffset +
+                                  sparse_indices.byteOffset;
+
+        assert(sizeof(unsigned int) >= indices_component_size);
+
+        const auto sparse_values = normal_accessor.sparse.values;
+        const auto &values_buffer_view =
+            model.bufferViews[sparse_values.bufferView];
+        const auto &values_buffer = model.buffers[values_buffer_view.buffer];
+        const float *values_data = reinterpret_cast<const float *>(
+            values_buffer.data.data() + values_buffer_view.byteOffset +
+            sparse_values.byteOffset);
+
+        std::vector<unsigned int> indices(normal_accessor.sparse.count);
+        std::vector<float> values(3 * normal_accessor.sparse.count);
+
+        for (size_t sparse_index = 0; sparse_index < indices.size();
+             ++sparse_index) {
+          memcpy(&indices[sparse_index],
+                 indices_data + sparse_index * indices_component_size,
+                 indices_component_size);
+          memcpy(&values[3 * sparse_index], &values_data[3 * sparse_index],
+                 3 * sizeof(float));
+        }
+
+        // Patch the loaded sparse data into the morph target vertex attribute
+        for (size_t sparse_index = 0; sparse_index < indices.size(); ++i) {
+          memcpy(&morph_targets[i].normal[indices[sparse_index]],
+                 &values[sparse_index * 3], 3 * sizeof(float));
+        }
       }
     }
   }
