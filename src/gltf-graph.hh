@@ -46,7 +46,7 @@ struct gltf_node {
     glm::quat rotation;
 
     // TODO sore here arrays of weights for each morph targets?
-    // std::vector<float> blend_weights;
+    std::vector<float> blend_weights;
 
     // Sets default for a "neutral pose"
     animation_state()

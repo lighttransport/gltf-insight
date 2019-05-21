@@ -709,10 +709,12 @@ void load_animations(const tinygltf::Model &model,
   for (int i = 0; i < nb_animations; ++i) {
     const auto &gltf_animation = model.animations[i];
 
+    // Attempt to get an animation name, or generate one like "animation_x"
     animations[i].name = !gltf_animation.name.empty()
                              ? gltf_animation.name
                              : "animation_" + std::to_string(i);
 
+    // Load samplers:
     animations[i].samplers.resize(gltf_animation.samplers.size());
 
     for (int sampler_index = 0; sampler_index < animations[i].samplers.size();
@@ -749,6 +751,7 @@ void load_animations(const tinygltf::Model &model,
       }
     }
 
+    // Load channels
     animations[i].channels.resize(gltf_animation.channels.size());
     for (int channel_index = 0; channel_index < animations[i].channels.size();
          ++channel_index) {
@@ -1420,6 +1423,61 @@ int main(int argc, char **argv) {
 #endif
   }
 
+  // Load morph targets:
+  const auto nb_morph_targets = mesh.targets.size();
+  struct morph_target {
+    std::vector<float> position, normal /*, tangent*/;
+  };
+
+  std::vector<morph_target> morph_targets(nb_morph_targets);
+  for (size_t i = 0; i < nb_morph_targets; ++i) {
+    const auto &target = mesh.targets[i];
+
+    const auto position_it = target.find("POSITION");
+    const auto normal_it = target.find("NORMAL");
+    // const auto tangent_it = target.find("TANGENT"); //<- only useful for
+    // normal mapping...
+
+    if (position_it != target.end()) {
+      const auto &position_accessor = model.accessors[position_it->second];
+      const auto &position_buffer_view =
+          model.bufferViews[position_accessor.bufferView];
+      const auto &position_buffer = model.buffers[position_buffer_view.buffer];
+      const auto position_data_start = position_buffer.data.data() +
+                                       position_buffer_view.byteOffset +
+                                       position_accessor.byteOffset;
+      const auto stride = position_accessor.ByteStride(position_buffer_view);
+
+      assert(position_accessor.type == TINYGLTF_TYPE_VEC3);
+      assert(position_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+
+      morph_targets[i].position.resize(3 * position_accessor.count);
+      for (size_t vertex = 0; vertex < position_accessor.count; ++vertex) {
+        memcpy(&morph_targets[i].position[3 * vertex],
+               position_data_start + vertex * stride, sizeof(float) * 3);
+      }
+    }
+    if (normal_it != target.end()) {
+      const auto &normal_accessor = model.accessors[normal_it->second];
+      const auto &normal_buffer_view =
+          model.bufferViews[normal_accessor.bufferView];
+      const auto &normal_buffer = model.buffers[normal_buffer_view.buffer];
+      const auto normal_data_start = normal_buffer.data.data() +
+                                     normal_buffer_view.byteOffset +
+                                     normal_accessor.byteOffset;
+      const auto stride = normal_accessor.ByteStride(normal_buffer_view);
+
+      assert(normal_accessor.type == TINYGLTF_TYPE_VEC3);
+      assert(normal_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+
+      morph_targets[i].normal.resize(3 * normal_accessor.count);
+      for (size_t vertex = 0; vertex < normal_accessor.count; ++vertex) {
+        memcpy(&morph_targets[i].normal[3 * vertex],
+               normal_data_start + vertex * stride, sizeof(float) * 3);
+      }
+    }
+  }
+
   // For each submesh, we need to know the draw operation, the VAO to
   // bind, the textures to use and the element count. This array store all
   // of these
@@ -1524,11 +1582,16 @@ out vec4 interpolated_weights;
 
 void main()
 {
+  //compute skinning matrix
   mat4 skin_matrix =
     input_weights.x * joint_matrix[int(input_joints.x)]
   + input_weights.y * joint_matrix[int(input_joints.y)]
   + input_weights.z * joint_matrix[int(input_joints.z)]
   + input_weights.w * joint_matrix[int(input_joints.w)];
+
+
+  //perfom blending
+  vec4 blended_position = vec4(input_position, 1.0); 
 
   gl_Position = mvp * skin_matrix * vec4(input_position, 1.0);
 
