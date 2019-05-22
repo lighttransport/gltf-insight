@@ -185,7 +185,7 @@ static void animation_window(const std::vector<animation> &animations) {
     static int channel_idx = 0;
     ImGui::InputInt("channel", &channel_idx, 1, 1);
     channel_idx = std::max<int>(
-        std::min<int>(channel_idx, animation.channels.size() - 1), 0);
+        std::min<int>(channel_idx, int(animation.channels.size()) - 1), 0);
     const auto &channel = animation.channels[channel_idx];
 
     // ImGui::Text("sampler [%d]", channel.sampler);
@@ -324,7 +324,7 @@ static void animation_window(const std::vector<animation> &animations) {
     static int sampler_idx = 0;
     ImGui::InputInt("sampler", &sampler_idx, 1, 1);
     sampler_idx = std::max<int>(
-        std::min<int>(sampler_idx, animation.samplers.size() - 1), 0);
+        std::min<int>(sampler_idx, int(animation.samplers.size()) - 1), 0);
     const auto &sampler = animation.samplers[sampler_idx];
 
     ImGui::Text("Interpolation method [%s]", [sampler] {
@@ -1809,10 +1809,13 @@ void main()
 
   // Main loop
   double last_frame_time = glfwGetTime();
-  size_t active_animation = 0;
+  int active_animation = 0;
   bool playing_state = true;
   if (animations.size() > 0)
     animations[active_animation].set_playing_state(playing_state);
+  std::vector<std::string> animation_names(animations.size());
+  for (size_t i = 0; i < animations.size(); ++i)
+    animation_names[i] = animations[i].name;
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
@@ -1827,6 +1830,8 @@ void main()
       ImGui::Text("Has %d animation%s", animations.size(),
                   animations.size() > 1 ? "s" : "");
       ImGui::Checkbox("playing_state", &playing_state);
+
+      ImGuiCombo("Active animation", &active_animation, animation_names);
     }
     ImGui::End();
 
@@ -1966,7 +1971,8 @@ void main()
 
       double current_time = glfwGetTime();
       animations[active_animation].set_playing_state(playing_state);
-      animations[active_animation].add_time(current_time - last_frame_time);
+      animations[active_animation].add_time(
+          float(current_time - last_frame_time));
       last_frame_time = glfwGetTime();
 
       if (!playing_state) {

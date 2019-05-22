@@ -25,6 +25,7 @@ set(SOURCES
   	src/gltf-graph.cc
 	  src/gltf-graph.hh
     src/animation.hh
+	src/animation.cc
 )
 
 list(APPEND UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad.c)
