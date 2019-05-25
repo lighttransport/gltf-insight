@@ -19,11 +19,14 @@ void animation::set_time(float time) {
 }
 
 void animation::compute_time_boundaries() {
-  // Anything should be smaller than this :
-  max_time = std::numeric_limits<float>::max();
+  // initialize min and max to the first value in the sampler
+  min_time = samplers[0].min_v;
+  max_time = samplers[0].max_v;
+
+  // Compare all of them
   for (const auto& sampler : samplers) {
-    min_time = std::max(min_time, sampler.min_v);
-    max_time = std::min(max_time, sampler.max_v);
+    min_time = std::min(min_time, sampler.min_v);
+    max_time = std::max(max_time, sampler.max_v);
   }
 
   // TODO I think I've read something about time not starting at zero for

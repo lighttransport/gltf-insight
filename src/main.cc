@@ -177,6 +177,9 @@ static void animation_window(const std::vector<animation> &animations) {
   // const tinygltf::Animation &animation = model.animations[size_t(idx)];
   const auto &animation = animations[idx];
 
+  ImGui::Text("Min time [%f]", animation.min_time);
+  ImGui::Text("Max time [%f]", animation.max_time);
+
   //
   // channels
   //
