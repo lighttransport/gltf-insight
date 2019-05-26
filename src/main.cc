@@ -1153,14 +1153,15 @@ struct morph_target {
   std::vector<float> position, normal /*, tangent*/;
 };
 
-void load_morph_targets(tinygltf::Model model, const tinygltf::Mesh &mesh,
+void load_morph_targets(const tinygltf::Model &model,
+                        const tinygltf::Primitive &primitive,
                         std::vector<morph_target> &morph_targets) {
   for (size_t i = 0; i < morph_targets.size(); ++i) {
-    const auto &target = mesh.targets[i];
+    const auto &target = primitive.targets[i];
 
     const auto position_it = target.find("POSITION");
     const auto normal_it = target.find("NORMAL");
-    // const auto tangent_it = target.find("TANGENT"); //<- only useful forgg=G
+    // const auto tangent_it = target.find("TANGENT"); //<- only useful for
     // normal mapping...
 
     if (position_it != target.end()) {
@@ -1565,11 +1566,23 @@ int main(int argc, char **argv) {
   }
 
   // Load morph targets:
-  const auto nb_morph_targets = mesh.targets.size();
+  // TODO we can probably only have one loop going through the submeshes
+  std::vector<std::vector<morph_target>> morph_targets(nb_submeshes);
+  for (int i = 0; i < nb_submeshes; ++i) {
+    morph_targets[i].resize(mesh.primitives[i].targets.size());
+    load_morph_targets(model, mesh.primitives[i], morph_targets[i]);
+  }
 
-  // TODO refactor that
-  std::vector<morph_target> morph_targets(nb_morph_targets);
-  load_morph_targets(model, mesh, morph_targets);
+  // Set the number of weights to animate
+  int nb_morph_targets = 0;
+  for (auto &target : morph_targets) {
+    nb_morph_targets = std::max<int>(target.size(), nb_morph_targets);
+  }
+
+  mesh_skeleton_graph.pose.blend_weights.resize(nb_morph_targets);
+  std::generate(mesh_skeleton_graph.pose.blend_weights.begin(),
+                mesh_skeleton_graph.pose.blend_weights.end(),
+                [] { return 0.f; });
 
   // For each submesh, we need to know the draw operation, the VAO to
   // bind, the textures to use and the element count. This array store all
@@ -1833,8 +1846,9 @@ void main()
       ImGui::Text("Has %d animation%s", animations.size(),
                   animations.size() > 1 ? "s" : "");
       ImGui::Checkbox("playing_state", &playing_state);
-
       ImGuiCombo("Active animation", &active_animation, animation_names);
+      ImGui::Text("Playback time [%f] seconds",
+                  animations[active_animation].current_time);
     }
     ImGui::End();
 
@@ -1875,6 +1889,14 @@ void main()
     for (size_t i = 0; i < nb_submeshes; ++i) {
       skinning_data_window(i, weights[i], joints[i]);
     }
+
+    if (ImGui::Begin("Morph Target blend weights")) {
+      for (int w = 0; w < nb_morph_targets; ++w) {
+        ImGui::Text("Morph Target [%d] = [%f]", w,
+                    mesh_skeleton_graph.pose.blend_weights[w]);
+      }
+    }
+    ImGui::End();
 
     //    {
     //      // let's create the sequencer

@@ -113,9 +113,13 @@ void animation::apply_channel_target_for_interpolation_value(
 
 void animation::apply_step(const channel& chan, int lower_keyframe) {
   switch (chan.mode) {
-    case channel::path::weight:
-      // TODO morph wieghts
-      break;
+    case channel::path::weight: {
+      const auto nb_weights = chan.target_graph_node->pose.blend_weights.size();
+      for (int w = 0; w < nb_weights; ++w)
+        chan.target_graph_node->pose.blend_weights[w] =
+            chan.keyframes[lower_keyframe * nb_weights + w]
+                .second.motion.weight;
+    } break;
     case channel::path::translation:
       chan.target_graph_node->pose.translation =
           chan.keyframes[lower_keyframe].second.motion.translation;
@@ -134,9 +138,17 @@ void animation::apply_step(const channel& chan, int lower_keyframe) {
 void animation::apply_linear(const channel& chan, int lower_keyframe,
                              int upper_keyframe, float mix) {
   switch (chan.mode) {
-    case channel::path::weight:
-      // TODO weight
-      break;
+    case channel::path::weight: {
+      const auto nb_weights = chan.target_graph_node->pose.blend_weights.size();
+      for (int w = 0; w < nb_weights; ++w) {
+        chan.target_graph_node->pose.blend_weights[w] =
+            glm::mix(chan.keyframes[lower_keyframe * nb_weights + w]
+                         .second.motion.weight,
+                     chan.keyframes[upper_keyframe * nb_weights + w]
+                         .second.motion.weight,
+                     mix);
+      }
+    } break;
     case channel::path::translation: {
       glm::vec3 lower_translation =
           chan.keyframes[lower_keyframe].second.motion.translation;
@@ -220,9 +232,17 @@ void animation::apply_cubic_spline(float interpolation_value, int lower_frame,
   // being interpolated)
 
   switch (chan.mode) {
-    case channel::path::weight:
-      // TODO morph weights
-      break;
+    case channel::path::weight: {
+      const auto nb_weights = chan.target_graph_node->pose.blend_weights.size();
+      for (int w = 0; w < nb_weights; ++w) {
+        chan.target_graph_node->pose.blend_weights[w] =
+            cubic_spline_interpolate(
+                interpolation_value, p0.second.motion.weight,
+                frame_delta * unscaled_m0.second.motion.weight,
+                p1.second.motion.weight,
+                frame_delta * unscaled_m1.second.motion.weight);
+      }
+    } break;
     case channel::path::translation: {
       chan.target_graph_node->pose.translation = cubic_spline_interpolate(
           interpolation_value, p0.second.motion.translation,
