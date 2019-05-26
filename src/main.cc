@@ -1896,9 +1896,15 @@ void main()
 
     if (ImGui::Begin("Morph Target blend weights")) {
       for (int w = 0; w < nb_morph_targets; ++w) {
-        ImGui::Text("Morph Target [%d] = [%f]", w,
-                    mesh_skeleton_graph.pose.blend_weights[w]);
+        ImGui::Columns(2, 0, false);
+        const std::string name  = "Morph Target [" + std::to_string(w) + "]";
+        ImGui::Text(name.c_str());
+        ImGui::NextColumn();
+        ImGui::InputFloat((std::string("##") + name).c_str(), &mesh_skeleton_graph.pose.blend_weights[w], 0.01f, 0.1f, "%f");
+        mesh_skeleton_graph.pose.blend_weights[w] = glm::clamp(mesh_skeleton_graph.pose.blend_weights[w], 0.f, 1.f);
+        ImGui::NextColumn();
       }
+      ImGui::Columns();
     }
     ImGui::End();
 
