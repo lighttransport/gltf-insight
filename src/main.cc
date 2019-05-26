@@ -1073,7 +1073,7 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][0]);
       glBufferData(GL_ARRAY_BUFFER,
                    vertex_coord[submesh].size() * sizeof(float),
-                   vertex_coord[submesh].data(), GL_STATIC_DRAW);
+                   vertex_coord[submesh].data(), GL_STREAM_DRAW);
       glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(0);
@@ -1081,7 +1081,7 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
       // Layout "1" = vertex normal
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][1]);
       glBufferData(GL_ARRAY_BUFFER, normals[submesh].size() * sizeof(float),
-                   normals[submesh].data(), GL_STATIC_DRAW);
+                   normals[submesh].data(), GL_STREAM_DRAW);
       glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(1);
@@ -1609,6 +1609,10 @@ int main(int argc, char **argv) {
   load_geometry(model, textures, primitives, draw_call_descriptor, VAOs, VBOs,
                 indices, vertex_coord, texture_coord, normals, weights, joints);
 
+  // create a copy of the data for morphing
+  auto display_position = vertex_coord;
+  auto display_normal = normals;
+
   // not doing this seems to break imgui in opengl2 mode...
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -2025,7 +2029,39 @@ void main()
       shaders[shader_to_use].set_uniform("debug_color",
                                          glm::vec4(0.5f, 0.5f, 0.f, 1.f));
 
-      for (const auto &draw_call_to_perform : draw_call_descriptor) {
+      for (size_t i = 0; i < draw_call_descriptor.size(); ++i) {
+        const auto &draw_call_to_perform = draw_call_descriptor[i];
+
+        // If mesh has morph targets
+        if (mesh_skeleton_graph.pose.blend_weights.size() > 0) {
+          assert(display_position[i].size() == display_normal[i].size());
+          // Blend between morph targets on the CPU:
+          for (size_t v = 0; v < display_position[i].size(); ++v) {
+            // Get the base vector
+            display_position[i][v] = vertex_coord[i][v];
+            display_normal[i][v] = normals[i][v];
+            // Accumulate the delta, v = v0 + w0 * m0 + w1 * m1 + w2 * m2 ...
+            for (size_t w = 0;
+                 w < mesh_skeleton_graph.pose.blend_weights.size(); ++w) {
+              const float weight = mesh_skeleton_graph.pose.blend_weights[w];
+              display_position[i][v] +=
+                  weight * morph_targets[i][w].position[v];
+              display_normal[i][v] += weight * morph_targets[i][w].normal[v];
+            }
+
+            // upload to GPU
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[i][0]);
+            glBufferData(GL_ARRAY_BUFFER,
+                         display_position[i].size() * sizeof(float),
+                         display_position[i].data(), GL_STREAM_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, VBOs[i][1]);
+            glBufferData(GL_ARRAY_BUFFER,
+                         display_normal[i].size() * sizeof(float),
+                         display_normal[i].data(), GL_STREAM_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+          }
+        }
+
         glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
         glBindVertexArray(draw_call_to_perform.VAO);
         glDrawElements(draw_call_to_perform.draw_mode,
