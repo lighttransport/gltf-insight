@@ -137,7 +137,7 @@ static void model_info_window(const tinygltf::Model &model) {
       return;
     }
 
-    ImGui::Text("Main node with a mesh [%d]");
+    ImGui::Text("Main node with a mesh [%d]", main_node_index);
     const auto &main_node = model.nodes[main_node_index];
 
     if (main_node.skin >= 0) {
@@ -535,23 +535,32 @@ void populate_gltf_skeleton_subgraph(const tinygltf::Model &model,
                                      int skeleton_index) {
   const auto &skeleton_node = model.nodes[skeleton_index];
 
+  // Holder for the data.
   glm::mat4 xform(1.f);
   glm::vec3 translation(0.f), scale(1.f, 1.f, 1.f);
   glm::quat rotation(1.f, 0.f, 0.f, 0.f);
 
+  // A node can store both a transform matrix and separate translation, rotation
+  // and scale. We need to load them if they are present. tiny_gltf signal this
+  // by either having empty vectors, or vectors of the expected size.
   const auto &node_matrix = skeleton_node.matrix;
   if (node_matrix.size() == 16)  // 4x4 matrix
   {
     double tmp[16];
     float tmpf[16];
     memcpy(tmp, skeleton_node.matrix.data(), 16 * sizeof(double));
+
+    // Convert a double array to a float array
     for (int i = 0; i < 16; ++i) {
       tmpf[i] = float(tmp[i]);
     }
 
+    // Both glm matrices and this float array have the same data layout. We can
+    // pass the pointer to glm::make_mat4
     xform = glm::make_mat4(tmpf);
   }
 
+  // Do the same for translation rotation and scale.
   const auto &node_translation = skeleton_node.translation;
   if (node_translation.size() == 3)  // 3D vector
   {
@@ -581,6 +590,8 @@ void populate_gltf_skeleton_subgraph(const tinygltf::Model &model,
   const glm::mat4 reconstructed_matrix =
       translation_matrix * rotation_matrix * scale_matrix;
 
+  // In the case that the node has both the matrix and the individual vectors,
+  // both transform has to be applied.
   xform = xform * reconstructed_matrix;
 
   graph_root.add_child_bone(xform);
@@ -899,7 +910,8 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
       // number of elements to pass to glDrawElements(...)
       draw_call_descriptor[submesh].count = indices_accessor.count;
     }
-    // VERTEX POSITIONS}
+
+    // VERTEX POSITIONS
     {
       const auto position = primitive.attributes.at("POSITION");
       const auto &position_accessor = model.accessors[position];
@@ -932,6 +944,7 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
         }
       }
     }
+
     // VERTEX NORMAL
     {
       const auto normal = primitive.attributes.at("NORMAL");
@@ -1066,7 +1079,8 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
       }
     }
 
-    {  // GPU upload and shader layout association
+    {
+      // GPU upload and shader layout association
       glBindVertexArray(VAOs[submesh]);
 
       // Layout "0" = vertex coordinates
@@ -1086,6 +1100,7 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
                             nullptr);
       glEnableVertexAttribArray(1);
 
+      // We we haven't loaded any texture, don't even bother with UVs
       if (textures.size() > 0) {
         // Layout "2" = vertex UV
         glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][2]);
@@ -1129,6 +1144,9 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
   }
 }
 
+// This is useful because mesh.skeleton isn't required to point to the skeleton
+// root. We still want to find the skeleton root, so we are going to search for
+// it by hand.
 int find_skeleton_root(const tinygltf::Model &model,
                        const std::vector<int> &joints, int start_node = 0) {
   // Get the node to get the children
@@ -1150,6 +1168,11 @@ int find_skeleton_root(const tinygltf::Model &model,
 }
 
 struct morph_target {
+  // std::string name;
+  // TODO having acces to the name of a morph target would be nice. BUT glTF 2.0
+  // doesn't define this.
+  // See: https://github.com/KhronosGroup/glTF/issues/1036
+
   std::vector<float> position, normal /*, tangent*/;
 };
 
@@ -1518,12 +1541,13 @@ int main(int argc, char **argv) {
           inverse_bind_matrices_component_size * 16);
       inverse_bind_matrices[i] = glm::make_mat4(temp);
     }
-    // TODO actually, in the glTF spec supports using doubles.
-    // We are doing this here because in the tiny_gltf API, it's implied we
-    // could have stored doubles. This is unrelated with the fact that
-    // numbers in the JSON are read as doubles. Here we are talking about
+    // TODO actually, in the glTF spec there's no mention of  supports for
+    // doubles. We are doing this here because in the tiny_gltf API, it's
+    // implied we could have stored doubles. This is unrelated with the fact
+    // that numbers in the JSON are read as doubles. Here we are talking about
     // the format where the data is stored inside the binary buffers that
-    // comes with the glTF JSON part
+    // comes with the glTF JSON part. Maybe remove the "double" types from
+    // tiny_gltf?
     if (inverse_bind_matrices_component_size == sizeof(double)) {
       double temp[16], tempf[16];
       memcpy(
@@ -1579,10 +1603,14 @@ int main(int argc, char **argv) {
     nb_morph_targets = std::max<int>(target.size(), nb_morph_targets);
   }
 
+  // Create an array of blend weights in the main node, and fill it with zeroes
   mesh_skeleton_graph.pose.blend_weights.resize(nb_morph_targets);
   std::generate(mesh_skeleton_graph.pose.blend_weights.begin(),
                 mesh_skeleton_graph.pose.blend_weights.end(),
                 [] { return 0.f; });
+
+  // TODO technically there's a "default" pose of the glTF asset in therm of the
+  // value of theses weights. They are set to zero by default, but still.
 
   // For each submesh, we need to know the draw operation, the VAO to
   // bind, the textures to use and the element count. This array store all
@@ -1609,20 +1637,25 @@ int main(int argc, char **argv) {
   load_geometry(model, textures, primitives, draw_call_descriptor, VAOs, VBOs,
                 indices, vertex_coord, texture_coord, normals, weights, joints);
 
-  // create a copy of the data for morphing
+  // create a copy of the data for morphing. We will repeatidly upload theses
+  // arrays to the GPU, while preserving the value of the original vertex
+  // coordinates. Morph targets are only deltas from the default position.
   auto display_position = vertex_coord;
   auto display_normal = normals;
 
-  // not doing this seems to break imgui in opengl2 mode...
+  // Not doing this seems to break imgui in opengl2 mode...
+  // TODO maybe just move to the OpenGL 3.x code. This could help debuging as
+  // tools like nvidia nsights are less usefull on old style opengl
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-  /*glm::mat4 model_matrix{1.f}*/
+  // Objects to store application display state
   glm::mat4 &model_matrix = mesh_skeleton_graph.local_xform;
   glm::mat4 view_matrix{1.f}, projection_matrix{1.f};
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 3.F};
 
+  //We need to pass this to glfw to have mouse control
   struct application_parameters {
     glm::vec3 &camera_position;
     bool button_states[3]{false};
@@ -1672,6 +1705,8 @@ int main(int argc, char **argv) {
     param->last_mouse_y = mouse_y;
   });
 
+  //TODO put the GLSL code ouside of here, load them from files
+  //Main vertex shader, that perform GPU skinning
   std::string vertex_shader_source_str = R"glsl(
 #version 330
 
@@ -1698,10 +1733,6 @@ void main()
   + input_weights.y * joint_matrix[int(input_joints.y)]
   + input_weights.z * joint_matrix[int(input_joints.z)]
   + input_weights.w * joint_matrix[int(input_joints.w)];
-
-
-  //perfom blending
-  vec4 blended_position = vec4(input_position, 1.0); 
 
   gl_Position = mvp * skin_matrix * vec4(input_position, 1.0);
 
@@ -1897,11 +1928,14 @@ void main()
     if (ImGui::Begin("Morph Target blend weights")) {
       for (int w = 0; w < nb_morph_targets; ++w) {
         ImGui::Columns(2, 0, false);
-        const std::string name  = "Morph Target [" + std::to_string(w) + "]";
+        const std::string name = "Morph Target [" + std::to_string(w) + "]";
         ImGui::Text(name.c_str());
         ImGui::NextColumn();
-        ImGui::InputFloat((std::string("##") + name).c_str(), &mesh_skeleton_graph.pose.blend_weights[w], 0.01f, 0.1f, "%f");
-        mesh_skeleton_graph.pose.blend_weights[w] = glm::clamp(mesh_skeleton_graph.pose.blend_weights[w], 0.f, 1.f);
+        ImGui::InputFloat((std::string("##") + name).c_str(),
+                          &mesh_skeleton_graph.pose.blend_weights[w], 0.01f,
+                          0.1f, "%f");
+        mesh_skeleton_graph.pose.blend_weights[w] =
+            glm::clamp(mesh_skeleton_graph.pose.blend_weights[w], 0.f, 1.f);
         ImGui::NextColumn();
       }
       ImGui::Columns();
