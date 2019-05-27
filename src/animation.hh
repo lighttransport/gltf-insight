@@ -113,9 +113,9 @@ struct animation {
       }
   }
 
- private:
   /// Apply the pose at "current time" to the animated objects
   void apply_pose();
+ private:
 
   /// Apply the pose in the animation channel for the given interpolation mode
   void apply_channel_target_for_interpolation_value(

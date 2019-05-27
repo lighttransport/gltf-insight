@@ -1446,19 +1446,20 @@ int main(int argc, char **argv) {
 
   // sequence with default values
   gltf_insight::AnimSequence mySequence;
-  mySequence.mFrameMin = -100;
-  mySequence.mFrameMax = 1000;
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{0, 10, 30, false});
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{1, 20, 30, false});
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{3, 12, 60, false});
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{2, 61, 90, false});
-  mySequence.myItems.push_back(
-      gltf_insight::AnimSequence::AnimSequenceItem{4, 90, 99, false});
-
+  mySequence.mFrameMin = 0;
+  mySequence.mFrameMax = 100;
+  /*
+    mySequence.myItems.push_back(
+    gltf_insight::AnimSequence::AnimSequenceItem{0, 10, 30, false});
+    mySequence.myItems.push_back(
+    gltf_insight::AnimSequence::AnimSequenceItem{1, 20, 30, false});
+    mySequence.myItems.push_back(
+    gltf_insight::AnimSequence::AnimSequenceItem{3, 12, 60, false});
+    mySequence.myItems.push_back(
+    gltf_insight::AnimSequence::AnimSequenceItem{2, 61, 90, false});
+    mySequence.myItems.push_back(
+    gltf_insight::AnimSequence::AnimSequenceItem{4, 90, 99, false});
+  */
   bool show_imgui_demo = false;
 
   // We are bypassing the actual glTF scene here, we are interested in a
@@ -1513,6 +1514,12 @@ int main(int argc, char **argv) {
   std::vector<animation> animations(nb_animations);
 
   load_animations(model, animations);
+
+  for (int i = 0; i < nb_animations; ++i) {
+    mySequence.myItems.push_back(gltf_insight::AnimSequence::AnimSequenceItem{
+        0, 60 * int(animations[i].min_time), 60 * int(animations[i].max_time),
+        false});
+  }
 
   const auto &inverse_bind_matrices_bufferview =
       model.bufferViews[inverse_bind_matrices_accessor.bufferView];
@@ -1655,7 +1662,7 @@ int main(int argc, char **argv) {
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 3.F};
 
-  //We need to pass this to glfw to have mouse control
+  // We need to pass this to glfw to have mouse control
   struct application_parameters {
     glm::vec3 &camera_position;
     bool button_states[3]{false};
@@ -1705,8 +1712,8 @@ int main(int argc, char **argv) {
     param->last_mouse_y = mouse_y;
   });
 
-  //TODO put the GLSL code ouside of here, load them from files
-  //Main vertex shader, that perform GPU skinning
+  // TODO put the GLSL code ouside of here, load them from files
+  // Main vertex shader, that perform GPU skinning
   std::string vertex_shader_source_str = R"glsl(
 #version 330
 
@@ -1862,8 +1869,9 @@ void main()
   double last_frame_time = glfwGetTime();
   int active_animation = 0;
   bool playing_state = true;
-  if (animations.size() > 0)
-    animations[active_animation].set_playing_state(playing_state);
+  /*if (animations.size() > 0)
+    animations[active_animation].set_playing_state(playing_state);*/
+
   std::vector<std::string> animation_names(animations.size());
   for (size_t i = 0; i < animations.size(); ++i)
     animation_names[i] = animations[i].name;
@@ -1876,46 +1884,44 @@ void main()
     ImGui::NewFrame();
     ImGuizmo::BeginFrame();
     std::string shader_to_use;
-
+    /*
     if (ImGui::Begin("Animation Player")) {
       ImGui::Text("Has %d animation%s", animations.size(),
                   animations.size() > 1 ? "s" : "");
-      ImGui::Checkbox("playing_state", &playing_state);
+      //      ImGui::Checkbox("playing_state", &playing_state);
       ImGuiCombo("Active animation", &active_animation, animation_names);
       ImGui::Text("Playback time [%f] seconds",
                   animations[active_animation].current_time);
     }
     ImGui::End();
+    */
+    ImGui::Begin("Hello, world!");  // Create a window called "Hello,
+    // world!" and append into it.
 
-    {
-      ImGui::Begin("Hello, world!");  // Create a window called "Hello,
-      // world!" and append into it.
+    ImGui::Text("This is some useful text.");  // Display some text (you can
+    // use a format strings too)
 
-      ImGui::Text("This is some useful text.");  // Display some text (you can
-      // use a format strings too)
+    ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
+    if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
 
-      ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
-      if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
+    ImGui::End();
 
-      ImGui::End();
-
-      ImGui::Begin("Shader mode");
-      std::vector<std::string> selections;
-      static int selected_shader = 0;
-      static bool first = true;
-      int i = 0;
-      for (const auto &shader : shaders) {
-        selections.push_back(shader.first);
-        if (first && shader.first == "textured") {
-          selected_shader = i;
-          first = false;
-        }
-        ++i;
+    ImGui::Begin("Shader mode");
+    std::vector<std::string> selections;
+    static int selected_shader = 0;
+    static bool first = true;
+    int i = 0;
+    for (const auto &shader : shaders) {
+      selections.push_back(shader.first);
+      if (first && shader.first == "textured") {
+        selected_shader = i;
+        first = false;
       }
-      ImGuiCombo("Choose shader", &selected_shader, selections);
-      shader_to_use = selections[selected_shader];
-      ImGui::End();
+      ++i;
     }
+    ImGuiCombo("Choose shader", &selected_shader, selections);
+    shader_to_use = selections[selected_shader];
+    ImGui::End();
 
     asset_images_window(textures);
 
@@ -1942,48 +1948,73 @@ void main()
     }
     ImGui::End();
 
-    //    {
-    //      // let's create the sequencer
-    //      static int selectedEntry = -1;
-    //      static int firstFrame = 0;
-    //      static bool expanded = true;
-    //      static int currentFrame = 120;
-    //      ImGui::SetNextWindowPos(ImVec2(10, 350));
-    //
-    //      ImGui::SetNextWindowSize(ImVec2(940, 480));
-    //      ImGui::Begin("Sequencer");
-    //
-    //      ImGui::PushItemWidth(130);
-    //      ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
-    //      ImGui::SameLine();
-    //      ImGui::InputInt("Frame ", &currentFrame);
-    //      ImGui::SameLine();
-    //      ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
-    //      ImGui::PopItemWidth();
-    //#if 0
-    //      Sequencer(
-    //          &mySequence, &currentFrame, &expanded, &selectedEntry,
-    //          &firstFrame, ImSequencer::SEQUENCER_EDIT_STARTEND |
-    //          ImSequencer::SEQUENCER_ADD |
-    //              ImSequencer::SEQUENCER_DEL |
-    //              ImSequencer::SEQUENCER_COPYPASTE |
-    //              ImSequencer::SEQUENCER_CHANGE_FRAME);
-    //#else
-    //      Sequencer(&mySequence, &currentFrame, &expanded,
-    //      &selectedEntry,
-    //                &firstFrame, 0);
-    //#endif
-    //      // add a UI to edit that particular item
-    //      if (selectedEntry != -1) {
-    //        const gltf_insight::AnimSequence::AnimSequenceItem &item =
-    //            mySequence.myItems[selectedEntry];
-    //        ImGui::Text("I am a %s, please edit me",
-    //                    gltf_insight::SequencerItemTypeNames[item.mType]);
-    //        // switch (type) ....
-    //      }
-    //
-    //      ImGui::End();
-    //    }
+    // let's create the sequencer
+    static int selectedEntry = -1;
+    static int firstFrame = 0;
+    static bool expanded = true;
+    static int currentFrame;
+    static double currentPlayTime = 0;
+    double current_time = glfwGetTime();
+    if (playing_state) {
+      currentPlayTime += current_time - last_frame_time;
+    }
+    last_frame_time = current_time;
+    currentFrame = int(60 * currentPlayTime);
+
+    ImGui::Begin("Sequencer");
+    if (ImGui::Button(playing_state ? "Pause" : "Play")) {
+      playing_state = !playing_state;
+    }
+
+    ImGui::PushItemWidth(130);
+    ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
+    ImGui::SameLine();
+    if (ImGui::InputInt("Frame ", &currentFrame)) {
+      currentPlayTime = double(currentFrame) / 60.0;
+    }
+    ImGui::SameLine();
+    ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
+    ImGui::PopItemWidth();
+#if 0
+        Sequencer(
+                  &mySequence, &currentFrame, &expanded, &selectedEntry,
+                  &firstFrame, ImSequencer::SEQUENCER_EDIT_STARTEND |
+                  ImSequencer::SEQUENCER_ADD |
+                  ImSequencer::SEQUENCER_DEL |
+                  ImSequencer::SEQUENCER_COPYPASTE |
+                  ImSequencer::SEQUENCER_CHANGE_FRAME);
+#else
+    const auto saved_frame = currentFrame;
+    Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry,
+              &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
+    if (saved_frame != currentFrame) {
+      currentPlayTime = double(currentFrame) / 60.0;
+    }
+#endif
+    // add a UI to edit that particular item
+    if (selectedEntry != -1) {
+      const gltf_insight::AnimSequence::AnimSequenceItem &item =
+          mySequence.myItems[selectedEntry];
+      ImGui::Text("I am a %s, please edit me",
+                  gltf_insight::SequencerItemTypeNames[item.mType]);
+      // switch (type) ....
+    }
+
+    ImGui::End();
+
+    // loop the sequencer now: TODO replace that true with a "is looping"
+    // boolean
+    if (true && currentFrame > mySequence.mFrameMax) {
+      currentFrame = mySequence.mFrameMin;
+      currentPlayTime = double(currentFrame) / 60.0;
+    }
+
+    for (auto &anim : animations) {
+      anim.set_time(float(currentPlayTime));  // TODO handle timeline position
+                                              // of animaiton sequence
+      anim.playing = playing_state;
+      anim.apply_pose();
+    }
 
     {
       // Rendering
@@ -2039,9 +2070,9 @@ void main()
                            glm::value_ptr(model_matrix), NULL, NULL);
 
       double current_time = glfwGetTime();
-      animations[active_animation].set_playing_state(playing_state);
-      animations[active_animation].add_time(
-          float(current_time - last_frame_time));
+      /*animations[active_animation].set_playing_state(playing_state);
+      /*      animations[active_animation].add_time(
+              float(current_time - last_frame_time));*/
       last_frame_time = glfwGetTime();
 
       if (!playing_state) {
