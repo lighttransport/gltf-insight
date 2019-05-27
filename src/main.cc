@@ -1936,21 +1936,17 @@ void main()
 
     if (ImGui::Begin("Morph Target blend weights")) {
       for (int w = 0; w < nb_morph_targets; ++w) {
-        ImGui::Columns(2, 0, false);
         const std::string name = "Morph Target [" + std::to_string(w) + "]";
-        ImGui::Text(name.c_str());
-        ImGui::NextColumn();
-        ImGui::InputFloat((std::string("##") + name).c_str(),
-                          &mesh_skeleton_graph.pose.blend_weights[w], 0.01f,
-                          0.1f, "%f");
+        ImGui::SliderFloat(name.c_str(),
+                          &mesh_skeleton_graph.pose.blend_weights[w], 0,
+                          1, "%f");
         mesh_skeleton_graph.pose.blend_weights[w] =
             glm::clamp(mesh_skeleton_graph.pose.blend_weights[w], 0.f, 1.f);
-        ImGui::NextColumn();
       }
-      ImGui::Columns();
     }
     ImGui::End();
 
+    bool need_to_update_pose = false;
     // let's create the sequencer
     static int selectedEntry = -1;
     static int firstFrame = 0;
@@ -1974,6 +1970,7 @@ void main()
     ImGui::SameLine();
     if (ImGui::InputInt("Frame ", &currentFrame)) {
       currentPlayTime = double(currentFrame) / 60.0;
+      need_to_update_pose = true;
     }
     ImGui::SameLine();
     ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
@@ -1992,6 +1989,7 @@ void main()
               &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
     if (saved_frame != currentFrame) {
       currentPlayTime = double(currentFrame) / 60.0;
+      need_to_update_pose = true;
     }
 #endif
     // add a UI to edit that particular item
@@ -2016,7 +2014,7 @@ void main()
       anim.set_time(float(currentPlayTime));  // TODO handle timeline position
                                               // of animaiton sequence
       anim.playing = playing_state;
-      anim.apply_pose();
+      if (need_to_update_pose || playing_state) anim.apply_pose();
     }
 
     {
@@ -2078,13 +2076,13 @@ void main()
               float(current_time - last_frame_time));*/
       last_frame_time = glfwGetTime();
 
-      if (!playing_state) {
-        for (auto *bone : flat_bone_list) {
-          bone->pose.translation = glm::vec3(0.f, 0.f, 0.f);
-          bone->pose.scale = glm::vec3(1.f, 1.f, 1.f);
-          bone->pose.rotation = glm::quat(1.f, 0.f, 0.f, 0.f);
-        }
-      }
+      // if (!playing_state) {
+      //   for (auto *bone : flat_bone_list) {
+      //     bone->pose.translation = glm::vec3(0.f, 0.f, 0.f);
+      //     bone->pose.scale = glm::vec3(1.f, 1.f, 1.f);
+      //     bone->pose.rotation = glm::quat(1.f, 0.f, 0.f, 0.f);
+      //   }
+      // }
 
       update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
       glm::mat4 inverse_model = glm::inverse(model_matrix);
