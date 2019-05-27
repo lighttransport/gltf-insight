@@ -10,6 +10,11 @@ if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include")
     "by running \"git submodule update --init\"")
 endif()
 
+# cmake modules
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/sanitizers)
+find_package(Sanitizers) # Address sanitizer (-DSANITIZE_ADDRESS=ON)
+
 set (CMAKE_CXX_STANDARD 11)
 
 find_package(OpenGL REQUIRED)
@@ -22,10 +27,10 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/dep
 set(SOURCES
     src/main.cc
     src/gltf-loader.cc
-  	src/gltf-graph.cc
-	  src/gltf-graph.hh
+    src/gltf-graph.cc
+    src/gltf-graph.hh
     src/animation.hh
-	src/animation.cc
+    src/animation.cc
 )
 
 list(APPEND UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad.c)
@@ -66,6 +71,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glm)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf)
 
 add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES})
+add_sanitizers(${BUILD_TARGET})
 
 target_link_libraries(
     ${BUILD_TARGET}
