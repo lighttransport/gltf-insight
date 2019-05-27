@@ -146,7 +146,7 @@ static void model_info_window(const tinygltf::Model &model) {
       const auto &skin = model.skins[main_node.skin];
       ImGui::Text("Skin [%d] skeleton root node [%d]", main_node.skin,
                   skin.skeleton);
-      ImGui::Text("Skin joint count [%d]", skin.joints.size());
+      ImGui::Text("Skin joint count [%zu]", skin.joints.size());
       // if (ImGui::CollapsingHeader("Skeleton topology"))
       //  describe_node_topology_in_imgui_tree(model, skin.skeleton);
     }
@@ -184,7 +184,7 @@ static void animation_window(const std::vector<animation> &animations) {
   // channels
   //
   if (ImGui::CollapsingHeader("channels")) {
-    ImGui::Text("Animation has [%d] channels", animation.channels.size());
+    ImGui::Text("Animation has [%zu] channels", animation.channels.size());
     static int channel_idx = 0;
     ImGui::InputInt("channel", &channel_idx, 1, 1);
     channel_idx = std::max<int>(
@@ -323,7 +323,7 @@ static void animation_window(const std::vector<animation> &animations) {
   if (ImGui::CollapsingHeader("samplers")) {
     std::vector<std::string> sampler_names;
 
-    ImGui::Text("Animation has [%d] samplers", animation.samplers.size());
+    ImGui::Text("Animation has [%zu] samplers", animation.samplers.size());
     static int sampler_idx = 0;
     ImGui::InputInt("sampler", &sampler_idx, 1, 1);
     sampler_idx = std::max<int>(
@@ -345,7 +345,7 @@ static void animation_window(const std::vector<animation> &animations) {
     }());
 
     ImGui::Text("Keyframe range : %f, %f [secs]", sampler.min_v, sampler.max_v);
-    ImGui::Text("# of key frames : %d", sampler.keyframes.size());
+    ImGui::Text("# of key frames : %zu", sampler.keyframes.size());
 
     ImGui::Columns(2);
     ImGui::Text("Frame Number");
@@ -369,10 +369,9 @@ static void animation_window(const std::vector<animation> &animations) {
 void skinning_data_window(size_t submesh_id, const std::vector<float> &weights,
                           const std::vector<unsigned short> &joints) {
   ImGui::Begin("Skinning data", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Text("Submesh[%d]", submesh_id);
+  ImGui::Text("Submesh[%zu]", submesh_id);
   ImGui::BeginChild("##scrollable_data_region", ImVec2(600, 800), false,
-                    ImGuiWindowFlags_AlwaysVerticalScrollbar),
-      submesh_id;
+                    ImGuiWindowFlags_AlwaysVerticalScrollbar);
   const auto vertex_count = weights.size() / 4;
   assert(vertex_count == joints.size() / 4);
 
@@ -389,7 +388,7 @@ void skinning_data_window(size_t submesh_id, const std::vector<float> &weights,
   ImGui::NextColumn();
   ImGui::Separator();
   for (size_t i = 0; i < vertex_count; ++i) {
-    ImGui::Text("%d", i);
+    ImGui::Text("%zu", i);
     ImGui::NextColumn();
     ImGui::Text("%f * %d", weights[i * 4], joints[i * 4]);
     ImGui::NextColumn();
@@ -510,7 +509,7 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
 
 void asset_images_window(const std::vector<GLuint> &textures) {
   if (ImGui::Begin("glTF Images", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-    ImGui::Text("Number of textures [%d]", textures.size());
+    ImGui::Text("Number of textures [%zu]", textures.size());
     ImGui::BeginChild("##ScrollableRegion0", ImVec2(256, 286), false,
                       ImGuiWindowFlags_AlwaysVerticalScrollbar);
     for (int i = 0; i < textures.size(); ++i) {
