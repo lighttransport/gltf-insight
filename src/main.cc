@@ -1466,7 +1466,7 @@ int main(int argc, char **argv) {
   // node that has a mesh attached to it:
   const auto mesh_node_index = find_main_mesh_node(model);
   if (mesh_node_index < 0) {
-    std::cerr << "The loaded gltf file doesn't have any findable mesh";
+    std::cerr << "The loaded gltf file doesn't have any findable mesh\n";
     return EXIT_SUCCESS;
   }
 
@@ -1474,6 +1474,10 @@ int main(int argc, char **argv) {
   // Get access to the data
   const auto &mesh_node = model.nodes[mesh_node_index];
   const auto &mesh = model.meshes[mesh_node.mesh];
+  if (mesh_node.skin < 0) {
+    std::cerr << "The loaded gltf file doesn't have any skin in the mesh\n";
+    return EXIT_SUCCESS;
+  }
   const auto &skin = model.skins[mesh_node.skin];
   auto skeleton = skin.skeleton;
 
