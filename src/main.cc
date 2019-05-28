@@ -1467,7 +1467,7 @@ int main(int argc, char **argv) {
   const auto mesh_node_index = find_main_mesh_node(model);
   if (mesh_node_index < 0) {
     std::cerr << "The loaded gltf file doesn't have any findable mesh\n";
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE;
   }
 
   // TODO (ybalrid) : refactor loading code outside of int main()
@@ -1476,7 +1476,7 @@ int main(int argc, char **argv) {
   const auto &mesh = model.meshes[mesh_node.mesh];
   if (mesh_node.skin < 0) {
     std::cerr << "The loaded gltf file doesn't have any skin in the mesh\n";
-    return EXIT_SUCCESS;
+    return EXIT_FAILURE;
   }
   const auto &skin = model.skins[mesh_node.skin];
   auto skeleton = skin.skeleton;
@@ -1870,7 +1870,6 @@ void main()
 
   // Main loop
   double last_frame_time = glfwGetTime();
-  int active_animation = 0;
   bool playing_state = true;
   /*if (animations.size() > 0)
     animations[active_animation].set_playing_state(playing_state);*/
@@ -1938,8 +1937,8 @@ void main()
       for (int w = 0; w < nb_morph_targets; ++w) {
         const std::string name = "Morph Target [" + std::to_string(w) + "]";
         ImGui::SliderFloat(name.c_str(),
-                          &mesh_skeleton_graph.pose.blend_weights[w], 0,
-                          1, "%f");
+                           &mesh_skeleton_graph.pose.blend_weights[w], 0, 1,
+                           "%f");
         mesh_skeleton_graph.pose.blend_weights[w] =
             glm::clamp(mesh_skeleton_graph.pose.blend_weights[w], 0.f, 1.f);
       }
