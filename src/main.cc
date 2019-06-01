@@ -696,8 +696,10 @@ void create_flat_bone_array(gltf_node &root,
 
 void sort_bone_array(std::vector<gltf_node *> &bone_array,
                      const tinygltf::Skin &skin_object) {
-  assert(bone_array.size() == skin_object.joints.size());
-  for (size_t counter = 0; counter < bone_array.size(); ++counter) {
+  // assert(bone_array.size() == skin_object.joints.size());
+  for (size_t counter = 0;
+       counter < std::min(bone_array.size(), skin_object.joints.size());
+       ++counter) {
     int index_to_find = skin_object.joints[counter];
     for (size_t bone_index = 0; bone_index < bone_array.size(); ++bone_index) {
       if (bone_array[bone_index]->gltf_model_node_index == index_to_find) {
@@ -1579,14 +1581,14 @@ int main(int argc, char **argv) {
   // joint matrix calculation
   std::vector<gltf_node *> flat_bone_list;
   create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_bone_list);
-  assert(flat_bone_list.size() == nb_joints);
+  // assert(flat_bone_list.size() == nb_joints);
 
   // Five : For each animation loaded that is supposed to move the skeleton,
   // associate the animation channel targets with their gltf "node" here:
   for (auto &animation : animations) {
     animation.set_gltf_graph_targets(&mesh_skeleton_graph);
 
-#if defined(DEBUG) || defined(_DEBUG)
+#if 0 && (defined(DEBUG) || defined(_DEBUG))
     // Animation playing depend on these values being absolutely consistent:
     for (auto &channel : animation.channels) {
       // if this pointer is not null, it means that this channel is moving a
