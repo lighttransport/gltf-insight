@@ -8,7 +8,36 @@
 // contributors.
 //
 
+#pragma once
+
+#include <iostream>
+
 #include "tiny_gltf.h"
+
+static int find_node_with_mesh_in_children(const tinygltf::Model &model,
+                                           int root) {
+  const auto &root_node = model.nodes[root];
+  if (root_node.mesh >= 0) return root;
+
+  for (auto child : root_node.children) {
+    const auto result = find_node_with_mesh_in_children(model, child);
+    if (result > 0 && model.nodes[result].mesh >= 0) return result;
+  }
+
+  return -1;
+}
+
+static int find_main_mesh_node(const tinygltf::Model &model) {
+  const auto &node_list =
+      model.scenes[model.defaultScene >= 0 ? model.defaultScene : 0].nodes;
+
+  for (auto node : node_list) {
+    const auto mesh_node = find_node_with_mesh_in_children(model, node);
+    if (mesh_node >= 0) return mesh_node;
+  }
+
+  return -1;
+}
 
 namespace tinygltf {
 
@@ -129,9 +158,9 @@ static inline float DecodeAnimationChannelValue(uint16_t c) {
   return float(c) / 65525.0f;
 }
 
-const uint8_t *GetBufferAddress(const int i, const Accessor &accessor,
-                                const BufferView &bufferViewObject,
-                                const Buffer &buffer) {
+static inline const uint8_t *GetBufferAddress(
+    const int i, const Accessor &accessor, const BufferView &bufferViewObject,
+    const Buffer &buffer) {
   if (i >= int(accessor.count)) return nullptr;
 
   int byte_stride = accessor.ByteStride(bufferViewObject);
@@ -146,10 +175,9 @@ const uint8_t *GetBufferAddress(const int i, const Accessor &accessor,
   return addr;
 }
 
-static bool DecodeScalarAnimationValue(const size_t i,
-                                       const tinygltf::Accessor &accessor,
-                                       const tinygltf::Model &model,
-                                       float *scalar) {
+static inline bool DecodeScalarAnimationValue(
+    const size_t i, const tinygltf::Accessor &accessor,
+    const tinygltf::Model &model, float *scalar) {
   const BufferView &bufferView = model.bufferViews[accessor.bufferView];
   const Buffer &buffer = model.buffers[bufferView.buffer];
 

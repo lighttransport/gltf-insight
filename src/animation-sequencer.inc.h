@@ -1,7 +1,6 @@
 namespace gltf_insight {
 
-static const char *SequencerItemTypeNames[] = {
-    "Animation"};
+static const char *SequencerItemTypeNames[] = {"Animation"};
 
 struct RampEdit : public ImCurveEdit::Delegate {
   RampEdit() {

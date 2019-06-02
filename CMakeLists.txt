@@ -24,14 +24,7 @@ include_directories(${OPENGL_INCLUDE_DIR})
 # local glad
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/deps")
 
-set(SOURCES
-    src/main.cc
-    src/gltf-loader.cc
-    src/gltf-graph.cc
-    src/gltf-graph.hh
-    src/animation.hh
-    src/animation.cc
-)
+file(GLOB SOURCES src/*) #TODO should upgrade cmake and use CONFIGURE DEPENDS here
 
 list(APPEND UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad.c)
 
