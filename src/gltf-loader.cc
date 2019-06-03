@@ -579,3 +579,59 @@ void load_morph_targets(const tinygltf::Model &model,
     }
   }
 }
+
+void load_inverse_bind_matrix_array(
+    tinygltf::Model model, const tinygltf::Skin &skin, size_t nb_joints,
+    std::vector<glm::mat4> &inverse_bind_matrices) {
+  // Two :  we need to get the inverse bind matrix array, as it is
+  // necessary for skinning
+  const auto &inverse_bind_matrices_accessor =
+      model.accessors[skin.inverseBindMatrices];
+  assert(inverse_bind_matrices_accessor.type == TINYGLTF_TYPE_MAT4);
+  assert(inverse_bind_matrices_accessor.count == nb_joints);
+
+  const auto &inverse_bind_matrices_bufferview =
+      model.bufferViews[inverse_bind_matrices_accessor.bufferView];
+  const auto &inverse_bind_matrices_buffer =
+      model.buffers[inverse_bind_matrices_bufferview.buffer];
+  const size_t inverse_bind_matrices_stride =
+      inverse_bind_matrices_accessor.ByteStride(
+          inverse_bind_matrices_bufferview);
+  const auto inverse_bind_matrices_data_start =
+      inverse_bind_matrices_buffer.data.data() +
+      inverse_bind_matrices_accessor.byteOffset +
+      inverse_bind_matrices_bufferview.byteOffset;
+  const size_t inverse_bind_matrices_component_size =
+      tinygltf::GetComponentSizeInBytes(
+          inverse_bind_matrices_accessor.componentType);
+  assert(sizeof(double) >= inverse_bind_matrices_component_size);
+
+  inverse_bind_matrices.resize(nb_joints);
+
+  for (size_t i = 0; i < nb_joints; ++i) {
+    if (inverse_bind_matrices_component_size == sizeof(float)) {
+      float temp[16];
+      memcpy(
+          temp,
+          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
+          inverse_bind_matrices_component_size * 16);
+      inverse_bind_matrices[i] = glm::make_mat4(temp);
+    }
+    // TODO actually, in the glTF spec there's no mention of  supports for
+    // doubles. We are doing this here because in the tiny_gltf API, it's
+    // implied we could have stored doubles. This is unrelated with the fact
+    // that numbers in the JSON are read as doubles. Here we are talking about
+    // the format where the data is stored inside the binary buffers that
+    // comes with the glTF JSON part. Maybe remove the "double" types from
+    // tiny_gltf?
+    if (inverse_bind_matrices_component_size == sizeof(double)) {
+      double temp[16], tempf[16];
+      memcpy(
+          temp,
+          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
+          inverse_bind_matrices_component_size * 16);
+      for (int j = 0; j < 16; ++j) tempf[j] = float(temp[j]);
+      inverse_bind_matrices[i] = glm::make_mat4(tempf);
+    }
+  }
+}

@@ -33,190 +33,6 @@
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
 
-// skeleton_index is the first node that will be added as a child of
-// "graph_root" e.g: a gltf node has a mesh. That mesh has a skin, and that
-// skin as a node index as "skeleton". You need to pass that "skeleton"
-// integer to this function as skeleton_index. This returns a flat array of
-// the bones to be used by the skinning code
-void populate_gltf_skeleton_subgraph(const tinygltf::Model &model,
-                                     gltf_node &graph_root,
-                                     int skeleton_index) {
-  const auto &skeleton_node = model.nodes[skeleton_index];
-
-  // Holder for the data.
-  glm::mat4 xform(1.f);
-  glm::vec3 translation(0.f), scale(1.f, 1.f, 1.f);
-  glm::quat rotation(1.f, 0.f, 0.f, 0.f);
-
-  // A node can store both a transform matrix and separate translation, rotation
-  // and scale. We need to load them if they are present. tiny_gltf signal this
-  // by either having empty vectors, or vectors of the expected size.
-  const auto &node_matrix = skeleton_node.matrix;
-  if (node_matrix.size() == 16)  // 4x4 matrix
-  {
-    double tmp[16];
-    float tmpf[16];
-    memcpy(tmp, skeleton_node.matrix.data(), 16 * sizeof(double));
-
-    // Convert a double array to a float array
-    for (int i = 0; i < 16; ++i) {
-      tmpf[i] = float(tmp[i]);
-    }
-
-    // Both glm matrices and this float array have the same data layout. We can
-    // pass the pointer to glm::make_mat4
-    xform = glm::make_mat4(tmpf);
-  }
-
-  // Do the same for translation rotation and scale.
-  const auto &node_translation = skeleton_node.translation;
-  if (node_translation.size() == 3)  // 3D vector
-  {
-    for (size_t i = 0; i < 3; ++i) translation[i] = float(node_translation[i]);
-  }
-
-  const auto &node_scale = skeleton_node.scale;
-  if (node_scale.size() == 3)  // 3D vector
-  {
-    for (size_t i = 0; i < 3; ++i) scale[i] = float(node_scale[i]);
-  }
-
-  const auto &node_rotation = skeleton_node.rotation;
-  if (node_rotation.size() == 4)  // Quaternion
-  {
-    rotation.w = float(node_rotation[3]);
-    rotation.x = float(node_rotation[0]);
-    rotation.y = float(node_rotation[1]);
-    rotation.z = float(node_rotation[2]);
-    glm::normalize(rotation);  // Be prudent
-  }
-
-  const glm::mat4 rotation_matrix = glm::toMat4(rotation);
-  const glm::mat4 translation_matrix =
-      glm::translate(glm::mat4(1.f), translation);
-  const glm::mat4 scale_matrix = glm::scale(glm::mat4(1.f), scale);
-  const glm::mat4 reconstructed_matrix =
-      translation_matrix * rotation_matrix * scale_matrix;
-
-  // In the case that the node has both the matrix and the individual vectors,
-  // both transform has to be applied.
-  xform = xform * reconstructed_matrix;
-
-  graph_root.add_child_bone(xform);
-  auto &new_bone = *graph_root.children.back().get();
-  new_bone.gltf_model_node_index = skeleton_index;
-
-  for (int child : skeleton_node.children) {
-    populate_gltf_skeleton_subgraph(model, new_bone, child);
-  }
-}
-
-bool draw_joint_point = true;
-bool draw_bone_segment = true;
-bool draw_mesh_anchor_point = true;
-bool draw_bone_axes = true;
-
-// TODO use this snipet in a fragment shader to draw a cirle instead of a
-// square vec2 coord = gl_PointCoord - vec2(0.5);  //from [0,1] to
-// [-0.5,0.5] if(length(coord) > 0.5)                  //outside of circle
-// radius?
-//    discard;
-void draw_bones(gltf_node &root, GLuint shader, glm::mat4 view_matrix,
-                glm::mat4 projection_matrix) {
-  glUseProgram(shader);
-  glm::mat4 mvp = projection_matrix * view_matrix * root.world_xform;
-  glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
-                     glm::value_ptr(mvp));
-
-  const float line_width = 2;
-  const float axis_scale = 0.125;
-
-  if (draw_bone_axes) draw_space_base(shader, line_width, axis_scale);
-
-  for (auto &child : root.children) {
-    if (root.type != gltf_node::node_type::mesh && draw_bone_segment) {
-      glUseProgram(shader);
-      glLineWidth(8);
-      glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 0.5, 0.5, 1);
-      glBegin(GL_LINES);
-      glVertex4f(0, 0, 0, 1);
-      const auto child_position = child->local_xform[3];
-      glVertex4f(child_position.x, child_position.y, child_position.z, 1);
-      glEnd();
-    }
-    draw_bones(*child, shader, view_matrix, projection_matrix);
-  }
-
-  glUseProgram(shader);
-  glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
-                     glm::value_ptr(mvp));
-  if (draw_joint_point && root.type == gltf_node::node_type::bone) {
-    glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
-
-    draw_space_origin_point(10);
-  } else if (draw_mesh_anchor_point &&
-             root.type == gltf_node::node_type::mesh) {
-    glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 1, 0, 1);
-    draw_space_origin_point(10);
-  }
-  glUseProgram(0);
-}
-
-void create_flat_bone_array(gltf_node &root,
-                            std::vector<gltf_node *> &flat_array) {
-  if (root.type == gltf_node::node_type::bone)
-    flat_array.push_back(root.get_ptr());
-
-  for (auto &child : root.children) create_flat_bone_array(*child, flat_array);
-}
-
-void sort_bone_array(std::vector<gltf_node *> &bone_array,
-                     const tinygltf::Skin &skin_object) {
-  // assert(bone_array.size() == skin_object.joints.size());
-  for (size_t counter = 0;
-       counter < std::min(bone_array.size(), skin_object.joints.size());
-       ++counter) {
-    int index_to_find = skin_object.joints[counter];
-    for (size_t bone_index = 0; bone_index < bone_array.size(); ++bone_index) {
-      if (bone_array[bone_index]->gltf_model_node_index == index_to_find) {
-        std::swap(bone_array[counter], bone_array[bone_index]);
-        break;
-      }
-    }
-  }
-}
-
-void create_flat_bone_list(const tinygltf::Skin &skin,
-                           const std::vector<int>::size_type nb_joints,
-                           gltf_node mesh_skeleton_graph,
-                           std::vector<gltf_node *> &flatened_bone_list) {
-  create_flat_bone_array(mesh_skeleton_graph, flatened_bone_list);
-  sort_bone_array(flatened_bone_list, skin);
-}
-
-// This is useful because mesh.skeleton isn't required to point to the skeleton
-// root. We still want to find the skeleton root, so we are going to search for
-// it by hand.
-int find_skeleton_root(const tinygltf::Model &model,
-                       const std::vector<int> &joints, int start_node = 0) {
-  // Get the node to get the children
-  const auto &node = model.nodes[start_node];
-
-  for (int child : node.children) {
-    // If we are part of the skeleton, return our parent
-    for (int joint : joints) {
-      if (joint == child) return joint;
-    }
-    // try to find in children, if found return the child's child's parent (so,
-    // here, the retunred value by find_skeleton_root)
-    const int result = find_skeleton_root(model, joints, child);
-    if (result != -1) return result;
-  }
-
-  // Here it means we found nothing, return "nothing"
-  return -1;
-}
-
 static std::string GetFilePathExtension(const std::string &FileName) {
   if (FileName.find_last_of(".") != std::string::npos)
     return FileName.substr(FileName.find_last_of(".") + 1);
@@ -419,13 +235,6 @@ int main(int argc, char **argv) {
   for (int i = 0; i < nb_joints; ++i)
     joint_inverse_bind_matrix_map[skin.joints[i]] = i;
 
-  // Two :  we need to get the inverse bind matrix array, as it is
-  // necessary for skinning
-  const auto &inverse_bind_matrices_accessor =
-      model.accessors[skin.inverseBindMatrices];
-  assert(inverse_bind_matrices_accessor.type == TINYGLTF_TYPE_MAT4);
-  assert(inverse_bind_matrices_accessor.count == nb_joints);
-
   const auto nb_animations = model.animations.size();
   std::vector<animation> animations(nb_animations);
 
@@ -437,50 +246,8 @@ int main(int argc, char **argv) {
         false});
   }
 
-  const auto &inverse_bind_matrices_bufferview =
-      model.bufferViews[inverse_bind_matrices_accessor.bufferView];
-  const auto &inverse_bind_matrices_buffer =
-      model.buffers[inverse_bind_matrices_bufferview.buffer];
-  const size_t inverse_bind_matrices_stride =
-      inverse_bind_matrices_accessor.ByteStride(
-          inverse_bind_matrices_bufferview);
-  const auto inverse_bind_matrices_data_start =
-      inverse_bind_matrices_buffer.data.data() +
-      inverse_bind_matrices_accessor.byteOffset +
-      inverse_bind_matrices_bufferview.byteOffset;
-  const size_t inverse_bind_matrices_component_size =
-      tinygltf::GetComponentSizeInBytes(
-          inverse_bind_matrices_accessor.componentType);
-  assert(sizeof(double) >= inverse_bind_matrices_component_size);
-
-  std::vector<glm::mat4> inverse_bind_matrices(nb_joints);
-
-  for (size_t i = 0; i < nb_joints; ++i) {
-    if (inverse_bind_matrices_component_size == sizeof(float)) {
-      float temp[16];
-      memcpy(
-          temp,
-          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
-          inverse_bind_matrices_component_size * 16);
-      inverse_bind_matrices[i] = glm::make_mat4(temp);
-    }
-    // TODO actually, in the glTF spec there's no mention of  supports for
-    // doubles. We are doing this here because in the tiny_gltf API, it's
-    // implied we could have stored doubles. This is unrelated with the fact
-    // that numbers in the JSON are read as doubles. Here we are talking about
-    // the format where the data is stored inside the binary buffers that
-    // comes with the glTF JSON part. Maybe remove the "double" types from
-    // tiny_gltf?
-    if (inverse_bind_matrices_component_size == sizeof(double)) {
-      double temp[16], tempf[16];
-      memcpy(
-          temp,
-          inverse_bind_matrices_data_start + i * inverse_bind_matrices_stride,
-          inverse_bind_matrices_component_size * 16);
-      for (int j = 0; j < 16; ++j) tempf[j] = float(temp[j]);
-      inverse_bind_matrices[i] = glm::make_mat4(tempf);
-    }
-  }
+  std::vector<glm::mat4> inverse_bind_matrices;
+  load_inverse_bind_matrix_array(model, skin, nb_joints, inverse_bind_matrices);
 
   // Three : Load the skeleton graph. We need this to calculate the bones
   // world transform
@@ -679,7 +446,9 @@ int main(int argc, char **argv) {
     morph_window(mesh_skeleton_graph, nb_morph_targets);
 
     bool need_to_update_pose = false;
+
     // let's create the sequencer
+    static bool looping = true;
     static int selectedEntry = -1;
     static int firstFrame = 0;
     static bool expanded = true;
@@ -696,6 +465,7 @@ int main(int argc, char **argv) {
     if (ImGui::Button(playing_state ? "Pause" : "Play")) {
       playing_state = !playing_state;
     }
+    ImGui::SameLine(), ImGui::Checkbox("looping", &looping);
 
     ImGui::PushItemWidth(130);
     ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
@@ -707,15 +477,7 @@ int main(int argc, char **argv) {
     ImGui::SameLine();
     ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
     ImGui::PopItemWidth();
-#if 0
-        Sequencer(
-                  &mySequence, &currentFrame, &expanded, &selectedEntry,
-                  &firstFrame, ImSequencer::SEQUENCER_EDIT_STARTEND |
-                  ImSequencer::SEQUENCER_ADD |
-                  ImSequencer::SEQUENCER_DEL |
-                  ImSequencer::SEQUENCER_COPYPASTE |
-                  ImSequencer::SEQUENCER_CHANGE_FRAME);
-#else
+
     const auto saved_frame = currentFrame;
     Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry,
               &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
@@ -723,7 +485,7 @@ int main(int argc, char **argv) {
       currentPlayTime = double(currentFrame) / 60.0;
       need_to_update_pose = true;
     }
-#endif
+
     // add a UI to edit that particular item
     if (selectedEntry != -1) {
       const gltf_insight::AnimSequence::AnimSequenceItem &item =
@@ -737,7 +499,7 @@ int main(int argc, char **argv) {
 
     // loop the sequencer now: TODO replace that true with a "is looping"
     // boolean
-    if (true && currentFrame > mySequence.mFrameMax) {
+    if (looping && currentFrame > mySequence.mFrameMax) {
       currentFrame = mySequence.mFrameMin;
       currentPlayTime = double(currentFrame) / 60.0;
     }
@@ -863,13 +625,7 @@ int main(int argc, char **argv) {
       glBindVertexArray(0);
       glDisable(GL_DEPTH_TEST);
 
-      if (ImGui::Begin("Skeleton drawing options")) {
-        ImGui::Checkbox("Draw joint points", &draw_joint_point);
-        ImGui::Checkbox("Draw Bone as segments", &draw_bone_segment);
-        ImGui::Checkbox("Draw Bone's base axes", &draw_bone_axes);
-        ImGui::Checkbox("Draw Skeleton's Mesh base", &draw_mesh_anchor_point);
-      }
-      ImGui::End();
+      bone_display_window();
 
       shaders["debug_color"].use();
       draw_bones(mesh_skeleton_graph, shaders["debug_color"].get_program(),

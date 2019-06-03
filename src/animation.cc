@@ -1,5 +1,7 @@
 #include "animation.hh"
 
+#include "gltf-graph.hh"
+
 void animation::set_playing_state(bool state) { playing = state; }
 
 void animation::add_time(float delta) {
@@ -45,6 +47,18 @@ void animation::compute_time_boundaries() {
 
 animation::animation()
     : current_time(0), min_time(0), max_time(0), playing(false), name() {}
+
+/// Assign to each animation channel a pointer to the node they control
+
+void animation::set_gltf_graph_targets(gltf_node* root_node) {
+  for (auto& channel : channels)
+    if (channel.mode == channel::path::weight) {
+      channel.target_graph_node = root_node;
+    } else if (channel.target_node >= 0) {
+      gltf_node* node = root_node->get_node_with_index(channel.target_node);
+      if (node) channel.target_graph_node = node;
+    }
+}
 
 void animation::apply_pose() {
   for (auto& channel : channels) {

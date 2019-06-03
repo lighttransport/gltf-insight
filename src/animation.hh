@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-#include "gltf-graph.hh"
+struct gltf_node;
 
 /// Represent a loaded animation
 struct animation {
@@ -103,20 +103,12 @@ struct animation {
   animation();
 
   /// Assign to each animation channel a pointer to the node they control
-  void set_gltf_graph_targets(gltf_node* root_node) {
-    for (auto& channel : channels)
-      if (channel.mode == channel::path::weight) {
-        channel.target_graph_node = root_node;
-      } else if (channel.target_node >= 0) {
-        gltf_node* node = root_node->get_node_with_index(channel.target_node);
-        if (node) channel.target_graph_node = node;
-      }
-  }
+  void set_gltf_graph_targets(gltf_node* root_node);
 
   /// Apply the pose at "current time" to the animated objects
   void apply_pose();
- private:
 
+ private:
   /// Apply the pose in the animation channel for the given interpolation mode
   void apply_channel_target_for_interpolation_value(
       float interpolation_value, sampler::interpolation mode, int lower_frame,

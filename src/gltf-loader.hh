@@ -38,3 +38,7 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
 void load_morph_targets(const tinygltf::Model &model,
                         const tinygltf::Primitive &primitive,
                         std::vector<morph_target> &morph_targets);
+
+void load_inverse_bind_matrix_array(
+    tinygltf::Model model, const tinygltf::Skin &skin, size_t nb_joints,
+    std::vector<glm::mat4> &inverse_bind_matrices);

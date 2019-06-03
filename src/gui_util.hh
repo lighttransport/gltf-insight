@@ -8,6 +8,7 @@
 #include "examples/imgui_impl_glfw.h"
 #include "examples/imgui_impl_opengl2.h"
 #include "glm/glm.hpp"
+#include "gltf-graph.hh"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "tiny_gltf.h"
