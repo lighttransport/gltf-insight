@@ -33,16 +33,15 @@
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
 
-static std::string GetFilePathExtension(const std::string &FileName) {
+inline std::string GetFilePathExtension(const std::string& FileName) {
   if (FileName.find_last_of(".") != std::string::npos)
     return FileName.substr(FileName.find_last_of(".") + 1);
   return "";
 }
 
-int main(int argc, char **argv) {
+void parse_command_line(int argc, char** argv, bool debug_output,
+                        std::string& input_filename) {
   cxxopts::Options options("gltf-insignt", "glTF data insight tool");
-
-  bool debug_output = false;
 
   options.add_options()("d,debug", "Enable debugging",
                         cxxopts::value<bool>(debug_output))(
@@ -53,95 +52,55 @@ int main(int argc, char **argv) {
 
   if (argc < 2) {
     std::cout << options.help({"", "group"}) << std::endl;
-    return EXIT_FAILURE;
+    exit(EXIT_FAILURE);
   }
 
-  auto result = options.parse(argc, argv);
+  const auto result = options.parse(argc, argv);
 
   if (result.count("help")) {
     std::cout << options.help({"", "group"}) << std::endl;
-    return EXIT_FAILURE;
+    exit(EXIT_FAILURE);
   }
 
   if (!result.count("input")) {
     std::cerr << "Input file not specified." << std::endl;
     std::cout << options.help({"", "group"}) << std::endl;
-    return EXIT_FAILURE;
+    exit(EXIT_FAILURE);
   }
 
-  std::string input_filename = result["input"].as<std::string>();
+  input_filename = result["input"].as<std::string>();
+}
 
-  tinygltf::Model model;
-  tinygltf::TinyGLTF gltf_ctx;
-  {
-    std::string err;
-    std::string warn;
-    const std::string ext = GetFilePathExtension(input_filename);
+void load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,
+                     const std::string& input_filename,
+                     tinygltf::Model& model) {
+  std::string err;
+  std::string warn;
+  const std::string ext = GetFilePathExtension(input_filename);
 
-    bool ret = false;
-    if (ext.compare("glb") == 0) {
-      std::cout << "Reading binary glTF" << std::endl;
-      // assume binary glTF.
-      ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn,
-                                        input_filename.c_str());
-    } else {
-      std::cout << "Reading ASCII glTF" << std::endl;
-      // assume ascii glTF.
-      ret = gltf_ctx.LoadASCIIFromFile(&model, &err, &warn,
-                                       input_filename.c_str());
-    }
-
-    if (ret) {
-      std::cerr << "Problem while loading gltf:\n"
-                << "error: " << err << "\nwarning: " << warn << '\n';
-    }
-  }
-
-  // Setup window
-  glfwSetErrorCallback(error_callback);
-  if (!glfwInit()) {
-    return EXIT_FAILURE;
-  }
-
-#ifdef _DEBUG
-  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
-#endif
-
-  GLFWwindow *window =
-      glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
-  glfwMakeContextCurrent(window);
-  glfwSwapInterval(1);  // Enable vsync
-
-  glfwSetKeyCallback(window, key_callback);
-
-  // glad must be called after glfwMakeContextCurrent()
-
-  if (!gladLoadGL()) {
-    std::cerr << "Failed to initialize OpenGL context." << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  if (((GLVersion.major == 2) && (GLVersion.minor >= 1)) ||
-      (GLVersion.major >= 3)) {
-    // ok
+  bool ret = false;
+  if (ext.compare("glb") == 0) {
+    std::cout << "Reading binary glTF" << std::endl;
+    // assume binary glTF.
+    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn,
+                                      input_filename.c_str());
   } else {
-    std::cerr << "OpenGL 2.1 is not available." << std::endl;
-    return EXIT_FAILURE;
+    std::cout << "Reading ASCII glTF" << std::endl;
+    // assume ascii glTF.
+    ret =
+        gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
   }
 
-  std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
+  if (!ret) {
+    std::cerr << "Problem while loading gltf:\n"
+              << "error: " << err << "\nwarning: " << warn << '\n';
+  }
+}
 
-#ifdef _DEBUG
-  glEnable(GL_DEBUG_OUTPUT);
-  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-  glDebugMessageCallback((GLDEBUGPROC)glDebugOutput, nullptr);
-  glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr,
-                        GL_TRUE);
-#endif
-  glEnable(GL_DEPTH_TEST);
-
-  const auto nb_textures = model.images.size();
-  std::vector<GLuint> textures(nb_textures);
+void load_all_textures(
+    tinygltf::Model model,
+    const std::vector<tinygltf::Image>::size_type nb_textures,
+    std::vector<GLuint>& textures) {
   glGenTextures(GLsizei(nb_textures), textures.data());
 
   for (size_t i = 0; i < textures.size(); ++i) {
@@ -153,41 +112,29 @@ int main(int argc, char **argv) {
                  GL_UNSIGNED_BYTE, model.images[i].image.data());
     glGenerateMipmap(GL_TEXTURE_2D);
   }
+}
 
-  // Setup Dear ImGui context
-  ImGui::CreateContext();
-  ImGuiIO &io = ImGui::GetIO();
-  (void)io;
-  // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable
-  // Keyboard Controls io.ConfigFlags |=
-  // ImGuiConfigFlags_NavEnableGamepad;
-  // // Enable Gamepad Controls
+int main(int argc, char** argv) {
+  bool debug_output = false;
+  std::string input_filename;
+  tinygltf::Model model;
+  tinygltf::TinyGLTF gltf_ctx;
+  GLFWwindow* window;
 
-  // Setup Platform/Renderer bindings
-  ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL2_Init();
+  parse_command_line(argc, argv, debug_output, input_filename);
+  initialize_glfw_opengl_window(window);
+  load_glTF_asset(gltf_ctx, input_filename, model);
 
-  // Setup Style
-  ImGui::StyleColorsDark();
+  const auto nb_textures = model.images.size();
+  std::vector<GLuint> textures(nb_textures);
+  load_all_textures(model, nb_textures, textures);
+  initialize_imgui(window);
+  auto io = ImGui::GetIO();
 
   ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
   // sequence with default values
   gltf_insight::AnimSequence mySequence;
-  mySequence.mFrameMin = 0;
-  mySequence.mFrameMax = 100;
-  /*
-    mySequence.myItems.push_back(
-    gltf_insight::AnimSequence::AnimSequenceItem{0, 10, 30, false});
-    mySequence.myItems.push_back(
-    gltf_insight::AnimSequence::AnimSequenceItem{1, 20, 30, false});
-    mySequence.myItems.push_back(
-    gltf_insight::AnimSequence::AnimSequenceItem{3, 12, 60, false});
-    mySequence.myItems.push_back(
-    gltf_insight::AnimSequence::AnimSequenceItem{2, 61, 90, false});
-    mySequence.myItems.push_back(
-    gltf_insight::AnimSequence::AnimSequenceItem{4, 90, 99, false});
-  */
   bool show_imgui_demo = false;
 
   // We are bypassing the actual glTF scene here, we are interested in a
@@ -201,13 +148,13 @@ int main(int argc, char **argv) {
 
   // TODO (ybalrid) : refactor loading code outside of int main()
   // Get access to the data
-  const auto &mesh_node = model.nodes[mesh_node_index];
-  const auto &mesh = model.meshes[mesh_node.mesh];
+  const auto& mesh_node = model.nodes[mesh_node_index];
+  const auto& mesh = model.meshes[mesh_node.mesh];
   if (mesh_node.skin < 0) {
     std::cerr << "The loaded gltf file doesn't have any skin in the mesh\n";
     return EXIT_FAILURE;
   }
-  const auto &skin = model.skins[mesh_node.skin];
+  const auto& skin = model.skins[mesh_node.skin];
   auto skeleton = skin.skeleton;
 
   while (skeleton == -1) {
@@ -220,7 +167,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  const auto &primitives = mesh.primitives;
+  const auto& primitives = mesh.primitives;
   // I tend to call a "primitive" here a submesh, not to mix them with what
   // OpenGL actually call a "primitive" (point, line, triangle, strip,
   // fan...)
@@ -257,13 +204,13 @@ int main(int argc, char **argv) {
   // Four : Get an array that is in the same order as the bones in the
   // glTF to represent the whole skeletons. This is important for the
   // joint matrix calculation
-  std::vector<gltf_node *> flat_bone_list;
+  std::vector<gltf_node*> flat_bone_list;
   create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_bone_list);
   // assert(flat_bone_list.size() == nb_joints);
 
   // Five : For each animation loaded that is supposed to move the skeleton,
   // associate the animation channel targets with their gltf "node" here:
-  for (auto &animation : animations) {
+  for (auto& animation : animations) {
     animation.set_gltf_graph_targets(&mesh_skeleton_graph);
 
 #if 0 && (defined(DEBUG) || defined(_DEBUG))
@@ -289,7 +236,7 @@ int main(int argc, char **argv) {
 
   // Set the number of weights to animate
   int nb_morph_targets = 0;
-  for (auto &target : morph_targets) {
+  for (auto& target : morph_targets) {
     nb_morph_targets = std::max<int>(target.size(), nb_morph_targets);
   }
 
@@ -313,7 +260,7 @@ int main(int argc, char **argv) {
   // We have 5 vertex attributes per vertex and one element array buffer
   std::vector<GLuint[6]> VBOs(nb_submeshes);
   glGenVertexArrays(GLsizei(nb_submeshes), VAOs.data());
-  for (auto &VBO : VBOs) {
+  for (auto& VBO : VBOs) {
     glGenBuffers(6, VBO);
   }
 
@@ -340,26 +287,26 @@ int main(int argc, char **argv) {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
   // Objects to store application display state
-  glm::mat4 &model_matrix = mesh_skeleton_graph.local_xform;
+  glm::mat4& model_matrix = mesh_skeleton_graph.local_xform;
   glm::mat4 view_matrix{1.f}, projection_matrix{1.f};
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 3.F};
 
   // We need to pass this to glfw to have mouse control
   struct application_parameters {
-    glm::vec3 &camera_position;
+    glm::vec3& camera_position;
     bool button_states[3]{false};
     double last_mouse_x{0}, last_mouse_y{0};
     double rot_pitch{0}, rot_yaw{0};
     double rotation_scale = 0.2;
-    application_parameters(glm::vec3 &cam_pos) : camera_position(cam_pos) {}
+    application_parameters(glm::vec3& cam_pos) : camera_position(cam_pos) {}
   } my_user_pointer{camera_position};
 
   glfwSetWindowUserPointer(window, &my_user_pointer);
 
   glfwSetMouseButtonCallback(
-      window, [](GLFWwindow *window, int button, int action, int mods) {
-        auto *param = reinterpret_cast<application_parameters *>(
+      window, [](GLFWwindow* window, int button, int action, int mods) {
+        auto* param = reinterpret_cast<application_parameters*>(
             glfwGetWindowUserPointer(window));
 
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
@@ -376,9 +323,9 @@ int main(int argc, char **argv) {
           param->button_states[2] = false;
       });
 
-  glfwSetCursorPosCallback(window, [](GLFWwindow *window, double mouse_x,
+  glfwSetCursorPosCallback(window, [](GLFWwindow* window, double mouse_x,
                                       double mouse_y) {
-    auto *param = reinterpret_cast<application_parameters *>(
+    auto* param = reinterpret_cast<application_parameters*>(
         glfwGetWindowUserPointer(window));
 
     // mouse left pressed
@@ -408,15 +355,17 @@ int main(int argc, char **argv) {
 
   std::vector<std::string> shader_names;
   static int selected_shader = 0;
-  static bool first = true;
-  int i = 0;
-  for (const auto &shader : shaders) {
-    shader_names.push_back(shader.first);
-    if (first && shader.first == "textured") {
-      selected_shader = i;
-      first = false;
+  {
+    static bool first = true;
+    int i = 0;
+    for (const auto& shader : shaders) {
+      shader_names.push_back(shader.first);
+      if (first && shader.first == "textured") {
+        selected_shader = i;
+        first = false;
+      }
+      ++i;
     }
-    ++i;
   }
 
   while (!glfwWindowShouldClose(window)) {
@@ -488,7 +437,7 @@ int main(int argc, char **argv) {
 
     // add a UI to edit that particular item
     if (selectedEntry != -1) {
-      const gltf_insight::AnimSequence::AnimSequenceItem &item =
+      const gltf_insight::AnimSequence::AnimSequenceItem& item =
           mySequence.myItems[selectedEntry];
       ImGui::Text("I am a %s, please edit me",
                   gltf_insight::SequencerItemTypeNames[item.mType]);
@@ -504,7 +453,7 @@ int main(int argc, char **argv) {
       currentPlayTime = double(currentFrame) / 60.0;
     }
 
-    for (auto &anim : animations) {
+    for (auto& anim : animations) {
       anim.set_time(float(currentPlayTime));  // TODO handle timeline position
                                               // of animaiton sequence
       anim.playing = playing_state;
@@ -557,7 +506,6 @@ int main(int argc, char **argv) {
       ImGuizmo::RecomposeMatrixFromComponents(matrixTranslation, matrixRotation,
                                               matrixScale,
                                               glm::value_ptr(model_matrix));
-
       ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
       ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
                            glm::value_ptr(projection_matrix),
@@ -584,7 +532,7 @@ int main(int argc, char **argv) {
                                          glm::vec4(0.5f, 0.5f, 0.f, 1.f));
 
       for (size_t i = 0; i < draw_call_descriptor.size(); ++i) {
-        const auto &draw_call_to_perform = draw_call_descriptor[i];
+        const auto& draw_call_to_perform = draw_call_descriptor[i];
 
         // If mesh has morph targets
         if (mesh_skeleton_graph.pose.blend_weights.size() > 0) {

@@ -342,3 +342,57 @@ void morph_window(gltf_node &mesh_skeleton_graph, int nb_morph_targets) {
   }
   ImGui::End();
 }
+
+void initialize_glfw_opengl_window(GLFWwindow *&window) {
+  // Setup window
+  glfwSetErrorCallback(error_callback);
+  if (!glfwInit()) {
+    exit(EXIT_FAILURE);
+  }
+
+#ifdef _DEBUG
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
+
+  window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
+  glfwMakeContextCurrent(window);
+  glfwSwapInterval(1);  // Enable vsync
+  glfwSetKeyCallback(window, key_callback);
+
+  // glad must be called after glfwMakeContextCurrent()
+  if (!gladLoadGL()) {
+    std::cerr << "Failed to initialize OpenGL context." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  if (((GLVersion.major == 2) && (GLVersion.minor >= 1)) ||
+      (GLVersion.major >= 3)) {
+    // ok
+  } else {
+    std::cerr << "OpenGL 2.1 is not available." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
+
+#ifdef _DEBUG
+  glEnable(GL_DEBUG_OUTPUT);
+  glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+  glDebugMessageCallback((GLDEBUGPROC)glDebugOutput, nullptr);
+  glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr,
+                        GL_TRUE);
+#endif
+  glEnable(GL_DEPTH_TEST);
+}
+
+void initialize_imgui(GLFWwindow *window) {
+  // Setup Dear ImGui context
+  ImGui::CreateContext();
+  auto io = ImGui::GetIO();
+  (void)io;
+  // Setup Platform/Renderer bindings
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplOpenGL2_Init();
+  // Setup Style
+  ImGui::StyleColorsDark();
+}
