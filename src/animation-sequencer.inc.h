@@ -1,6 +1,8 @@
+#include <algorithm>
+
 namespace gltf_insight {
 
-static const char *SequencerItemTypeNames[] = {"Animation"};
+static const char* SequencerItemTypeNames[] = {"Animation"};
 
 struct RampEdit : public ImCurveEdit::Delegate {
   RampEdit() {
@@ -37,7 +39,7 @@ struct RampEdit : public ImCurveEdit::Delegate {
     uint32_t cols[] = {0xFF0000FF, 0xFF00FF00, 0xFFFF0000};
     return cols[curveIndex];
   }
-  ImVec2 *GetPoints(size_t curveIndex) { return mPts[curveIndex]; }
+  ImVec2* GetPoints(size_t curveIndex) { return mPts[curveIndex]; }
 
   virtual int EditPoint(size_t curveIndex, int pointIndex, ImVec2 value) {
     mPts[curveIndex][pointIndex] = ImVec2(value.x, value.y);
@@ -53,8 +55,8 @@ struct RampEdit : public ImCurveEdit::Delegate {
     SortValues(curveIndex);
   }
   virtual ImVec2 GetRange() { return ImVec2(mMax.x - mMin.x, mMax.y - mMin.y); }
-  virtual ImVec2 &GetMin() { return mMin; }
-  virtual ImVec2 &GetMax() { return mMax; }
+  virtual ImVec2& GetMin() { return mMin; }
+  virtual ImVec2& GetMax() { return mMax; }
   virtual unsigned int GetBackgroundColor() { return 0; }
   ImVec2 mPts[3][8];
   size_t mPointCount[3];
@@ -78,12 +80,12 @@ struct AnimSequence : public ImSequencer::SequenceInterface {
   virtual int GetItemCount() const { return (int)myItems.size(); }
 
   virtual int GetItemTypeCount() const {
-    return sizeof(SequencerItemTypeNames) / sizeof(char *);
+    return sizeof(SequencerItemTypeNames) / sizeof(char*);
   }
-  virtual const char *GetItemTypeName(int typeIndex) const {
+  virtual const char* GetItemTypeName(int typeIndex) const {
     return SequencerItemTypeNames[typeIndex];
   }
-  virtual const char *GetItemLabel(int index) const {
+  virtual const char* GetItemLabel(int index) const {
     static char tmps[512];
 #ifdef _MSC_VER
     sprintf_s(tmps, "[%02d] %s", index,
@@ -95,9 +97,9 @@ struct AnimSequence : public ImSequencer::SequenceInterface {
     return tmps;
   }
 
-  virtual void Get(int index, int **start, int **end, int *type,
-                   unsigned int *color) {
-    AnimSequenceItem &item = myItems[index];
+  virtual void Get(int index, int** start, int** end, int* type,
+                   unsigned int* color) {
+    AnimSequenceItem& item = myItems[index];
     if (color)
       *color =
           0xFFAA8080;  // same color for everyone, return color based on type
@@ -130,14 +132,14 @@ struct AnimSequence : public ImSequencer::SequenceInterface {
       myItems[index].mExpanded = false;
       return;
     }
-    for (auto &item : myItems) item.mExpanded = false;
+    for (auto& item : myItems) item.mExpanded = false;
     myItems[index].mExpanded = !myItems[index].mExpanded;
   }
 
-  virtual void CustomDraw(int index, ImDrawList *draw_list, const ImRect &rc,
-                          const ImRect &legendRect, const ImRect &clippingRect,
-                          const ImRect &legendClippingRect) {
-    static const char *labels[] = {"Translation", "Rotation", "Scale"};
+  virtual void CustomDraw(int index, ImDrawList* draw_list, const ImRect& rc,
+                          const ImRect& legendRect, const ImRect& clippingRect,
+                          const ImRect& legendClippingRect) {
+    static const char* labels[] = {"Translation", "Rotation", "Scale"};
     static RampEdit rampEdit;
     rampEdit.mMax = ImVec2(mFrameMax, 1.f);
     rampEdit.mMin = ImVec2(mFrameMin, 0.f);
