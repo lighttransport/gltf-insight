@@ -18,11 +18,11 @@
 #include "gltf-loader.hh"
 #include "tiny_gltf_util.h"
 
-void load_animations(const tinygltf::Model &model,
-                     std::vector<animation> &animations) {
+void load_animations(const tinygltf::Model& model,
+                     std::vector<animation>& animations) {
   const auto nb_animations = animations.size();
   for (int i = 0; i < nb_animations; ++i) {
-    const auto &gltf_animation = model.animations[i];
+    const auto& gltf_animation = model.animations[i];
 
     // Attempt to get an animation name, or generate one like "animation_x"
     animations[i].name = !gltf_animation.name.empty()
@@ -76,14 +76,14 @@ void load_animations(const tinygltf::Model &model,
       animations[i].channels[channel_index].sampler_index =
           gltf_animation.channels[channel_index].sampler;
 
-      const auto &sampler =
+      const auto& sampler =
           gltf_animation
               .samplers[gltf_animation.channels[channel_index].sampler];
 
       const auto nb_frames =
           tinygltf::util::GetAnimationSamplerOutputCount(sampler, model);
       animations[i].channels[channel_index].keyframes.resize(nb_frames);
-      const auto &accessor = model.accessors[sampler.output];
+      const auto& accessor = model.accessors[sampler.output];
 
       if (gltf_animation.channels[channel_index].target_path == "weights") {
         animations[i].channels[channel_index].mode =
@@ -164,20 +164,20 @@ void load_animations(const tinygltf::Model &model,
   }
 }
 
-void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
-                   const std::vector<tinygltf::Primitive> &primitives,
-                   std::vector<draw_call_submesh> &draw_call_descriptor,
-                   const std::vector<GLuint> &VAOs,
-                   const std::vector<GLuint[6]> &VBOs,
-                   std::vector<std::vector<unsigned>> &indices,
-                   std::vector<std::vector<float>> &vertex_coord,
-                   std::vector<std::vector<float>> &texture_coord,
-                   std::vector<std::vector<float>> &normals,
-                   std::vector<std::vector<float>> &weights,
-                   std::vector<std::vector<unsigned short>> &joints) {
+void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
+                   const std::vector<tinygltf::Primitive>& primitives,
+                   std::vector<draw_call_submesh>& draw_call_descriptor,
+                   std::vector<GLuint>& VAOs,
+                   std::vector<std::array<GLuint, 6>>& VBOs,
+                   std::vector<std::vector<unsigned>>& indices,
+                   std::vector<std::vector<float>>& vertex_coord,
+                   std::vector<std::vector<float>>& texture_coord,
+                   std::vector<std::vector<float>>& normals,
+                   std::vector<std::vector<float>>& weights,
+                   std::vector<std::vector<unsigned short>>& joints) {
   const auto nb_submeshes = primitives.size();
   for (size_t submesh = 0; submesh < nb_submeshes; ++submesh) {
-    const auto &primitive = primitives[submesh];
+    const auto& primitive = primitives[submesh];
 
     // We have one VAO per "submesh" (= gltf primitive)
     draw_call_descriptor[submesh].VAO = VAOs[submesh];
@@ -187,10 +187,10 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
 
     // INDEX BUFFER
     {
-      const auto &indices_accessor = model.accessors[primitive.indices];
-      const auto &indices_buffer_view =
+      const auto& indices_accessor = model.accessors[primitive.indices];
+      const auto& indices_buffer_view =
           model.bufferViews[indices_accessor.bufferView];
-      const auto &indices_buffer = model.buffers[indices_buffer_view.buffer];
+      const auto& indices_buffer = model.buffers[indices_buffer_view.buffer];
       const auto indices_start_pointer = indices_buffer.data.data() +
                                          indices_buffer_view.byteOffset +
                                          indices_accessor.byteOffset;
@@ -215,10 +215,10 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
     // VERTEX POSITIONS
     {
       const auto position = primitive.attributes.at("POSITION");
-      const auto &position_accessor = model.accessors[position];
-      const auto &position_buffer_view =
+      const auto& position_accessor = model.accessors[position];
+      const auto& position_buffer_view =
           model.bufferViews[position_accessor.bufferView];
-      const auto &position_buffer = model.buffers[position_buffer_view.buffer];
+      const auto& position_buffer = model.buffers[position_buffer_view.buffer];
       const auto position_stride =
           position_accessor.ByteStride(position_buffer_view);
       const auto position_start_pointer = position_buffer.data.data() +
@@ -249,10 +249,10 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
     // VERTEX NORMAL
     {
       const auto normal = primitive.attributes.at("NORMAL");
-      const auto &normal_accessor = model.accessors[normal];
-      const auto &normal_buffer_view =
+      const auto& normal_accessor = model.accessors[normal];
+      const auto& normal_buffer_view =
           model.bufferViews[normal_accessor.bufferView];
-      const auto &normal_buffer = model.buffers[normal_buffer_view.buffer];
+      const auto& normal_buffer = model.buffers[normal_buffer_view.buffer];
       const auto normal_stride = normal_accessor.ByteStride(normal_buffer_view);
       const auto normal_start_pointer = normal_buffer.data.data() +
                                         normal_buffer_view.byteOffset +
@@ -283,10 +283,10 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
     // VERTEX UV
     if (textures.size() > 0) {
       const auto texture = primitive.attributes.at("TEXCOORD_0");
-      const auto &texture_accessor = model.accessors[texture];
-      const auto &texture_buffer_view =
+      const auto& texture_accessor = model.accessors[texture];
+      const auto& texture_buffer_view =
           model.bufferViews[texture_accessor.bufferView];
-      const auto &texture_buffer = model.buffers[texture_buffer_view.buffer];
+      const auto& texture_buffer = model.buffers[texture_buffer_view.buffer];
       const auto texture_stride =
           texture_accessor.ByteStride(texture_buffer_view);
       const auto texture_start_pointer = texture_buffer.data.data() +
@@ -318,10 +318,10 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
     // VERTEX JOINTS ASSIGNMENT
     {
       const auto joint = primitive.attributes.at("JOINTS_0");
-      const auto &joints_accessor = model.accessors[joint];
-      const auto &joints_buffer_view =
+      const auto& joints_accessor = model.accessors[joint];
+      const auto& joints_buffer_view =
           model.bufferViews[joints_accessor.bufferView];
-      const auto &joints_buffer = model.buffers[joints_buffer_view.buffer];
+      const auto& joints_buffer = model.buffers[joints_buffer_view.buffer];
       const auto joints_stride = joints_accessor.ByteStride(joints_buffer_view);
       const auto joints_start_pointer = joints_buffer.data.data() +
                                         joints_buffer_view.byteOffset +
@@ -343,10 +343,10 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
     // VERTEX BONE WEIGHTS
     {
       const auto weight = primitive.attributes.at("WEIGHTS_0");
-      const auto &weights_accessor = model.accessors[weight];
-      const auto &weights_buffer_view =
+      const auto& weights_accessor = model.accessors[weight];
+      const auto& weights_buffer_view =
           model.bufferViews[weights_accessor.bufferView];
-      const auto &weights_buffer = model.buffers[weights_buffer_view.buffer];
+      const auto& weights_buffer = model.buffers[weights_buffer_view.buffer];
       const auto weights_stride =
           weights_accessor.ByteStride(weights_buffer_view);
       const auto weights_start_pointer = weights_buffer.data.data() +
@@ -438,18 +438,18 @@ void load_geometry(const tinygltf::Model &model, std::vector<GLuint> &textures,
       glBindVertexArray(0);
     }
 
-    const auto &material = model.materials[primitive.material];
+    const auto& material = model.materials[primitive.material];
     if (textures.size() > 0)
       draw_call_descriptor[submesh].main_texture =
           textures[material.values.at("baseColorTexture").TextureIndex()];
   }
 }
 
-void load_morph_targets(const tinygltf::Model &model,
-                        const tinygltf::Primitive &primitive,
-                        std::vector<morph_target> &morph_targets) {
+void load_morph_targets(const tinygltf::Model& model,
+                        const tinygltf::Primitive& primitive,
+                        std::vector<morph_target>& morph_targets) {
   for (size_t i = 0; i < morph_targets.size(); ++i) {
-    const auto &target = primitive.targets[i];
+    const auto& target = primitive.targets[i];
 
     const auto position_it = target.find("POSITION");
     const auto normal_it = target.find("NORMAL");
@@ -457,10 +457,10 @@ void load_morph_targets(const tinygltf::Model &model,
     // normal mapping...
 
     if (position_it != target.end()) {
-      const auto &position_accessor = model.accessors[position_it->second];
-      const auto &position_buffer_view =
+      const auto& position_accessor = model.accessors[position_it->second];
+      const auto& position_buffer_view =
           model.bufferViews[position_accessor.bufferView];
-      const auto &position_buffer = model.buffers[position_buffer_view.buffer];
+      const auto& position_buffer = model.buffers[position_buffer_view.buffer];
       const auto position_data_start = position_buffer.data.data() +
                                        position_buffer_view.byteOffset +
                                        position_accessor.byteOffset;
@@ -479,9 +479,9 @@ void load_morph_targets(const tinygltf::Model &model,
         const auto sparse_indices = position_accessor.sparse.indices;
         const auto indices_component_size = tinygltf::GetComponentSizeInBytes(
             position_accessor.sparse.indices.componentType);
-        const auto &indices_buffer_view =
+        const auto& indices_buffer_view =
             model.bufferViews[sparse_indices.bufferView];
-        const auto &indices_buffer = model.buffers[indices_buffer_view.buffer];
+        const auto& indices_buffer = model.buffers[indices_buffer_view.buffer];
         const auto indices_data = indices_buffer.data.data() +
                                   indices_buffer_view.byteOffset +
                                   sparse_indices.byteOffset;
@@ -489,10 +489,10 @@ void load_morph_targets(const tinygltf::Model &model,
         assert(sizeof(unsigned int) >= indices_component_size);
 
         const auto sparse_values = position_accessor.sparse.values;
-        const auto &values_buffer_view =
+        const auto& values_buffer_view =
             model.bufferViews[sparse_values.bufferView];
-        const auto &values_buffer = model.buffers[values_buffer_view.buffer];
-        const float *values_data = reinterpret_cast<const float *>(
+        const auto& values_buffer = model.buffers[values_buffer_view.buffer];
+        const float* values_data = reinterpret_cast<const float*>(
             values_buffer.data.data() + values_buffer_view.byteOffset +
             sparse_values.byteOffset);
 
@@ -518,10 +518,10 @@ void load_morph_targets(const tinygltf::Model &model,
     }
 
     if (normal_it != target.end()) {
-      const auto &normal_accessor = model.accessors[normal_it->second];
-      const auto &normal_buffer_view =
+      const auto& normal_accessor = model.accessors[normal_it->second];
+      const auto& normal_buffer_view =
           model.bufferViews[normal_accessor.bufferView];
-      const auto &normal_buffer = model.buffers[normal_buffer_view.buffer];
+      const auto& normal_buffer = model.buffers[normal_buffer_view.buffer];
       const auto normal_data_start = normal_buffer.data.data() +
                                      normal_buffer_view.byteOffset +
                                      normal_accessor.byteOffset;
@@ -540,9 +540,9 @@ void load_morph_targets(const tinygltf::Model &model,
         const auto sparse_indices = normal_accessor.sparse.indices;
         const auto indices_component_size = tinygltf::GetComponentSizeInBytes(
             normal_accessor.sparse.indices.componentType);
-        const auto &indices_buffer_view =
+        const auto& indices_buffer_view =
             model.bufferViews[sparse_indices.bufferView];
-        const auto &indices_buffer = model.buffers[indices_buffer_view.buffer];
+        const auto& indices_buffer = model.buffers[indices_buffer_view.buffer];
         const auto indices_data = indices_buffer.data.data() +
                                   indices_buffer_view.byteOffset +
                                   sparse_indices.byteOffset;
@@ -550,10 +550,10 @@ void load_morph_targets(const tinygltf::Model &model,
         assert(sizeof(unsigned int) >= indices_component_size);
 
         const auto sparse_values = normal_accessor.sparse.values;
-        const auto &values_buffer_view =
+        const auto& values_buffer_view =
             model.bufferViews[sparse_values.bufferView];
-        const auto &values_buffer = model.buffers[values_buffer_view.buffer];
-        const float *values_data = reinterpret_cast<const float *>(
+        const auto& values_buffer = model.buffers[values_buffer_view.buffer];
+        const float* values_data = reinterpret_cast<const float*>(
             values_buffer.data.data() + values_buffer_view.byteOffset +
             sparse_values.byteOffset);
 
@@ -581,18 +581,18 @@ void load_morph_targets(const tinygltf::Model &model,
 }
 
 void load_inverse_bind_matrix_array(
-    tinygltf::Model model, const tinygltf::Skin &skin, size_t nb_joints,
-    std::vector<glm::mat4> &inverse_bind_matrices) {
+    tinygltf::Model model, const tinygltf::Skin& skin, size_t nb_joints,
+    std::vector<glm::mat4>& inverse_bind_matrices) {
   // Two :  we need to get the inverse bind matrix array, as it is
   // necessary for skinning
-  const auto &inverse_bind_matrices_accessor =
+  const auto& inverse_bind_matrices_accessor =
       model.accessors[skin.inverseBindMatrices];
   assert(inverse_bind_matrices_accessor.type == TINYGLTF_TYPE_MAT4);
   assert(inverse_bind_matrices_accessor.count == nb_joints);
 
-  const auto &inverse_bind_matrices_bufferview =
+  const auto& inverse_bind_matrices_bufferview =
       model.bufferViews[inverse_bind_matrices_accessor.bufferView];
-  const auto &inverse_bind_matrices_buffer =
+  const auto& inverse_bind_matrices_buffer =
       model.buffers[inverse_bind_matrices_bufferview.buffer];
   const size_t inverse_bind_matrices_stride =
       inverse_bind_matrices_accessor.ByteStride(

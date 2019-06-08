@@ -2,6 +2,34 @@
 
 #include "gl_util.hh"
 
+void gui_new_frame() {
+  glfwPollEvents();
+  ImGui_ImplOpenGL2_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
+  ImGuizmo::BeginFrame();
+}
+
+void gl_new_frame(GLFWwindow* window, ImVec4 clear_color, int& display_w,
+                  int& display_h) {
+  // Rendering
+  glfwGetFramebufferSize(window, &display_w, &display_h);
+  glViewport(0, 0, display_w, display_h);
+  glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+  glEnable(GL_DEPTH_TEST);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
+
+void gui_end_frame(GLFWwindow* window) {
+  glUseProgram(0);  // You may want this if using this code in an
+  // OpenGL 3+ context where shaders may be bound, but prefer using
+  // the GL3+ code.
+
+  ImGui::Render();
+  ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+  glfwSwapBuffers(window);
+}
+
 bool ImGuiCombo(const char* label, int* current_item,
                 const std::vector<std::string>& items) {
   return ImGui::Combo(
@@ -278,9 +306,9 @@ void skinning_data_window(
     const std::vector<std::vector<float>>& weights,
     const std::vector<std::vector<unsigned short>>& joints) {
   ImGui::Begin("Skinning data", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-  int submesh_id;
+  static int submesh_id = 0;
   ImGui::InputInt("Submesh #", &submesh_id, 1, 1);
-  submesh_id = glm::clamp<int>(submesh_id, 0, weights.size());
+  submesh_id = glm::clamp<int>(submesh_id, 0, weights.size() - 1);
   ImGui::Text("Submesh[%zu]", submesh_id);
   ImGui::BeginChild("##scrollable_data_region", ImVec2(600, 800), false,
                     ImGuiWindowFlags_AlwaysVerticalScrollbar);
@@ -315,7 +343,7 @@ void skinning_data_window(
   ImGui::End();
 }
 
-void morph_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets) {
+void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets) {
   if (ImGui::Begin("Morph Target blend weights")) {
     for (int w = 0; w < nb_morph_targets; ++w) {
       const std::string name = "Morph Target [" + std::to_string(w) + "]";
@@ -390,6 +418,118 @@ void deinitialize_gui_and_window(GLFWwindow* window) {
 
   glfwDestroyWindow(window);
   glfwTerminate();
+}
+
+void transform_window(glm::mat4& view_matrix, glm::vec3& camera_position,
+                      application_parameters& my_user_pointer,
+                      float vecTranslation[3], float vecRotation[3],
+                      float vecScale[3],
+                      ImGuizmo::OPERATION& mCurrentGizmoOperation) {
+  if (ImGui::Begin("Transform manipulator")) {
+    ImGui::Text("camera pitch %f yaw %f", my_user_pointer.rot_pitch,
+                my_user_pointer.rot_yaw);
+
+    glm::quat camera_rotation(glm::vec3(glm::radians(my_user_pointer.rot_pitch),
+                                        0.f,
+                                        glm::radians(my_user_pointer.rot_yaw)));
+    view_matrix = glm::lookAt(camera_rotation * camera_position, glm::vec3(0.f),
+                              camera_rotation * glm::vec3(0, 1.f, 0));
+
+    ImGui::InputFloat3("Tr", vecTranslation, 3);
+    ImGui::InputFloat3("Rt", vecRotation, 3);
+    ImGui::InputFloat3("Sc", vecScale, 3);
+
+    if (ImGui::Button("RESET")) {
+      vecTranslation[0] = 0;
+      vecTranslation[1] = 0;
+      vecTranslation[2] = 0;
+      vecRotation[0] = 0;
+      vecRotation[1] = 0;
+      vecRotation[2] = 0;
+      vecScale[0] = 1;
+      vecScale[1] = 1;
+      vecScale[2] = 1;
+    }
+
+    if (ImGui::RadioButton("Translate",
+                           mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+      mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Rotate",
+                           mCurrentGizmoOperation == ImGuizmo::ROTATE))
+      mCurrentGizmoOperation = ImGuizmo::ROTATE;
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
+      mCurrentGizmoOperation = ImGuizmo::SCALE;
+  }
+  ImGui::End();
+}
+
+void sequencer_window(gltf_insight::AnimSequence mySequence,
+                      bool& playing_state, bool& need_to_update_pose,
+                      bool& looping, int& selectedEntry, int& firstFrame,
+                      bool& expanded, int& currentFrame,
+                      double& currentPlayTime) {
+  if (ImGui::Begin("Sequencer")) {
+    if (ImGui::Button(playing_state ? "Pause" : "Play")) {
+      playing_state = !playing_state;
+    }
+    ImGui::SameLine(), ImGui::Checkbox("looping", &looping);
+
+    ImGui::PushItemWidth(130);
+    ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
+    ImGui::SameLine();
+    if (ImGui::InputInt("Frame ", &currentFrame)) {
+      currentPlayTime = double(currentFrame) / ANIMATION_FPS;
+      need_to_update_pose = true;
+    }
+    ImGui::SameLine();
+    ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
+    ImGui::PopItemWidth();
+
+    const auto saved_frame = currentFrame;
+    Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry,
+              &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
+    if (saved_frame != currentFrame) {
+      currentPlayTime = double(currentFrame) / ANIMATION_FPS;
+      need_to_update_pose = true;
+    }
+
+    // add a UI to edit that particular item
+    if (selectedEntry != -1) {
+      const gltf_insight::AnimSequence::AnimSequenceItem& item =
+          mySequence.myItems[selectedEntry];
+      ImGui::Text("I am a %s, please edit me",
+                  gltf_insight::SequencerItemTypeNames[item.mType]);
+      // switch (type) ....
+    }
+  }
+  ImGui::End();
+}
+
+void shader_selector_window(const std::vector<std::string>& shader_names,
+                            int& selected_shader, std::string& shader_to_use) {
+  if (ImGui::Begin("Shader mode")) {
+    ImGuiCombo("Choose shader", &selected_shader, shader_names);
+    shader_to_use = shader_names[selected_shader];
+  }
+  ImGui::End();
+}
+
+void utilities_window(bool& show_imgui_demo) {
+  if (ImGui::Begin("Utilities")) {
+    ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
+    if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
+  }
+  ImGui::End();
+}
+
+void camera_parameters_window(float& fovy, float& z_far) {
+  if (ImGui::Begin("Camera Parameters")) {
+    ImGui::SliderFloat("FOV", &fovy, 45, 90, "%.1f");
+    ImGui::SliderFloat("draw distance", &z_far, 100, 1000, "%.0f");
+  }
+  ImGui::End();
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action,

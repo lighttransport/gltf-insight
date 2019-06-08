@@ -31,6 +31,13 @@ struct application_parameters {
   application_parameters(glm::vec3& cam_pos) : camera_position(cam_pos) {}
 };
 
+void gui_new_frame();
+
+void gl_new_frame(GLFWwindow* window, ImVec4 clear_color, int& display_w,
+                  int& display_h);
+
+void gui_end_frame(GLFWwindow* window);
+
 // Build a combo widget from a vector of strings
 bool ImGuiCombo(const char* label, int* current_item,
                 const std::vector<std::string>& items);
@@ -67,7 +74,7 @@ void skinning_data_window(
     const std::vector<std::vector<unsigned short>>& joints);
 
 // Window that display the morph target and their current weights
-void morph_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets);
+void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets);
 
 // Call this to initialize a window, and an opengl context in it
 void initialize_glfw_opengl_window(GLFWwindow*& window);
@@ -77,3 +84,22 @@ void initialize_imgui(GLFWwindow* window);
 
 // Cleaup the gui and the window systems
 void deinitialize_gui_and_window(GLFWwindow* window);
+
+void transform_window(glm::mat4& view_matrix, glm::vec3& camera_position,
+                      application_parameters& my_user_pointer,
+                      float vecTranslation[3], float vecRotation[3],
+                      float vecScale[3],
+                      ImGuizmo::OPERATION& mCurrentGizmoOperation);
+
+void sequencer_window(gltf_insight::AnimSequence mySequence,
+                      bool& playing_state, bool& need_to_update_pose,
+                      bool& looping, int& selectedEntry, int& firstFrame,
+                      bool& expanded, int& currentFrame,
+                      double& currentPlayTime);
+
+void shader_selector_window(const std::vector<std::string>& shader_names,
+                            int& selected_shader, std::string& shader_to_use);
+
+void utilities_window(bool& show_imgui_demo);
+
+void camera_parameters_window(float& fovy, float& z_far);

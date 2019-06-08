@@ -121,34 +121,6 @@ void genrate_joint_inverse_bind_matrix_map(
     joint_inverse_bind_matrix_map[skin.joints[i]] = i;
 }
 
-void gui_new_frame() {
-  glfwPollEvents();
-  ImGui_ImplOpenGL2_NewFrame();
-  ImGui_ImplGlfw_NewFrame();
-  ImGui::NewFrame();
-  ImGuizmo::BeginFrame();
-}
-
-void gl_new_frame(GLFWwindow* window, ImVec4 clear_color, int& display_w,
-                  int& display_h) {
-  // Rendering
-  glfwGetFramebufferSize(window, &display_w, &display_h);
-  glViewport(0, 0, display_w, display_h);
-  glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-  glEnable(GL_DEPTH_TEST);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-}
-
-void gui_end_frame(GLFWwindow* window) {
-  glUseProgram(0);  // You may want this if using this code in an
-  // OpenGL 3+ context where shaders may be bound, but prefer using
-  // the GL3+ code.
-
-  ImGui::Render();
-  ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
-  glfwSwapBuffers(window);
-}
-
 void cpu_compute_morphed_display_mesh(
     gltf_node mesh_skeleton_graph, size_t submesh_id,
     const std::vector<std::vector<morph_target>>& morph_targets,
@@ -172,7 +144,7 @@ void cpu_compute_morphed_display_mesh(
 void gpu_update_morphed_submesh(
     size_t submesh_id, std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<GLuint[6]>& VBOs) {
+    std::vector<std::array<GLuint, 6>>& VBOs) {
   // upload to GPU
   glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][0]);
   glBufferData(GL_ARRAY_BUFFER,
@@ -192,7 +164,7 @@ void perform_software_morphing(
     const std::vector<std::vector<float>>& normals,
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<GLuint[6]>& VBOs) {
+    std::vector<std::array<GLuint, 6>>& VBOs) {
   // If mesh has morph targets
   if (mesh_skeleton_graph.pose.blend_weights.size() > 0) {
     assert(display_position[submesh_id].size() ==
@@ -209,13 +181,6 @@ void perform_software_morphing(
   }
 }
 
-void perform_draw_call(const draw_call_submesh& draw_call_to_perform) {
-  glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
-  glBindVertexArray(draw_call_to_perform.VAO);
-  glDrawElements(draw_call_to_perform.draw_mode,
-                 GLsizei(draw_call_to_perform.count), GL_UNSIGNED_INT, 0);
-}
-
 void draw_bone_overlay(gltf_node& mesh_skeleton_graph,
                        const glm::mat4& view_matrix,
                        const glm::mat4& projection_matrix,
@@ -229,118 +194,177 @@ void draw_bone_overlay(gltf_node& mesh_skeleton_graph,
              view_matrix, projection_matrix);
 }
 
-void update_uniforms(std::map<std::string, shader>& shaders,
-                     const std::string& shader_to_use, const glm::mat4& mvp,
-                     const glm::mat3& normal,
-                     const std::vector<glm::mat4>& joint_matrices) {
-  shaders[shader_to_use].use();
-  shaders[shader_to_use].set_uniform("joint_matrix", joint_matrices);
-  shaders[shader_to_use].set_uniform("mvp", mvp);
-  shaders[shader_to_use].set_uniform("normal", normal);
-  shaders[shader_to_use].set_uniform("debug_color",
-                                     glm::vec4(0.5f, 0.5f, 0.f, 1.f));
+void precompute_hardware_skinning_data(
+    gltf_node& mesh_skeleton_graph, glm::mat4& model_matrix,
+    std::vector<glm::mat4>& joint_matrices,
+    std::vector<gltf_node*>& flat_joint_list,
+    std::vector<glm::mat4>& inverse_bind_matrices) {
+  // This goes through the skeleton hierarchy, and compute the global
+  // transform of each joint
+  update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
+
+  // This compute the individual joint matrices that are uploaded to the
+  // GPU. Detailed explanations about skinning can be found in this tutorial
+  // https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_020_Skins.md#vertex-skinning-implementation
+  // Please note that the code in the tutorial compute the inverse model
+  // matrix for each joint, but this matrix doesn't vary here, so
+  // we can put it out of the loop. I borrowed this slight optimization from
+  // Sascha Willems's "vulkan-glTF-PBR" code...
+  // https://github.com/SaschaWillems/Vulkan-glTF-PBR/blob/master/base/VulkanglTFModel.hpp
+  glm::mat4 inverse_model = glm::inverse(model_matrix);
+  for (size_t i = 0; i < joint_matrices.size(); ++i) {
+    joint_matrices[i] = inverse_model * flat_joint_list[i]->world_xform *
+                        inverse_bind_matrices[i];
+  }
 }
 
-void transform_window(glm::mat4& view_matrix, glm::vec3& camera_position,
-                      application_parameters& my_user_pointer,
-                      float matrixTranslation[3], float matrixRotation[3],
-                      float matrixScale[3],
-                      ImGuizmo::OPERATION& mCurrentGizmoOperation) {
-  if (ImGui::Begin("Transform manipulator")) {
-    ImGui::Text("camera pitch %f yaw %f", my_user_pointer.rot_pitch,
-                my_user_pointer.rot_yaw);
-
-    glm::quat camera_rotation(glm::vec3(glm::radians(my_user_pointer.rot_pitch),
-                                        0.f,
-                                        glm::radians(my_user_pointer.rot_yaw)));
-    view_matrix = glm::lookAt(camera_rotation * camera_position, glm::vec3(0.f),
-                              camera_rotation * glm::vec3(0, 1.f, 0));
-
-    ImGui::InputFloat3("Tr", matrixTranslation, 3);
-    ImGui::InputFloat3("Rt", matrixRotation, 3);
-    ImGui::InputFloat3("Sc", matrixScale, 3);
-
-    if (ImGui::RadioButton("Translate",
-                           mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
-      mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Rotate",
-                           mCurrentGizmoOperation == ImGuizmo::ROTATE))
-      mCurrentGizmoOperation = ImGuizmo::ROTATE;
-    ImGui::SameLine();
-    if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
-      mCurrentGizmoOperation = ImGuizmo::SCALE;
+void run_animation_player(gltf_insight::AnimSequence& sequence, bool& looping,
+                          int& selectedEntry, int& firstFrame, bool& expanded,
+                          int& currentFrame, double& currentPlayTime,
+                          double& last_frame_time, bool& playing_state,
+                          std::vector<animation>& animations) {
+  // let's create the sequencer
+  double current_time = glfwGetTime();
+  bool need_to_update_pose = false;
+  if (playing_state) {
+    currentPlayTime += current_time - last_frame_time;
   }
-  ImGui::End();
+
+  currentFrame = int(ANIMATION_FPS * currentPlayTime);
+  sequencer_window(sequence, playing_state, need_to_update_pose, looping,
+                   selectedEntry, firstFrame, expanded, currentFrame,
+                   currentPlayTime);
+
+  // loop the sequencer now: TODO replace that true with a "is looping"
+  // boolean
+  if (looping && currentFrame > sequence.mFrameMax) {
+    currentFrame = sequence.mFrameMin;
+    currentPlayTime = double(currentFrame) / ANIMATION_FPS;
+  }
+
+  for (auto& anim : animations) {
+    anim.set_time(float(currentPlayTime));  // TODO handle timeline position
+    // of animaiton sequence
+    anim.playing = playing_state;
+    if (need_to_update_pose || playing_state) anim.apply_pose();
+  }
+
+  last_frame_time = current_time;
 }
 
-void sequencer_window(gltf_insight::AnimSequence mySequence,
-                      bool& playing_state, bool& need_to_update_pose,
-                      bool& looping, int& selectedEntry, int& firstFrame,
-                      bool& expanded, int& currentFrame,
-                      double& currentPlayTime) {
-  if (ImGui::Begin("Sequencer")) {
-    if (ImGui::Button(playing_state ? "Pause" : "Play")) {
-      playing_state = !playing_state;
-    }
-    ImGui::SameLine(), ImGui::Checkbox("looping", &looping);
+void run_3D_gizmo(glm::mat4& view_matrix, const glm::mat4& projection_matrix,
+                  glm::mat4& model_matrix, glm::vec3& camera_position,
+                  application_parameters& my_user_pointer) {
+  float vecTranslation[3], vecRotation[3], vecScale[3];
+  static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::ROTATE);
+  static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
 
-    ImGui::PushItemWidth(130);
-    ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
-    ImGui::SameLine();
-    if (ImGui::InputInt("Frame ", &currentFrame)) {
-      currentPlayTime = double(currentFrame) / 60.0;
-      need_to_update_pose = true;
-    }
-    ImGui::SameLine();
-    ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
-    ImGui::PopItemWidth();
+  ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(model_matrix),
+                                        vecTranslation, vecRotation, vecScale);
 
-    const auto saved_frame = currentFrame;
-    Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry,
-              &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
-    if (saved_frame != currentFrame) {
-      currentPlayTime = double(currentFrame) / 60.0;
-      need_to_update_pose = true;
-    }
+  transform_window(view_matrix, camera_position, my_user_pointer,
+                   vecTranslation, vecRotation, vecScale,
+                   mCurrentGizmoOperation);
 
-    // add a UI to edit that particular item
-    if (selectedEntry != -1) {
-      const gltf_insight::AnimSequence::AnimSequenceItem& item =
-          mySequence.myItems[selectedEntry];
-      ImGui::Text("I am a %s, please edit me",
-                  gltf_insight::SequencerItemTypeNames[item.mType]);
-      // switch (type) ....
-    }
+  ImGuizmo::RecomposeMatrixFromComponents(vecTranslation, vecRotation, vecScale,
+                                          glm::value_ptr(model_matrix));
+
+  auto io = ImGui::GetIO();
+  ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+  ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
+                       glm::value_ptr(projection_matrix),
+                       mCurrentGizmoOperation, mCurrentGizmoMode,
+                       glm::value_ptr(model_matrix), NULL, NULL);
+}
+
+void fill_sequencer(gltf_insight::AnimSequence& sequence,
+                    const std::vector<animation>& animations) {
+  for (int i = 0; i < animations.size(); ++i) {
+    // TODO change animation sequencer to use seconds instead of frames
+    sequence.myItems.push_back(gltf_insight::AnimSequence::AnimSequenceItem{
+        0, int(ANIMATION_FPS * animations[i].min_time),
+        int(ANIMATION_FPS * animations[i].max_time), false});
   }
-  ImGui::End();
+
+  auto max_time = sequence.myItems[0].mFrameEnd;
+  for (auto& item : sequence.myItems) {
+    max_time = std::max(max_time, item.mFrameEnd);
+  }
+  sequence.mFrameMax = max_time;
 }
 
 int main(int argc, char** argv) {
   gltf_node mesh_skeleton_graph(gltf_node::node_type::mesh);
+  ImVec4 viewport_background_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+  tinygltf::Model model;
+  tinygltf::TinyGLTF gltf_ctx;
+
+  // display parameters
+  std::map<std::string, shader> shader_list;
+  std::vector<std::string> shader_names;
+  int selected_shader = 0;
+  std::string shader_to_use;
+  glm::mat4 view_matrix{1.f}, projection_matrix{1.f};
+  glm::mat4& model_matrix = mesh_skeleton_graph.local_xform;
+  int display_w, display_h;
+  glm::vec3 camera_position{0, 0, 7.f};
+  float fovy = 45.f;
+  float z_near = 1.f;
+  float z_far = 100.f;
+
+  // user interface state
   bool debug_output = false;
   bool show_imgui_demo = false;
   std::string input_filename;
-  tinygltf::Model model;
-  tinygltf::TinyGLTF gltf_ctx;
   GLFWwindow* window(nullptr);
-  std::map<std::string, shader> shaders;
+  application_parameters gui_parameters{camera_position};
+
+  // Sequecer state
+  gltf_insight::AnimSequence sequence;
+  bool looping = true;
+  int selectedEntry = -1;
+  int firstFrame = 0;
+  bool expanded = true;
+  int currentFrame;
+  double currentPlayTime = 0;
+  double last_frame_time = 0;
+  bool playing_state = true;
+
+  // loaded data
+  std::vector<GLuint> textures;
+  std::vector<glm::mat4> joint_matrices;
+  std::map<int, int> joint_inverse_bind_matrix_map;
+  std::vector<gltf_node*> flat_joint_list;
+  std::vector<animation> animations;
+  std::vector<std::string> animation_names;
+  std::vector<glm::mat4> inverse_bind_matrices;
+  std::vector<std::vector<morph_target>> morph_targets;
+  std::vector<draw_call_submesh> draw_call_descriptors;
+  std::vector<GLuint> VAOs;
+  std::vector<std::array<GLuint, 6>> VBOs;
+  std::vector<std::vector<unsigned>> indices;
+  std::vector<std::vector<float>> vertex_coord, texture_coord, normals, weights,
+      display_position, display_normal;
+  std::vector<std::vector<unsigned short>> joints;
 
   parse_command_line(argc, argv, debug_output, input_filename);
+
+  if (input_filename.empty()) {
+    // TODO support not loading file directly
+  }
+
   initialize_glfw_opengl_window(window);
+  glfwSetWindowUserPointer(window, &gui_parameters);
+  glfwSetMouseButtonCallback(window, mouse_button_callback);
+  glfwSetCursorPosCallback(window, cursor_pos_callback);
   load_glTF_asset(gltf_ctx, input_filename, model);
 
   const auto nb_textures = model.images.size();
-  std::vector<GLuint> textures(nb_textures);
+  textures.resize(nb_textures);
   load_all_textures(model, nb_textures, textures);
+
   initialize_imgui(window);
-  auto io = ImGui::GetIO();
-
-  ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-  // sequence with default values
-  gltf_insight::AnimSequence mySequence;
-
+  (void)ImGui::GetIO();
   // We are bypassing the actual glTF scene here, we are interested in a
   // file that only represent a character with animations. Find the scene
   // node that has a mesh attached to it:
@@ -378,44 +402,29 @@ int main(int argc, char** argv) {
   const auto nb_submeshes = primitives.size();
 
   const auto nb_joints = skin.joints.size();
-  std::vector<glm::mat4> joint_matrices(nb_joints);
+  joint_matrices.resize(nb_joints);
 
   // One : We need to know, for each joint, what is it's inverse bind
   // matrix
-  std::map<int, int> joint_inverse_bind_matrix_map;
   genrate_joint_inverse_bind_matrix_map(skin, nb_joints,
                                         joint_inverse_bind_matrix_map);
 
+  // Two : We load the actual animation data. We also initialize the animation
+  // sequencer
   const auto nb_animations = model.animations.size();
-  std::vector<animation> animations(nb_animations);
+  animations.resize(nb_animations);
   load_animations(model, animations);
-
-  for (int i = 0; i < nb_animations; ++i) {
-    mySequence.myItems.push_back(gltf_insight::AnimSequence::AnimSequenceItem{
-        0, int(60.f * animations[i].min_time),
-        int(60.f * animations[i].max_time), false});
-  }
-
-  {
-    auto max_time = mySequence.myItems[0].mFrameEnd;
-    for (auto& item : mySequence.myItems) {
-      max_time = std::max(max_time, item.mFrameEnd);
-    }
-    mySequence.mFrameMax = max_time;
-  }
-
-  std::vector<glm::mat4> inverse_bind_matrices;
-  load_inverse_bind_matrix_array(model, skin, nb_joints, inverse_bind_matrices);
+  fill_sequencer(sequence, animations);
 
   // Three : Load the skeleton graph. We need this to calculate the bones
   // world transform
+  load_inverse_bind_matrix_array(model, skin, nb_joints, inverse_bind_matrices);
   populate_gltf_skeleton_subgraph(model, mesh_skeleton_graph, skeleton);
 
   // Four : Get an array that is in the same order as the bones in the
   // glTF to represent the whole skeletons. This is important for the
   // joint matrix calculation
-  std::vector<gltf_node*> flat_bone_list;
-  create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_bone_list);
+  create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_joint_list);
   // assert(flat_bone_list.size() == nb_joints);
 
   // Five : For each animation loaded that is supposed to move the skeleton,
@@ -436,9 +445,9 @@ int main(int argc, char** argv) {
 #endif
   }
 
-  // Load morph targets:
+  // Six : Load morph targets:
   // TODO we can probably only have one loop going through the submeshes
-  std::vector<std::vector<morph_target>> morph_targets(nb_submeshes);
+  morph_targets.resize(nb_submeshes);
   for (int i = 0; i < nb_submeshes; ++i) {
     morph_targets[i].resize(mesh.primitives[i].targets.size());
     load_morph_targets(model, mesh.primitives[i], morph_targets[i]);
@@ -462,23 +471,25 @@ int main(int argc, char** argv) {
   // For each submesh, we need to know the draw operation, the VAO to
   // bind, the textures to use and the element count. This array store all
   // of these
-  std::vector<draw_call_submesh> draw_call_descriptors(nb_submeshes);
+  draw_call_descriptors.resize(nb_submeshes);
 
   // Create opengl objects
-  std::vector<GLuint> VAOs(nb_submeshes);
+  VAOs.resize(nb_submeshes);
 
-  // We have 5 vertex attributes per vertex and one element array buffer
-  std::vector<GLuint[6]> VBOs(nb_submeshes);
+  VBOs.resize(nb_submeshes);
   glGenVertexArrays(GLsizei(nb_submeshes), VAOs.data());
   for (auto& VBO : VBOs) {
-    glGenBuffers(6, VBO);
+    // We have 5 vertex attributes per vertex + 1 element array.
+    glGenBuffers(6, VBO.data());
   }
 
   // CPU sise storage for all vertex attributes
-  std::vector<std::vector<unsigned>> indices(nb_submeshes);
-  std::vector<std::vector<float>> vertex_coord(nb_submeshes),
-      texture_coord(nb_submeshes), normals(nb_submeshes), weights(nb_submeshes);
-  std::vector<std::vector<unsigned short>> joints(nb_submeshes);
+  indices.resize(nb_submeshes);
+  vertex_coord.resize(nb_submeshes);
+  texture_coord.resize(nb_submeshes);
+  normals.resize(nb_submeshes);
+  weights.resize(nb_submeshes);
+  joints.resize(nb_submeshes);
 
   // For each submesh of the mesh, load the data
   load_geometry(model, textures, primitives, draw_call_descriptors, VAOs, VBOs,
@@ -487,8 +498,8 @@ int main(int argc, char** argv) {
   // create a copy of the data for morphing. We will repeatidly upload theses
   // arrays to the GPU, while preserving the value of the original vertex
   // coordinates. Morph targets are only deltas from the default position.
-  auto display_position = vertex_coord;
-  auto display_normal = normals;
+  display_position = vertex_coord;
+  display_normal = normals;
 
   // Not doing this seems to break imgui in opengl2 mode...
   // TODO maybe just move to the OpenGL 3.x code. This could help debuging as
@@ -496,35 +507,18 @@ int main(int argc, char** argv) {
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-  // Objects to store application display state
-  glm::mat4& model_matrix = mesh_skeleton_graph.local_xform;
-  glm::mat4 view_matrix{1.f}, projection_matrix{1.f};
-  int display_w, display_h;
-  glm::vec3 camera_position{0, 0, 3.F};
-
-  // We need to pass this to glfw to have mouse control
-  application_parameters my_user_pointer{camera_position};
-
-  glfwSetWindowUserPointer(window, &my_user_pointer);
-  glfwSetMouseButtonCallback(window, mouse_button_callback);
-  glfwSetCursorPosCallback(window, cursor_pos_callback);
-
-  load_shaders(nb_joints, shaders);
+  load_shaders(nb_joints, shader_list);
 
   // Main loop
-  double last_frame_time = glfwGetTime();
-  bool playing_state = true;
 
-  std::vector<std::string> animation_names(animations.size());
+  animation_names.resize(nb_animations);
   for (size_t i = 0; i < animations.size(); ++i)
     animation_names[i] = animations[i].name;
 
-  std::vector<std::string> shader_names;
-  static int selected_shader = 0;
   {
     static bool first = true;
     int i = 0;
-    for (const auto& shader : shaders) {
+    for (const auto& shader : shader_list) {
       shader_names.push_back(shader.first);
       if (first && shader.first == "textured") {
         selected_shader = i;
@@ -535,130 +529,80 @@ int main(int argc, char** argv) {
   }
 
   while (!glfwWindowShouldClose(window)) {
-    gui_new_frame();
+    {  // GUI
+      gui_new_frame();
 
-    std::string shader_to_use;
-
-    ImGui::Begin("Utilities");
-    ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
-    if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
-    ImGui::End();
-
-    ImGui::Begin("Shader mode");
-    ImGuiCombo("Choose shader", &selected_shader, shader_names);
-    shader_to_use = shader_names[selected_shader];
-    ImGui::End();
-
-    asset_images_window(textures);
-    model_info_window(model);
-    animation_window(animations);
-    skinning_data_window(weights, joints);
-
-    morph_window(mesh_skeleton_graph, nb_morph_targets);
-
-    bool need_to_update_pose = false;
-
-    // let's create the sequencer
-    static bool looping = true;
-    static int selectedEntry = -1;
-    static int firstFrame = 0;
-    static bool expanded = true;
-    static int currentFrame;
-    static double currentPlayTime = 0;
-    double current_time = glfwGetTime();
-
-    if (playing_state) {
-      currentPlayTime += current_time - last_frame_time;
-    }
-
-    last_frame_time = current_time;
-    currentFrame = int(60 * currentPlayTime);
-
-    sequencer_window(mySequence, playing_state, need_to_update_pose, looping,
-                     selectedEntry, firstFrame, expanded, currentFrame,
-                     currentPlayTime);
-
-    // loop the sequencer now: TODO replace that true with a "is looping"
-    // boolean
-    if (looping && currentFrame > mySequence.mFrameMax) {
-      currentFrame = mySequence.mFrameMin;
-      currentPlayTime = double(currentFrame) / 60.0;
-    }
-
-    for (auto& anim : animations) {
-      anim.set_time(float(currentPlayTime));  // TODO handle timeline position
-                                              // of animaiton sequence
-      anim.playing = playing_state;
-      if (need_to_update_pose || playing_state) anim.apply_pose();
-    }
-
-    {
-      gl_new_frame(window, clear_color, display_w, display_h);
-      projection_matrix = glm::perspective(
-          45.f, float(display_w) / float(display_h), 1.f, 100.f);
-      float vecTranslation[3], vecRotation[3], vecScale[3];
-
-      static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::ROTATE);
-      static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
-
-      ImGuizmo::DecomposeMatrixToComponents(
-          glm::value_ptr(model_matrix), vecTranslation, vecRotation, vecScale);
-
-      transform_window(view_matrix, camera_position, my_user_pointer,
-                       vecTranslation, vecRotation, vecScale,
-                       mCurrentGizmoOperation);
-
-      ImGuizmo::RecomposeMatrixFromComponents(
-          vecTranslation, vecRotation, vecScale, glm::value_ptr(model_matrix));
-
-      ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-      ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
-                           glm::value_ptr(projection_matrix),
-                           mCurrentGizmoOperation, mCurrentGizmoMode,
-                           glm::value_ptr(model_matrix), NULL, NULL);
-
-      last_frame_time = glfwGetTime();
-
-      // This goes through the skeleton hierarchy, and compute the global
-      // transform of each joint
-      update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
-
-      // This compute the individual joint matrices that are uploaded to the
-      // GPU. Detailed explanations about skinning can be found in this tutorial
-      // https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_020_Skins.md#vertex-skinning-implementation
-      // Please note that the code in the tutorial compute the inverse model
-      // matrix for each joint, but this matrix doesn't vary here, so
-      // we can put it out of the loop. I borrowed this slight optimization from
-      // Sascha Willems's "vulkan-glTF-PBR" code...
-      // https://github.com/SaschaWillems/Vulkan-glTF-PBR/blob/master/base/VulkanglTFModel.hpp
-      glm::mat4 inverse_model = glm::inverse(model_matrix);
-      for (size_t i = 0; i < joint_matrices.size(); ++i) {
-        joint_matrices[i] = inverse_model * flat_bone_list[i]->world_xform *
-                            inverse_bind_matrices[i];
+      // TODO put main menu in it's own function wen done
+      ImGui::BeginMainMenuBar();
+      if (ImGui::BeginMenu("File")) {
+        // TODO use ImGuiFileDialog
+        if (ImGui::MenuItem("Open glTF...")) {
+        }
+        if (ImGui::MenuItem("Save as...")) {
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Quit")) {
+          glfwSetWindowShouldClose(window, GLFW_TRUE);
+        }
+        ImGui::EndMenu();
       }
+      ImGui::EndMainMenuBar();
 
-      // Calculates other matrices needed, and update the rendering shader
-      // uniforms with them
+      // Draw all windows
+      utilities_window(show_imgui_demo);
+      shader_selector_window(shader_names, selected_shader, shader_to_use);
+      asset_images_window(textures);
+      model_info_window(model);
+      animation_window(animations);
+      skinning_data_window(weights, joints);
+      morph_target_window(mesh_skeleton_graph, nb_morph_targets);
+      camera_parameters_window(fovy, z_far);
+
+      // Animation player advances time and apply animation interpolation. It
+      // also display the sequencer timeline and controls on screen
+      run_animation_player(sequence, looping, selectedEntry, firstFrame,
+                           expanded, currentFrame, currentPlayTime,
+                           last_frame_time, playing_state, animations);
+    }
+
+    {  // 3D rendering
+      gl_new_frame(window, viewport_background_color, display_w, display_h);
+
+      projection_matrix =
+          glm::perspective(glm::radians(fovy),
+                           float(display_w) / float(display_h), z_near, z_far);
+
+      run_3D_gizmo(view_matrix, projection_matrix, model_matrix,
+                   camera_position, gui_parameters);
+
+      // Calculate all the needed matrices to render the frame, this includes
+      // the "model view projection" that transform the geometry to the screen
+      // space, the normal matrix, and the joint matrix array that is used to
+      // deform the skin with the bones
+      precompute_hardware_skinning_data(mesh_skeleton_graph, model_matrix,
+                                        joint_matrices, flat_joint_list,
+                                        inverse_bind_matrices);
+
       glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
       glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
-      update_uniforms(shaders, shader_to_use, mvp, normal, joint_matrices);
+      update_uniforms(shader_list, shader_to_use, mvp, normal, joint_matrices);
 
       // Draw all of the submeshes of the object
-      for (size_t submesh_id = 0; submesh_id < draw_call_descriptors.size();
-           ++submesh_id) {
-        const auto& draw_call_descriptor = draw_call_descriptors[submesh_id];
-        perform_software_morphing(mesh_skeleton_graph, submesh_id,
-                                  morph_targets, vertex_coord, normals,
-                                  display_position, display_normal, VBOs);
-        perform_draw_call(draw_call_descriptor);
+      for (size_t submesh = 0; submesh < draw_call_descriptors.size();
+           ++submesh) {
+        const auto& draw_call = draw_call_descriptors[submesh];
+        perform_software_morphing(mesh_skeleton_graph, submesh, morph_targets,
+                                  vertex_coord, normals, display_position,
+                                  display_normal, VBOs);
+        perform_draw_call(draw_call);
       }
 
       // Then draw 2D bones and joints on top of that
       draw_bone_overlay(mesh_skeleton_graph, view_matrix, projection_matrix,
-                        shaders);
-
-      gui_end_frame(window);
+                        shader_list);
     }
+    // Render all ImGui, then swap buffers
+    gui_end_frame(window);
   }
 
   deinitialize_gui_and_window(window);

@@ -3,7 +3,7 @@
 #include <iostream>
 
 void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
-                   GLsizei length, const GLchar *message, void *userParam) {
+                   GLsizei length, const GLchar* message, void* userParam) {
   // ignore non-significant error/warning codes
   if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
 
@@ -120,7 +120,7 @@ void draw_space_base(GLuint shader, const float line_width,
 }
 
 void load_shaders(const size_t nb_joints,
-                  std::map<std::string, shader> &shaders) {
+                  std::map<std::string, shader>& shaders) {
   // TODO put the GLSL code ouside of here, load them from files
   // Main vertex shader, that perform GPU skinning
   std::string vertex_shader_source_str = R"glsl(
@@ -158,7 +158,7 @@ void main()
 }
 )glsl";
 
-  const char *vertex_shader_no_skinning = R"glsl(
+  const char* vertex_shader_no_skinning = R"glsl(
 #version 330
 
 layout (location = 0) in vec3 input_position;
@@ -196,9 +196,9 @@ void main()
     vertex_shader_source_str.replace(index, strlen("$nb_joints"),
                                      std::to_string(nb_joints));
   }
-  const char *vertex_shader_source = vertex_shader_source_str.c_str();
+  const char* vertex_shader_source = vertex_shader_source_str.c_str();
 
-  const char *fragment_shader_source_textured = R"glsl(
+  const char* fragment_shader_source_textured = R"glsl(
 #version 330
 
 in vec2 interpolated_uv;
@@ -212,7 +212,7 @@ void main()
 }
 )glsl";
 
-  const char *fragment_shader_source_draw_debug_color = R"glsl(
+  const char* fragment_shader_source_draw_debug_color = R"glsl(
 #version 330
 
 out vec4 output_color;
@@ -224,7 +224,7 @@ void main()
 }
 )glsl";
 
-  const char *fragment_shader_source_uv = R"glsl(
+  const char* fragment_shader_source_uv = R"glsl(
 #version 330
 
 out vec4 output_color;
@@ -236,7 +236,7 @@ void main()
 }
 )glsl";
 
-  const char *fragment_shader_source_normals = R"glsl(
+  const char* fragment_shader_source_normals = R"glsl(
 #version 330
 
 in vec3 interpolated_normal;
@@ -249,7 +249,7 @@ void main()
 
 )glsl";
 
-  const char *fragment_shader_weights = R"glsl(
+  const char* fragment_shader_weights = R"glsl(
 #version 330
 
 in vec4 interpolated_weights;
@@ -275,4 +275,23 @@ void main()
              fragment_shader_source_textured);
   shaders["weights"] =
       shader("weights", vertex_shader_source, fragment_shader_weights);
+}
+
+void update_uniforms(std::map<std::string, shader>& shaders,
+                     const std::string& shader_to_use, const glm::mat4& mvp,
+                     const glm::mat3& normal,
+                     const std::vector<glm::mat4>& joint_matrices) {
+  shaders[shader_to_use].use();
+  shaders[shader_to_use].set_uniform("joint_matrix", joint_matrices);
+  shaders[shader_to_use].set_uniform("mvp", mvp);
+  shaders[shader_to_use].set_uniform("normal", normal);
+  shaders[shader_to_use].set_uniform("debug_color",
+                                     glm::vec4(0.5f, 0.5f, 0.f, 1.f));
+}
+
+void perform_draw_call(const draw_call_submesh& draw_call_to_perform) {
+  glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
+  glBindVertexArray(draw_call_to_perform.VAO);
+  glDrawElements(draw_call_to_perform.draw_mode,
+                 GLsizei(draw_call_to_perform.count), GL_UNSIGNED_INT, 0);
 }

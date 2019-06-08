@@ -10,6 +10,8 @@
 
 struct gltf_node;
 
+#define ANIMATION_FPS 60.0f
+
 /// Represent a loaded animation
 struct animation {
   /// Represent a glTF animation channel
