@@ -309,7 +309,7 @@ void skinning_data_window(
   static int submesh_id = 0;
   ImGui::InputInt("Submesh #", &submesh_id, 1, 1);
   submesh_id = glm::clamp<int>(submesh_id, 0, weights.size() - 1);
-  ImGui::Text("Submesh[%zu]", submesh_id);
+  ImGui::Text("Submesh[%zu]", size_t(submesh_id));
   ImGui::BeginChild("##scrollable_data_region", ImVec2(600, 800), false,
                     ImGuiWindowFlags_AlwaysVerticalScrollbar);
   const auto vertex_count = weights[submesh_id].size() / 4;

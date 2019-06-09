@@ -1,7 +1,16 @@
 # Simple C++11 based glTF 2.0 data insight tool [![Build Status](https://travis-ci.org/lighttransport/gltf-insight.svg?branch=devel)](https://travis-ci.org/lighttransport/gltf-insight) [![Build status](https://ci.appveyor.com/api/projects/status/pb5f6g3qwxrrnxga/branch/devel?svg=true)](https://ci.appveyor.com/project/Ybalrid/gltf-insight/branch/devel)
 
-gltf-insight is a C++11 based data insight tool for glTF 2.0 model.
-gltf-insight uses TinyGLTF for load/save glTF model and ImGUI for GUI.
+`gltf-insight` is a C++11 based data insight tool for glTF 2.0 model.
+
+For example, you can display and tweak animation prameters this tool(since glTF 2.0 spec does not allow ASCII serialization for animation parameters)
+
+`gltf-insight` also could be another reference viewer for glTF animation and PBR shading.
+
+`gltf-insight` uses TinyGLTF for load/save glTF model and ImGUI for GUI.
+
+## Status
+
+Work-in-progress.
 
 ## Requirements
 
@@ -14,6 +23,14 @@ gltf-insight uses TinyGLTF for load/save glTF model and ImGUI for GUI.
 * [x] Windows
 * [x] Linux
 * [x] macOS
+
+## Features
+
+* glTF animation with CPU evaluation
+  * [x] skin
+  * [x] morph
+* Data visualization
+  * [x] Skin weight
 
 ## Setup
 
@@ -41,12 +58,13 @@ $ make
 
 ## TODO
 
-* bone display
-* keyframe display
-* glTF compliant keyframe interpolation code
-* Animation curve display : https://github.com/ocornut/imgui/issues/786
-* load morph target
-* morph target blending code
+* [ ] PBR shading(in CPU)
+* [ ] Animation curve display : https://github.com/ocornut/imgui/issues/786
+* [ ] Edit animation parameters in GUI
+* [ ] Better GUI for animations.
+* [ ] GPU skinning and morph.
+* [ ] Draco compressed mesh support. https://github.com/google/draco
+* [ ] basis_universal texture compression support. https://github.com/binomialLLC/basis_universal
 
 ## License
 
