@@ -28,25 +28,67 @@
 /// Main application class
 class app {
  public:
-  app(int argc, char** argv) {
-    parse_command_line(argc, argv, debug_output, input_filename);
+  void unload() {
+    asset_loaded = false;
 
-    if (input_filename.empty()) {
-      // TODO support not loading file directly
+    // TODO cleanup what you can !
+
+    // loaded opengl objects
+    if (!textures.empty()) glDeleteTextures(textures.size(), textures.data());
+    textures.clear();
+
+    if (!VAOs.empty()) {
+      glDeleteVertexArrays(VAOs.size(), VAOs.data());
     }
+    VAOs.clear();
 
-    initialize_glfw_opengl_window(window);
-    glfwSetWindowUserPointer(window, &gui_parameters);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetCursorPosCallback(window, cursor_pos_callback);
+    for (auto& VBO : VBOs) {
+      glDeleteBuffers(VBO.size(), VBO.data());
+    }
+    VBOs.clear();
+
+    // loaded CPU side objects
+    joint_matrices.clear();
+    joint_inverse_bind_matrix_map.clear();
+    animations.clear();
+    animation_names.clear();
+    inverse_bind_matrices.clear();
+    morph_targets.clear();
+    indices.clear();
+    vertex_coord.clear();
+    texture_coord.clear();
+    normals.clear();
+    weights.clear();
+    display_position.clear();
+    display_normal.clear();
+    joints.clear();
+    draw_call_descriptors.clear();
+    flat_joint_list.clear();
+
+    empty_gltf_skeleton_subgraph(mesh_skeleton_graph);
+    mesh_skeleton_graph.local_xform = glm::mat4{1.f};
+
+    // other number counters and things
+    selectedEntry = -1;
+    currentFrame = 0;
+    playing_state = true;
+    camera_position = glm::vec3{0.f, 0.f, 7.f};
+    selected_shader = 0;
+
+    // file input information
+    input_filename.clear();
+
+    // library resources
+    model = tinygltf::Model();
+  }
+
+  void load() {
     load_glTF_asset(gltf_ctx, input_filename, model);
 
     const auto nb_textures = model.images.size();
     textures.resize(nb_textures);
     load_all_textures(model, nb_textures, textures);
 
-    initialize_imgui(window);
-    (void)ImGui::GetIO();
     // We are bypassing the actual glTF scene here, we are interested in a
     // file that only represent a character with animations. Find the scene
     // node that has a mesh attached to it:
@@ -91,8 +133,8 @@ class app {
     genrate_joint_inverse_bind_matrix_map(skin, nb_joints,
                                           joint_inverse_bind_matrix_map);
 
-    // Two : We load the actual animation data. We also initialize the animation
-    // sequencer
+    // Two : We load the actual animation data. We also initialize the
+    // animation sequencer
     const auto nb_animations = model.animations.size();
     animations.resize(nb_animations);
     load_animations(model, animations);
@@ -151,7 +193,8 @@ class app {
                   [] { return 0.f; });
 
     // TODO technically there's a "default" pose of the glTF asset in therm of
-    // the value of theses weights. They are set to zero by default, but still.
+    // the value of theses weights. They are set to zero by default, but
+    // still.
 
     // For each submesh, we need to know the draw operation, the VAO to
     // bind, the textures to use and the element count. This array store all
@@ -181,15 +224,16 @@ class app {
                   VBOs, indices, vertex_coord, texture_coord, normals, weights,
                   joints);
 
-    // create a copy of the data for morphing. We will repeatidly upload theses
-    // arrays to the GPU, while preserving the value of the original vertex
-    // coordinates. Morph targets are only deltas from the default position.
+    // create a copy of the data for morphing. We will repeatidly upload
+    // theses arrays to the GPU, while preserving the value of the original
+    // vertex coordinates. Morph targets are only deltas from the default
+    // position.
     display_position = vertex_coord;
     display_normal = normals;
 
     // Not doing this seems to break imgui in opengl2 mode...
-    // TODO maybe just move to the OpenGL 3.x code. This could help debuging as
-    // tools like nvidia nsights are less usefull on old style opengl
+    // TODO maybe just move to the OpenGL 3.x code. This could help debuging
+    // as tools like nvidia nsights are less usefull on old style opengl
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
@@ -212,6 +256,23 @@ class app {
         }
         ++i;
       }
+    }
+
+    asset_loaded = true;
+  }
+
+  app(int argc, char** argv) {
+    parse_command_line(argc, argv, debug_output, input_filename);
+
+    initialize_glfw_opengl_window(window);
+    glfwSetWindowUserPointer(window, &gui_parameters);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, cursor_pos_callback);
+    initialize_imgui(window);
+    (void)ImGui::GetIO();
+
+    if (!input_filename.empty()) {
+      load();
     }
   }
 
@@ -236,23 +297,32 @@ class app {
           }
           ImGui::EndMenu();
         }
+
+#if defined(DEBUG) || defined(_DEBUG)
+        if (ImGui::BeginMenu("DEBUG")) {
+          if (ImGui::MenuItem("call unload()")) unload();
+          ImGui::EndMenu();
+        }
+#endif
         ImGui::EndMainMenuBar();
 
-        // Draw all windows
-        utilities_window(show_imgui_demo);
-        shader_selector_window(shader_names, selected_shader, shader_to_use);
-        asset_images_window(textures);
-        model_info_window(model);
-        animation_window(animations);
-        skinning_data_window(weights, joints);
-        morph_target_window(mesh_skeleton_graph, nb_morph_targets);
-        camera_parameters_window(fovy, z_far);
+        if (asset_loaded) {
+          // Draw all windows
+          utilities_window(show_imgui_demo);
+          shader_selector_window(shader_names, selected_shader, shader_to_use);
+          asset_images_window(textures);
+          model_info_window(model);
+          animation_window(animations);
+          skinning_data_window(weights, joints);
+          morph_target_window(mesh_skeleton_graph, nb_morph_targets);
+          camera_parameters_window(fovy, z_far);
 
-        // Animation player advances time and apply animation interpolation. It
-        // also display the sequencer timeline and controls on screen
-        run_animation_player(sequence, looping, selectedEntry, firstFrame,
-                             expanded, currentFrame, currentPlayTime,
-                             last_frame_time, playing_state, animations);
+          // Animation player advances time and apply animation interpolation.
+          // It also display the sequencer timeline and controls on screen
+          run_animation_player(sequence, looping, selectedEntry, firstFrame,
+                               expanded, currentFrame, currentPlayTime,
+                               last_frame_time, playing_state, animations);
+        }
       }
 
       {  // 3D rendering
@@ -265,32 +335,34 @@ class app {
         run_3D_gizmo(view_matrix, projection_matrix, model_matrix,
                      camera_position, gui_parameters);
 
-        // Calculate all the needed matrices to render the frame, this includes
-        // the "model view projection" that transform the geometry to the screen
-        // space, the normal matrix, and the joint matrix array that is used to
-        // deform the skin with the bones
-        precompute_hardware_skinning_data(mesh_skeleton_graph, model_matrix,
-                                          joint_matrices, flat_joint_list,
-                                          inverse_bind_matrices);
+        if (asset_loaded) {
+          // Calculate all the needed matrices to render the frame, this
+          // includes the "model view projection" that transform the geometry to
+          // the screen space, the normal matrix, and the joint matrix array
+          // that is used to deform the skin with the bones
+          precompute_hardware_skinning_data(mesh_skeleton_graph, model_matrix,
+                                            joint_matrices, flat_joint_list,
+                                            inverse_bind_matrices);
 
-        glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
-        glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
-        update_uniforms(shader_list, shader_to_use, mvp, normal,
-                        joint_matrices);
+          glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
+          glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
+          update_uniforms(shader_list, shader_to_use, mvp, normal,
+                          joint_matrices);
 
-        // Draw all of the submeshes of the object
-        for (size_t submesh = 0; submesh < draw_call_descriptors.size();
-             ++submesh) {
-          const auto& draw_call = draw_call_descriptors[submesh];
-          perform_software_morphing(mesh_skeleton_graph, submesh, morph_targets,
-                                    vertex_coord, normals, display_position,
-                                    display_normal, VBOs);
-          perform_draw_call(draw_call);
+          // Draw all of the submeshes of the object
+          for (size_t submesh = 0; submesh < draw_call_descriptors.size();
+               ++submesh) {
+            const auto& draw_call = draw_call_descriptors[submesh];
+            perform_software_morphing(mesh_skeleton_graph, submesh,
+                                      morph_targets, vertex_coord, normals,
+                                      display_position, display_normal, VBOs);
+            perform_draw_call(draw_call);
+          }
+
+          // Then draw 2D bones and joints on top of that
+          draw_bone_overlay(mesh_skeleton_graph, view_matrix, projection_matrix,
+                            shader_list);
         }
-
-        // Then draw 2D bones and joints on top of that
-        draw_bone_overlay(mesh_skeleton_graph, view_matrix, projection_matrix,
-                          shader_list);
       }
       // Render all ImGui, then swap buffers
       gui_end_frame(window);
@@ -298,6 +370,8 @@ class app {
   }
 
  private:
+  bool asset_loaded = false;
+
   gltf_node mesh_skeleton_graph{gltf_node::node_type::mesh};
   ImVec4 viewport_background_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
   tinygltf::Model model;
@@ -383,13 +457,13 @@ class app {
       exit(EXIT_FAILURE);
     }
 
-    if (!result.count("input")) {
+    if (result.count("input")) {
+      input_filename = result["input"].as<std::string>();
+    } else {
       std::cerr << "Input file not specified." << std::endl;
       std::cout << options.help({"", "group"}) << std::endl;
-      exit(EXIT_FAILURE);
+      input_filename.clear();
     }
-
-    input_filename = result["input"].as<std::string>();
   }
 
   void load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,

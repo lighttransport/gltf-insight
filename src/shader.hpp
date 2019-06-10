@@ -4,8 +4,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include "glad/include/glad/glad.h"
 
+#include "glad/include/glad/glad.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/matrix.hpp"
@@ -28,7 +28,7 @@ class shader {
   shader& operator=(const shader&) = delete;
 
   ~shader() {
-    // TODO cleanup here
+    if (glIsProgram(program_) == GL_TRUE) glDeleteProgram(program_);
   }
 
   shader() {}
@@ -82,6 +82,9 @@ class shader {
       glGetProgramInfoLog(program_, sizeof info_log, nullptr, info_log);
       std::cout << info_log << "\n";
     }
+
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
   }
 
   void use() const { glUseProgram(program_); }
@@ -107,7 +110,8 @@ class shader {
                        GL_FALSE, glm::value_ptr(matrices[0]));
   }
 
-  void set_uniform(const char* name, size_t number_of_matrices, float* data) const {
+  void set_uniform(const char* name, size_t number_of_matrices,
+                   float* data) const {
     glUniformMatrix4fv(glGetUniformLocation(program_, name), number_of_matrices,
                        GL_FALSE, data);
   }
