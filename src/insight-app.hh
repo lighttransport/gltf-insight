@@ -316,7 +316,8 @@ class app {
             if (ImGuiFileDialog::Instance()->IsOk) {
               unload();
               input_filename =
-                  ImGuiFileDialog::Instance()->GetCurrentFileName();
+                ImGuiFileDialog::Instance()->GetFilepathName();
+              //std::cout << "input_filename is  : " << input_filename << "\n";
               load();
             } else {
             }
