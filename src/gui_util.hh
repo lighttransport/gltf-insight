@@ -6,6 +6,7 @@
 // program
 
 #include "GLFW/glfw3.h"
+#include "IconsIonicons.h"
 #include "ImCurveEdit.h"
 #include "ImGuiFileDialog.h"
 #include "ImGuizmo.h"

@@ -79,3 +79,6 @@ MIT license
 * glm : MIT license
 * ImGUI : MIT license
 * cxxopts : MIT license
+* ionicons icon helper header : zlib licence
+* ionic framework icon font : MIT
+* Roboto icons : Apache 2

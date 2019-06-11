@@ -50,6 +50,7 @@ list(APPEND UI_SOURCES
 
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
+	${CMAKE_CURRENT_SOURCE_DIR}/fonts/
 )
 
 if(WIN32)
@@ -106,3 +107,7 @@ if (WIN32)
   endif ()
 endif ()
 
+
+# Font compressor util
+
+add_executable(imgui_font_compressor_utility ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/misc/fonts/binary_to_compressed_c.cpp)

@@ -1,6 +1,9 @@
 #include "gui_util.hh"
 
 #include "gl_util.hh"
+#include "ionicons_embed.inc.h"
+#include "roboto_embed.inc.h"
+#include "roboto_mono_embed.inc.h"
 
 void gui_new_frame() {
   glfwPollEvents();
@@ -402,7 +405,39 @@ void initialize_imgui(GLFWwindow* window) {
   // Setup Dear ImGui context
   ImGui::CreateContext();
   auto io = ImGui::GetIO();
-  (void)io;
+
+  const float scale = 16.f;
+  ImFontConfig roboto_config;
+  strcpy(roboto_config.Name, "Roboto");
+  roboto_config.SizePixels = scale;
+  roboto_config.OversampleH = 2;
+  roboto_config.OversampleV = 2;
+  io.Fonts->AddFontFromMemoryCompressedTTF(
+      roboto_compressed_data, roboto_compressed_size, scale, &roboto_config);
+
+  ImFontConfig ionicons_config;
+  ionicons_config.MergeMode = true;
+  ionicons_config.GlyphMinAdvanceX = scale;
+  ionicons_config.OversampleH = 1;
+  ionicons_config.OversampleV = 1;
+  static const ImWchar icon_ranges[] = {ICON_MIN_II, ICON_MAX_II, 0};
+  io.Fonts->AddFontFromMemoryCompressedTTF(ionicons_compressed_data,
+                                           ionicons_compressed_size, scale,
+                                           &ionicons_config, icon_ranges);
+
+  ImFontConfig roboto_mono_config;
+  strcpy(roboto_mono_config.Name, "Roboto Mono");
+  roboto_mono_config.SizePixels = scale;
+  roboto_mono_config.OversampleH = 2;
+  roboto_mono_config.OversampleV = 2;
+  io.Fonts->AddFontFromMemoryCompressedTTF(roboto_mono_compressed_data,
+                                           roboto_compressed_size, scale,
+                                           &roboto_mono_config);
+
+  ImGuiFileDialog::fileLabel = ICON_II_ANDROID_DOCUMENT;
+  ImGuiFileDialog::dirLabel = ICON_II_ANDROID_FOLDER;
+  ImGuiFileDialog::linkLabel = ICON_II_ANDROID_ARROW_FORWARD;
+
   // Setup Platform/Renderer bindings
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL2_Init();

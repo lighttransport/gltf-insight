@@ -295,6 +295,11 @@ class app {
       {  // GUI
         gui_new_frame();
 
+        ImGui::Begin("Icon test");
+        ImGui::Text("%s %s %s", ICON_II_ANDROID_FOLDER_OPEN,
+                    ICON_II_ANDROID_DOCUMENT, ICON_II_ANDROID_ARROW_FORWARD);
+        ImGui::End();
+
         // TODO put main menu in it's own function wen done
         ImGui::BeginMainMenuBar();
         if (ImGui::BeginMenu("File")) {
