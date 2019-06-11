@@ -276,7 +276,10 @@ class app {
     }
   }
 
-  ~app() { deinitialize_gui_and_window(window); }
+  ~app() {
+    unload();
+    deinitialize_gui_and_window(window);
+  }
 
   void main_loop() {
     while (!glfwWindowShouldClose(window)) {
@@ -445,10 +448,10 @@ class app {
 
     options.parse_positional({"input", "output"});
 
-    if (argc < 2) {
-      std::cout << options.help({"", "group"}) << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    // if (argc < 2) {
+    //  std::cout << options.help({"", "group"}) << std::endl;
+    //  exit(EXIT_FAILURE);
+    //}
 
     const auto result = options.parse(argc, argv);
 
@@ -460,8 +463,6 @@ class app {
     if (result.count("input")) {
       input_filename = result["input"].as<std::string>();
     } else {
-      std::cerr << "Input file not specified." << std::endl;
-      std::cout << options.help({"", "group"}) << std::endl;
       input_filename.clear();
     }
   }

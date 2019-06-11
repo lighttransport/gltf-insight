@@ -13,3 +13,6 @@
 [submodule "third_party/tinygltf"]
 	path = third_party/tinygltf
 	url = https://github.com/syoyo/tinygltf
+[submodule "third_party/ImGuiFileDialog"]
+	path = third_party/ImGuiFileDialog
+	url = https://github.com/Ybalrid/ImGuiFileDialog.git
