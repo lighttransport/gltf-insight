@@ -7,6 +7,7 @@
 
 #include "GLFW/glfw3.h"
 #include "ImCurveEdit.h"
+#include "ImGuiFileDialog.h"
 #include "ImGuizmo.h"
 #include "ImSequencer.h"
 #include "animation.hh"

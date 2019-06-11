@@ -47,6 +47,11 @@ class app {
     }
     VBOs.clear();
 
+    shader_list.clear();
+    shader_names.clear();
+    shader_to_use.clear();
+    found_textured_shader = false;
+
     // loaded CPU side objects
     joint_matrices.clear();
     joint_inverse_bind_matrix_map.clear();
@@ -74,6 +79,7 @@ class app {
     playing_state = true;
     camera_position = glm::vec3{0.f, 0.f, 7.f};
     selected_shader = 0;
+    sequence.myItems.clear();
 
     // file input information
     input_filename.clear();
@@ -246,13 +252,13 @@ class app {
       animation_names[i] = animations[i].name;
 
     {
-      static bool first = true;
+      found_textured_shader = true;
       int i = 0;
       for (const auto& shader : shader_list) {
         shader_names.push_back(shader.first);
-        if (first && shader.first == "textured") {
+        if (found_textured_shader && shader.first == "textured") {
           selected_shader = i;
-          first = false;
+          found_textured_shader = false;
         }
         ++i;
       }
@@ -281,6 +287,8 @@ class app {
     deinitialize_gui_and_window(window);
   }
 
+  bool open_file_dialog = false;
+
   void main_loop() {
     while (!glfwWindowShouldClose(window)) {
       {  // GUI
@@ -291,6 +299,7 @@ class app {
         if (ImGui::BeginMenu("File")) {
           // TODO use ImGuiFileDialog
           if (ImGui::MenuItem("Open glTF...")) {
+            open_file_dialog = true;
           }
           if (ImGui::MenuItem("Save as...")) {
           }
@@ -300,6 +309,19 @@ class app {
           }
           ImGui::EndMenu();
         }
+
+        if (open_file_dialog)
+          if (ImGuiFileDialog::Instance()->FileDialog("Open glTF...",
+                                                      ".gltf\0.glb\0\0")) {
+            if (ImGuiFileDialog::Instance()->IsOk) {
+              unload();
+              input_filename =
+                  ImGuiFileDialog::Instance()->GetCurrentFileName();
+              load();
+            } else {
+            }
+            open_file_dialog = false;
+          }
 
 #if defined(DEBUG) || defined(_DEBUG)
         if (ImGui::BeginMenu("DEBUG")) {
@@ -374,7 +396,7 @@ class app {
 
  private:
   bool asset_loaded = false;
-
+  bool found_textured_shader = false;
   gltf_node mesh_skeleton_graph{gltf_node::node_type::mesh};
   ImVec4 viewport_background_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
   tinygltf::Model model;
