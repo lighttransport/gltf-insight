@@ -45,7 +45,18 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImCurveEdit.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGradient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.cpp
     )
+
+include_directories(
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
+)
+
+if(WIN32)
+include_directories(
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/dirent/include
+)
+endif()
 
 # [glfw]
 set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "" FORCE)
