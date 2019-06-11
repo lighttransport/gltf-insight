@@ -30,7 +30,6 @@ class app {
  public:
   void unload() {
     asset_loaded = false;
-
     // TODO cleanup what you can !
 
     // loaded opengl objects
@@ -278,7 +277,11 @@ class app {
     (void)ImGui::GetIO();
 
     if (!input_filename.empty()) {
-      load();
+      try {
+        load();
+      } catch (const std::exception& e) {
+        unload();
+      }
     }
   }
 
@@ -286,8 +289,6 @@ class app {
     unload();
     deinitialize_gui_and_window(window);
   }
-
-  bool open_file_dialog = false;
 
   void main_loop() {
     while (!glfwWindowShouldClose(window)) {
@@ -302,6 +303,7 @@ class app {
             open_file_dialog = true;
           }
           if (ImGui::MenuItem("Save as...")) {
+            save_file_dialog = true;
           }
           ImGui::Separator();
           if (ImGui::MenuItem("Quit")) {
@@ -310,19 +312,42 @@ class app {
           ImGui::EndMenu();
         }
 
-        if (open_file_dialog)
+        if (open_file_dialog) {
           if (ImGuiFileDialog::Instance()->FileDialog("Open glTF...",
                                                       ".gltf\0.glb\0\0")) {
             if (ImGuiFileDialog::Instance()->IsOk) {
               unload();
-              input_filename =
-                ImGuiFileDialog::Instance()->GetFilepathName();
-              //std::cout << "input_filename is  : " << input_filename << "\n";
-              load();
+              input_filename = ImGuiFileDialog::Instance()->GetFilepathName();
+              try {
+                load();
+              } catch (const std::exception& e) {
+                unload();
+              }
             } else {
             }
             open_file_dialog = false;
           }
+        }
+
+        if (save_file_dialog) {
+          if (!asset_loaded)
+            save_file_dialog = false;
+          else if (ImGuiFileDialog::Instance()->FileDialog("Save as...", "")) {
+            if (ImGuiFileDialog::Instance()->IsOk) {
+              auto save_as_filename =
+                  ImGuiFileDialog::Instance()->GetFilepathName();
+              try {
+                // Check file path extension for gltf or glb. Fix it if
+                // necessary.
+                // Serialize to file
+              } catch (const std::exception& e) {
+                // display error here
+              }
+            } else {
+            }
+            save_file_dialog = false;
+          }
+        }
 
 #if defined(DEBUG) || defined(_DEBUG)
         if (ImGui::BeginMenu("DEBUG")) {
@@ -396,6 +421,8 @@ class app {
   }
 
  private:
+  bool open_file_dialog = false;
+  bool save_file_dialog = false;
   bool asset_loaded = false;
   bool found_textured_shader = false;
   gltf_node mesh_skeleton_graph{gltf_node::node_type::mesh};
@@ -415,6 +442,10 @@ class app {
   float fovy = 45.f;
   float z_near = 1.f;
   float z_far = 100.f;
+
+  // OpenGL objects
+  std::vector<GLuint> VAOs;
+  std::vector<std::array<GLuint, 6>> VBOs;
 
   // user interface state
   bool debug_output = false;
@@ -444,8 +475,6 @@ class app {
   std::vector<glm::mat4> inverse_bind_matrices;
   std::vector<std::vector<morph_target>> morph_targets;
   std::vector<draw_call_submesh> draw_call_descriptors;
-  std::vector<GLuint> VAOs;
-  std::vector<std::array<GLuint, 6>> VBOs;
   std::vector<std::vector<unsigned>> indices;
   std::vector<std::vector<float>> vertex_coord, texture_coord, normals, weights,
       display_position, display_normal;
@@ -513,6 +542,8 @@ class app {
     if (!ret) {
       std::cerr << "Problem while loading gltf:\n"
                 << "error: " << err << "\nwarning: " << warn << '\n';
+
+      throw std::runtime_error("error: " + err);
     }
   }
 
