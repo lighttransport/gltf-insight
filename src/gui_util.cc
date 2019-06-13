@@ -577,40 +577,64 @@ void transform_window(glm::mat4& view_matrix, glm::vec3& camera_position,
   ImGui::End();
 }
 
-void sequencer_window(gltf_insight::AnimSequence mySequence,
+void sequencer_window(gltf_insight::AnimSequence loaded_sequence,
                       bool& playing_state, bool& need_to_update_pose,
                       bool& looping, int& selectedEntry, int& firstFrame,
                       bool& expanded, int& currentFrame,
                       double& currentPlayTime) {
   if (ImGui::Begin("Sequencer")) {
-    if (ImGui::Button(playing_state ? "Pause" : "Play")) {
-      playing_state = !playing_state;
-    }
-    ImGui::SameLine(), ImGui::Checkbox("looping", &looping);
-
-    ImGui::PushItemWidth(130);
-    ImGui::InputInt("Frame Min", &mySequence.mFrameMin);
-    ImGui::SameLine();
-    if (ImGui::InputInt("Frame ", &currentFrame)) {
+    const auto adjust_time = [&] {
       currentPlayTime = double(currentFrame) / ANIMATION_FPS;
       need_to_update_pose = true;
+    };
+
+    if (ImGui::Button(ICON_II_SKIP_BACKWARD)) {
+      currentFrame = 0;
+      adjust_time();
+    }
+
+    // play pause button
+    ImGui::SameLine();
+    if (ImGui::Button(playing_state ? ICON_II_PAUSE : ICON_II_PLAY))
+      playing_state = !playing_state;
+
+    // stop button
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_II_STOP)) {
+      playing_state = false;
+      currentFrame = 0;
+      adjust_time();
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button(ICON_II_SKIP_FORWARD)) {
+      currentFrame = loaded_sequence.mFrameMax;
+      adjust_time();
+    }
+
+    ImGui::SameLine();
+    ImGui::Checkbox(ICON_II_LOOP, &looping);
+
+    ImGui::PushItemWidth(130);
+    ImGui::InputInt("Frame Min ", &loaded_sequence.mFrameMin);
+    ImGui::SameLine();
+    if (ImGui::InputInt("Frame ", &currentFrame)) {
+      adjust_time();
     }
     ImGui::SameLine();
-    ImGui::InputInt("Frame Max", &mySequence.mFrameMax);
+    ImGui::InputInt("Frame Max ", &loaded_sequence.mFrameMax);
     ImGui::PopItemWidth();
 
     const auto saved_frame = currentFrame;
-    Sequencer(&mySequence, &currentFrame, &expanded, &selectedEntry,
+    Sequencer(&loaded_sequence, &currentFrame, &expanded, &selectedEntry,
               &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
     if (saved_frame != currentFrame) {
-      currentPlayTime = double(currentFrame) / ANIMATION_FPS;
-      need_to_update_pose = true;
     }
 
     // add a UI to edit that particular item
     if (selectedEntry != -1) {
       const gltf_insight::AnimSequence::AnimSequenceItem& item =
-          mySequence.myItems[selectedEntry];
+          loaded_sequence.myItems[selectedEntry];
       ImGui::Text("I am a %s, please edit me",
                   gltf_insight::SequencerItemTypeNames[item.mType]);
       // switch (type) ....

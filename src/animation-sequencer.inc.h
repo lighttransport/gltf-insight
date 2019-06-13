@@ -100,16 +100,16 @@ struct AnimSequence : public ImSequencer::SequenceInterface {
   virtual void Get(int index, int** start, int** end, int* type,
                    unsigned int* color) {
     AnimSequenceItem& item = myItems[index];
-    if (color)
-      *color =
-          0xFFAA8080;  // same color for everyone, return color based on type
+    if (color) *color = 0x80808080;
     if (start) *start = &item.mFrameStart;
     if (end) *end = &item.mFrameEnd;
     if (type) *type = item.mType;
   }
+
   virtual void Add(int type) {
     myItems.push_back(AnimSequenceItem{type, 0, 10, false});
   };
+
   virtual void Del(int index) { myItems.erase(myItems.begin() + index); }
   virtual void Duplicate(int index) { myItems.push_back(myItems[index]); }
 

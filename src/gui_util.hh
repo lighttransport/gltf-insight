@@ -93,7 +93,7 @@ void transform_window(glm::mat4& view_matrix, glm::vec3& camera_position,
                       float vecScale[3],
                       ImGuizmo::OPERATION& mCurrentGizmoOperation);
 
-void sequencer_window(gltf_insight::AnimSequence mySequence,
+void sequencer_window(gltf_insight::AnimSequence loaded_sequence,
                       bool& playing_state, bool& need_to_update_pose,
                       bool& looping, int& selectedEntry, int& firstFrame,
                       bool& expanded, int& currentFrame,
