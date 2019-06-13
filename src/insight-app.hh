@@ -734,12 +734,11 @@ class app {
 
   void fill_sequencer(gltf_insight::AnimSequence& sequence,
                       const std::vector<animation>& animations) {
-    for (int i = 0; i < animations.size(); ++i) {
+    for (auto& animation : animations) {
       // TODO change animation sequencer to use seconds instead of frames
       sequence.myItems.push_back(gltf_insight::AnimSequence::AnimSequenceItem{
-          0, int(ANIMATION_FPS * animations[i].min_time),
-          int(ANIMATION_FPS * animations[i].max_time), false,
-          animations[i].name});
+          0, int(ANIMATION_FPS * animation.min_time),
+          int(ANIMATION_FPS * animation.max_time), false, animation.name});
     }
 
     auto max_time = sequence.myItems[0].mFrameEnd;
