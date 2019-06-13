@@ -38,7 +38,7 @@ void gui_new_frame();
 void gl_new_frame(GLFWwindow* window, ImVec4 clear_color, int& display_w,
                   int& display_h);
 
-void gui_end_frame(GLFWwindow* window);
+void gl_gui_end_frame(GLFWwindow* window);
 
 // Build a combo widget from a vector of strings
 bool ImGuiCombo(const char* label, int* current_item,

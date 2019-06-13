@@ -383,10 +383,10 @@ class app {
 
       {  // 3D rendering
         gl_new_frame(window, viewport_background_color, display_w, display_h);
-
-        projection_matrix = glm::perspective(
-            glm::radians(fovy), float(display_w) / float(display_h), z_near,
-            z_far);
+        if (display_h && display_w)  // not zero please
+          projection_matrix = glm::perspective(
+              glm::radians(fovy), float(display_w) / float(display_h), z_near,
+              z_far);
 
         run_3D_gizmo(view_matrix, projection_matrix, model_matrix,
                      camera_position, gui_parameters);
@@ -421,7 +421,7 @@ class app {
         }
       }
       // Render all ImGui, then swap buffers
-      gui_end_frame(window);
+      gl_gui_end_frame(window);
     }
   }
 
@@ -431,7 +431,7 @@ class app {
   bool asset_loaded = false;
   bool found_textured_shader = false;
   gltf_node mesh_skeleton_graph{gltf_node::node_type::mesh};
-  ImVec4 viewport_background_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+  ImVec4 viewport_background_color = ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
   tinygltf::Model model;
   tinygltf::TinyGLTF gltf_ctx;
 
