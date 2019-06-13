@@ -629,6 +629,7 @@ void sequencer_window(gltf_insight::AnimSequence loaded_sequence,
     Sequencer(&loaded_sequence, &currentFrame, &expanded, &selectedEntry,
               &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
     if (saved_frame != currentFrame) {
+      adjust_time();
     }
 
     // add a UI to edit that particular item
