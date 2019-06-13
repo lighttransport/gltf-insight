@@ -615,7 +615,7 @@ void sequencer_window(gltf_insight::AnimSequence loaded_sequence,
     ImGui::SameLine();
     ImGui::Checkbox(ICON_II_LOOP, &looping);
 
-    ImGui::PushItemWidth(130);
+    ImGui::PushItemWidth(180);
     ImGui::InputInt("Frame Min ", &loaded_sequence.mFrameMin);
     ImGui::SameLine();
     if (ImGui::InputInt("Frame ", &currentFrame)) {

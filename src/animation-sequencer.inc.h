@@ -87,13 +87,11 @@ struct AnimSequence : public ImSequencer::SequenceInterface {
   }
   virtual const char* GetItemLabel(int index) const {
     static char tmps[512];
-#ifdef _MSC_VER
-    sprintf_s(tmps, "[%02d] %s", index,
-              SequencerItemTypeNames[myItems[index].mType]);
-#else
+
     sprintf(tmps, "[%02d] %s", index,
-            SequencerItemTypeNames[myItems[index].mType]);
-#endif
+            myItems[index].mType == 0
+                ? myItems[index].name.c_str()
+                : SequencerItemTypeNames[myItems[index].mType]);
     return tmps;
   }
 
@@ -124,6 +122,7 @@ struct AnimSequence : public ImSequencer::SequenceInterface {
     int mType;
     int mFrameStart, mFrameEnd;
     bool mExpanded;
+    std::string name;
   };
   std::vector<AnimSequenceItem> myItems;
 
