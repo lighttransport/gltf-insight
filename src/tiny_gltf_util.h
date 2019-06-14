@@ -14,9 +14,9 @@
 
 #include "tiny_gltf.h"
 
-static int find_node_with_mesh_in_children(const tinygltf::Model &model,
+static int find_node_with_mesh_in_children(const tinygltf::Model& model,
                                            int root) {
-  const auto &root_node = model.nodes[root];
+  const auto& root_node = model.nodes[root];
   if (root_node.mesh >= 0) return root;
 
   for (auto child : root_node.children) {
@@ -27,8 +27,8 @@ static int find_node_with_mesh_in_children(const tinygltf::Model &model,
   return -1;
 }
 
-static int find_main_mesh_node(const tinygltf::Model &model) {
-  const auto &node_list =
+static int find_main_mesh_node(const tinygltf::Model& model) {
+  const auto& node_list =
       model.scenes[model.defaultScene >= 0 ? model.defaultScene : 0].nodes;
 
   for (auto node : node_list) {
@@ -116,21 +116,21 @@ static std::string PrintComponentType(int ty) {
 }
 
 static int GetAnimationSamplerInputCount(
-    const tinygltf::AnimationSampler &sampler, const tinygltf::Model &model) {
-  const tinygltf::Accessor &accessor = model.accessors[sampler.input];
-  return accessor.count;
+    const tinygltf::AnimationSampler& sampler, const tinygltf::Model& model) {
+  const tinygltf::Accessor& accessor = model.accessors[sampler.input];
+  return int(accessor.count);
 }
 
 static int GetAnimationSamplerOutputCount(
-    const tinygltf::AnimationSampler &sampler, const tinygltf::Model &model) {
-  const tinygltf::Accessor &accessor = model.accessors[sampler.output];
-  return accessor.count;
+    const tinygltf::AnimationSampler& sampler, const tinygltf::Model& model) {
+  const tinygltf::Accessor& accessor = model.accessors[sampler.output];
+  return int(accessor.count);
 }
 
 static bool GetAnimationSamplerInputMinMax(
-    const tinygltf::AnimationSampler &sampler, const tinygltf::Model &model,
-    float *min_value, float *max_value) {
-  const tinygltf::Accessor &accessor = model.accessors[sampler.input];
+    const tinygltf::AnimationSampler& sampler, const tinygltf::Model& model,
+    float* min_value, float* max_value) {
+  const tinygltf::Accessor& accessor = model.accessors[sampler.input];
 
   // Assume scalar value.
   if ((accessor.minValues.size() > 0) && (accessor.maxValues.size() > 0)) {
@@ -158,9 +158,9 @@ static inline float DecodeAnimationChannelValue(uint16_t c) {
   return float(c) / 65525.0f;
 }
 
-static inline const uint8_t *GetBufferAddress(
-    const int i, const Accessor &accessor, const BufferView &bufferViewObject,
-    const Buffer &buffer) {
+static inline const uint8_t* GetBufferAddress(
+    const int i, const Accessor& accessor, const BufferView& bufferViewObject,
+    const Buffer& buffer) {
   if (i >= int(accessor.count)) return nullptr;
 
   int byte_stride = accessor.ByteStride(bufferViewObject);
@@ -169,19 +169,19 @@ static inline const uint8_t *GetBufferAddress(
   }
 
   // TODO(syoyo): Bounds check.
-  const uint8_t *base_addr =
+  const uint8_t* base_addr =
       buffer.data.data() + bufferViewObject.byteOffset + accessor.byteOffset;
-  const uint8_t *addr = base_addr + i * byte_stride;
+  const uint8_t* addr = base_addr + i * byte_stride;
   return addr;
 }
 
 static inline bool DecodeScalarAnimationValue(
-    const size_t i, const tinygltf::Accessor &accessor,
-    const tinygltf::Model &model, float *scalar) {
-  const BufferView &bufferView = model.bufferViews[accessor.bufferView];
-  const Buffer &buffer = model.buffers[bufferView.buffer];
+    const size_t i, const tinygltf::Accessor& accessor,
+    const tinygltf::Model& model, float* scalar) {
+  const BufferView& bufferView = model.bufferViews[accessor.bufferView];
+  const Buffer& buffer = model.buffers[bufferView.buffer];
 
-  const uint8_t *addr = GetBufferAddress(i, accessor, bufferView, buffer);
+  const uint8_t* addr = GetBufferAddress(int(i), accessor, bufferView, buffer);
   if (addr == nullptr) {
     std::cerr << "Invalid glTF data?" << std::endl;
     return false;
@@ -191,18 +191,18 @@ static inline bool DecodeScalarAnimationValue(
 
   if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_BYTE) {
     value =
-        DecodeAnimationChannelValue(*(reinterpret_cast<const int8_t *>(addr)));
+        DecodeAnimationChannelValue(*(reinterpret_cast<const int8_t*>(addr)));
   } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
     value =
-        DecodeAnimationChannelValue(*(reinterpret_cast<const uint8_t *>(addr)));
+        DecodeAnimationChannelValue(*(reinterpret_cast<const uint8_t*>(addr)));
   } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_SHORT) {
     value =
-        DecodeAnimationChannelValue(*(reinterpret_cast<const int16_t *>(addr)));
+        DecodeAnimationChannelValue(*(reinterpret_cast<const int16_t*>(addr)));
   } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-    value = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const uint16_t *>(addr)));
+    value =
+        DecodeAnimationChannelValue(*(reinterpret_cast<const uint16_t*>(addr)));
   } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
-    value = *(reinterpret_cast<const float *>(addr));
+    value = *(reinterpret_cast<const float*>(addr));
   } else {
     std::cerr << "??? Unknown componentType : "
               << PrintComponentType(accessor.componentType) << std::endl;
@@ -215,24 +215,24 @@ static inline bool DecodeScalarAnimationValue(
 }
 
 static bool DecodeTranslationAnimationValue(const size_t i,
-                                            const tinygltf::Accessor &accessor,
-                                            const tinygltf::Model &model,
-                                            float *xyz) {
+                                            const tinygltf::Accessor& accessor,
+                                            const tinygltf::Model& model,
+                                            float* xyz) {
   if (accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT) {
     std::cerr << "`translation` must be float type." << std::endl;
     return false;
   }
 
-  const BufferView &bufferView = model.bufferViews[accessor.bufferView];
-  const Buffer &buffer = model.buffers[bufferView.buffer];
+  const BufferView& bufferView = model.bufferViews[accessor.bufferView];
+  const Buffer& buffer = model.buffers[bufferView.buffer];
 
-  const uint8_t *addr = GetBufferAddress(i, accessor, bufferView, buffer);
+  const uint8_t* addr = GetBufferAddress(int(i), accessor, bufferView, buffer);
   if (addr == nullptr) {
     std::cerr << "Invalid glTF data?" << std::endl;
     return 0.0f;
   }
 
-  const float *ptr = reinterpret_cast<const float *>(addr);
+  const float* ptr = reinterpret_cast<const float*>(addr);
 
   xyz[0] = *(ptr + 0);
   xyz[1] = *(ptr + 1);
@@ -242,24 +242,24 @@ static bool DecodeTranslationAnimationValue(const size_t i,
 }
 
 static bool DecodeScaleAnimationValue(const size_t i,
-                                      const tinygltf::Accessor &accessor,
-                                      const tinygltf::Model &model,
-                                      float *xyz) {
+                                      const tinygltf::Accessor& accessor,
+                                      const tinygltf::Model& model,
+                                      float* xyz) {
   if (accessor.componentType != TINYGLTF_COMPONENT_TYPE_FLOAT) {
     std::cerr << "`scale` must be float type." << std::endl;
     return false;
   }
 
-  const BufferView &bufferView = model.bufferViews[accessor.bufferView];
-  const Buffer &buffer = model.buffers[bufferView.buffer];
+  const BufferView& bufferView = model.bufferViews[accessor.bufferView];
+  const Buffer& buffer = model.buffers[bufferView.buffer];
 
-  const uint8_t *addr = GetBufferAddress(i, accessor, bufferView, buffer);
+  const uint8_t* addr = GetBufferAddress(int(i), accessor, bufferView, buffer);
   if (addr == nullptr) {
     std::cerr << "Invalid glTF data?" << std::endl;
     return 0.0f;
   }
 
-  const float *ptr = reinterpret_cast<const float *>(addr);
+  const float* ptr = reinterpret_cast<const float*>(addr);
 
   xyz[0] = *(ptr + 0);
   xyz[1] = *(ptr + 1);
@@ -269,13 +269,13 @@ static bool DecodeScaleAnimationValue(const size_t i,
 }
 
 static bool DecodeRotationAnimationValue(const size_t i,
-                                         const tinygltf::Accessor &accessor,
-                                         const tinygltf::Model &model,
-                                         float *xyzw) {
-  const BufferView &bufferView = model.bufferViews[accessor.bufferView];
-  const Buffer &buffer = model.buffers[bufferView.buffer];
+                                         const tinygltf::Accessor& accessor,
+                                         const tinygltf::Model& model,
+                                         float* xyzw) {
+  const BufferView& bufferView = model.bufferViews[accessor.bufferView];
+  const Buffer& buffer = model.buffers[bufferView.buffer];
 
-  const uint8_t *addr = GetBufferAddress(i, accessor, bufferView, buffer);
+  const uint8_t* addr = GetBufferAddress(int(i), accessor, bufferView, buffer);
   if (addr == nullptr) {
     std::cerr << "Invalid glTF data?" << std::endl;
     return false;
@@ -285,45 +285,45 @@ static bool DecodeRotationAnimationValue(const size_t i,
 
   if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_BYTE) {
     xyzw[0] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const int8_t *>(addr) + 0));
+        *(reinterpret_cast<const int8_t*>(addr) + 0));
     xyzw[1] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const int8_t *>(addr) + 1));
+        *(reinterpret_cast<const int8_t*>(addr) + 1));
     xyzw[2] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const int8_t *>(addr) + 2));
+        *(reinterpret_cast<const int8_t*>(addr) + 2));
     xyzw[3] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const int8_t *>(addr) + 3));
+        *(reinterpret_cast<const int8_t*>(addr) + 3));
   } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
     xyzw[0] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const uint8_t *>(addr) + 0));
+        *(reinterpret_cast<const uint8_t*>(addr) + 0));
     xyzw[1] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const uint8_t *>(addr) + 1));
+        *(reinterpret_cast<const uint8_t*>(addr) + 1));
     xyzw[2] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const uint8_t *>(addr) + 2));
+        *(reinterpret_cast<const uint8_t*>(addr) + 2));
     xyzw[3] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const uint8_t *>(addr) + 3));
+        *(reinterpret_cast<const uint8_t*>(addr) + 3));
   } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_SHORT) {
     xyzw[0] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const int16_t *>(addr) + 0));
+        *(reinterpret_cast<const int16_t*>(addr) + 0));
     xyzw[1] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const int16_t *>(addr) + 1));
+        *(reinterpret_cast<const int16_t*>(addr) + 1));
     xyzw[2] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const int16_t *>(addr) + 2));
+        *(reinterpret_cast<const int16_t*>(addr) + 2));
     xyzw[3] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const int16_t *>(addr) + 3));
+        *(reinterpret_cast<const int16_t*>(addr) + 3));
   } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
     xyzw[0] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const uint16_t *>(addr) + 0));
+        *(reinterpret_cast<const uint16_t*>(addr) + 0));
     xyzw[1] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const uint16_t *>(addr) + 1));
+        *(reinterpret_cast<const uint16_t*>(addr) + 1));
     xyzw[2] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const uint16_t *>(addr) + 2));
+        *(reinterpret_cast<const uint16_t*>(addr) + 2));
     xyzw[3] = DecodeAnimationChannelValue(
-        *(reinterpret_cast<const uint16_t *>(addr) + 3));
+        *(reinterpret_cast<const uint16_t*>(addr) + 3));
   } else if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
-    xyzw[0] = *(reinterpret_cast<const float *>(addr) + 0);
-    xyzw[1] = *(reinterpret_cast<const float *>(addr) + 1);
-    xyzw[2] = *(reinterpret_cast<const float *>(addr) + 2);
-    xyzw[3] = *(reinterpret_cast<const float *>(addr) + 3);
+    xyzw[0] = *(reinterpret_cast<const float*>(addr) + 0);
+    xyzw[1] = *(reinterpret_cast<const float*>(addr) + 1);
+    xyzw[2] = *(reinterpret_cast<const float*>(addr) + 2);
+    xyzw[3] = *(reinterpret_cast<const float*>(addr) + 3);
   } else {
     std::cerr << "??? Unknown componentType : "
               << PrintComponentType(accessor.componentType) << std::endl;

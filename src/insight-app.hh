@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 // This includes opengl for us, along side debuging callbacks
 #include "gl_util.hh"
 
@@ -33,16 +37,17 @@ class app {
     // TODO cleanup what you can !
 
     // loaded opengl objects
-    if (!textures.empty()) glDeleteTextures(textures.size(), textures.data());
+    if (!textures.empty())
+      glDeleteTextures(GLsizei(textures.size()), textures.data());
     textures.clear();
 
     if (!VAOs.empty()) {
-      glDeleteVertexArrays(VAOs.size(), VAOs.data());
+      glDeleteVertexArrays(GLsizei(VAOs.size()), VAOs.data());
     }
     VAOs.clear();
 
     for (auto& VBO : VBOs) {
-      glDeleteBuffers(VBO.size(), VBO.data());
+      glDeleteBuffers(GLsizei(VBO.size()), VBO.data());
     }
     VBOs.clear();
 
@@ -187,7 +192,7 @@ class app {
     // Set the number of weights to animate
     nb_morph_targets = 0;
     for (auto& target : morph_targets) {
-      nb_morph_targets = std::max<int>(target.size(), nb_morph_targets);
+      nb_morph_targets = std::max<int>(int(target.size()), nb_morph_targets);
     }
 
     // Create an array of blend weights in the main node, and fill it with
@@ -280,6 +285,7 @@ class app {
       try {
         load();
       } catch (const std::exception& e) {
+        std::cerr << e.what() << '\n';
         unload();
       }
     }
@@ -326,6 +332,7 @@ class app {
               try {
                 load();
               } catch (const std::exception& e) {
+                std::cerr << e.what() << '\n';
                 unload();
               }
             } else {
@@ -346,6 +353,7 @@ class app {
                 // necessary.
                 // Serialize to file
               } catch (const std::exception& e) {
+                std::cerr << e.what() << '\n';
                 // display error here
               }
             } else {

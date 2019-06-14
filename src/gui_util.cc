@@ -1,3 +1,7 @@
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "gui_util.hh"
 
 // Need to access some OpenGL functions in there:
@@ -316,7 +320,7 @@ void skinning_data_window(
   ImGui::Begin("Skinning data", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
   static int submesh_id = 0;
   ImGui::InputInt("Submesh #", &submesh_id, 1, 1);
-  submesh_id = glm::clamp<int>(submesh_id, 0, weights.size() - 1);
+  submesh_id = glm::clamp<int>(submesh_id, 0, int(weights.size()) - 1);
   ImGui::Text("Submesh[%zu]", size_t(submesh_id));
   ImGui::BeginChild("##scrollable_data_region", ImVec2(600, 800), false,
                     ImGuiWindowFlags_AlwaysVerticalScrollbar);

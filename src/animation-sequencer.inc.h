@@ -1,5 +1,9 @@
 #include <algorithm>
 
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 namespace gltf_insight {
 
 static const char* SequencerItemTypeNames[] = {"Animation"};
@@ -45,7 +49,7 @@ struct RampEdit : public ImCurveEdit::Delegate {
     mPts[curveIndex][pointIndex] = ImVec2(value.x, value.y);
     SortValues(curveIndex);
     for (size_t i = 0; i < GetPointCount(curveIndex); i++) {
-      if (mPts[curveIndex][i].x == value.x) return i;
+      if (mPts[curveIndex][i].x == value.x) return int(i);
     }
     return pointIndex;
   }
@@ -140,8 +144,8 @@ struct AnimSequence : public ImSequencer::SequenceInterface {
                           const ImRect& legendClippingRect) {
     static const char* labels[] = {"Translation", "Rotation", "Scale"};
     static RampEdit rampEdit;
-    rampEdit.mMax = ImVec2(mFrameMax, 1.f);
-    rampEdit.mMin = ImVec2(mFrameMin, 0.f);
+    rampEdit.mMax = ImVec2(float(mFrameMax), 1.f);
+    rampEdit.mMin = ImVec2(float(mFrameMin), 0.f);
     draw_list->PushClipRect(legendClippingRect.Min, legendClippingRect.Max,
                             true);
     for (int i = 0; i < 3; i++) {

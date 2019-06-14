@@ -106,14 +106,15 @@ class shader {
 
   void set_uniform(const char* name,
                    const std::vector<glm::mat4>& matrices) const {
-    glUniformMatrix4fv(glGetUniformLocation(program_, name), matrices.size(),
-                       GL_FALSE, glm::value_ptr(matrices[0]));
+    glUniformMatrix4fv(glGetUniformLocation(program_, name),
+                       GLsizei(matrices.size()), GL_FALSE,
+                       glm::value_ptr(matrices[0]));
   }
 
   void set_uniform(const char* name, size_t number_of_matrices,
                    float* data) const {
-    glUniformMatrix4fv(glGetUniformLocation(program_, name), number_of_matrices,
-                       GL_FALSE, data);
+    glUniformMatrix4fv(glGetUniformLocation(program_, name),
+                       GLsizei(number_of_matrices), GL_FALSE, data);
   }
 
   GLuint get_program() const { return program_; }

@@ -1,3 +1,7 @@
+#ifndef _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include "gltf-graph.hh"
 
 #include "gl_util.hh"
@@ -129,13 +133,15 @@ void populate_gltf_skeleton_subgraph(const tinygltf::Model& model,
   const auto& node_translation = skeleton_node.translation;
   if (node_translation.size() == 3)  // 3D vector
   {
-    for (size_t i = 0; i < 3; ++i) translation[i] = float(node_translation[i]);
+    for (glm::vec3::length_type i = 0; i < 3; ++i)
+      translation[i] = float(node_translation[i]);
   }
 
   const auto& node_scale = skeleton_node.scale;
   if (node_scale.size() == 3)  // 3D vector
   {
-    for (size_t i = 0; i < 3; ++i) scale[i] = float(node_scale[i]);
+    for (glm::vec3::length_type i = 0; i < 3; ++i)
+      scale[i] = float(node_scale[i]);
   }
 
   const auto& node_rotation = skeleton_node.rotation;
