@@ -319,7 +319,7 @@ class app {
 
         if (open_file_dialog) {
           if (ImGuiFileDialog::Instance()->FileDialog(
-                  "Open glTF...", ".gltf\0.glb\0.vrm\0\0\0")) {
+                  "Open glTF...", ".gltf\0.glb\0.vrm\0.*\0\0")) {
             if (ImGuiFileDialog::Instance()->IsOk) {
               unload();
               input_filename = ImGuiFileDialog::Instance()->GetFilepathName();

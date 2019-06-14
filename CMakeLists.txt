@@ -46,6 +46,7 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGradient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.h
     )
 
 include_directories(
