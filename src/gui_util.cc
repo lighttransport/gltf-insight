@@ -535,26 +535,16 @@ void deinitialize_gui_and_window(GLFWwindow* window) {
   glfwTerminate();
 }
 
-void transform_window(glm::mat4& view_matrix, glm::vec3& camera_position,
-                      application_parameters& my_user_pointer,
-                      float vecTranslation[3], float vecRotation[3],
+void transform_window(float vecTranslation[3], float vecRotation[3],
                       float vecScale[3],
-                      ImGuizmo::OPERATION& mCurrentGizmoOperation) {
+                      ImGuizmo::OPERATION& mCurrentGizmoOperation,
+                      bool* show_gizmo) {
   if (ImGui::Begin("Transform manipulator")) {
-    ImGui::Text("camera pitch %f yaw %f", my_user_pointer.rot_pitch,
-                my_user_pointer.rot_yaw);
-
-    glm::quat camera_rotation(glm::vec3(glm::radians(my_user_pointer.rot_pitch),
-                                        0.f,
-                                        glm::radians(my_user_pointer.rot_yaw)));
-    view_matrix = glm::lookAt(camera_rotation * camera_position, glm::vec3(0.f),
-                              camera_rotation * glm::vec3(0, 1.f, 0));
-
     ImGui::InputFloat3("Tr", vecTranslation, 3);
     ImGui::InputFloat3("Rt", vecRotation, 3);
     ImGui::InputFloat3("Sc", vecScale, 3);
 
-    if (ImGui::Button("RESET")) {
+    if (ImGui::Button("Reset transforms")) {
       vecTranslation[0] = 0;
       vecTranslation[1] = 0;
       vecTranslation[2] = 0;
@@ -565,6 +555,13 @@ void transform_window(glm::mat4& view_matrix, glm::vec3& camera_position,
       vecScale[1] = 1;
       vecScale[2] = 1;
     }
+
+    if (show_gizmo) {
+      ImGui::SameLine();
+      ImGui::Checkbox("Show Gizmo?", show_gizmo);
+    }
+
+    ImGui::Separator();
 
     if (ImGui::RadioButton("Translate",
                            mCurrentGizmoOperation == ImGuizmo::TRANSLATE))

@@ -22,7 +22,10 @@
 #include "tiny_gltf_util.h"
 
 // after:
+#include <glm/common.hpp>
+
 #include "animation-sequencer.inc.h"
+#include "animation.hh"
 
 struct application_parameters {
   glm::vec3& camera_position;
@@ -87,11 +90,10 @@ void initialize_imgui(GLFWwindow* window);
 // Cleaup the gui and the window systems
 void deinitialize_gui_and_window(GLFWwindow* window);
 
-void transform_window(glm::mat4& view_matrix, glm::vec3& camera_position,
-                      application_parameters& my_user_pointer,
-                      float vecTranslation[3], float vecRotation[3],
+void transform_window(float vecTranslation[3], float vecRotation[3],
                       float vecScale[3],
-                      ImGuizmo::OPERATION& mCurrentGizmoOperation);
+                      ImGuizmo::OPERATION& mCurrentGizmoOperation,
+                      bool* show_gizmo);
 
 void sequencer_window(gltf_insight::AnimSequence loaded_sequence,
                       bool& playing_state, bool& need_to_update_pose,

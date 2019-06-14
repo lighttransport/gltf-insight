@@ -318,8 +318,8 @@ class app {
         }
 
         if (open_file_dialog) {
-          if (ImGuiFileDialog::Instance()->FileDialog("Open glTF...",
-                                                      ".gltf\0.glb\0\0")) {
+          if (ImGuiFileDialog::Instance()->FileDialog(
+                  "Open glTF...", ".gltf\0.glb\0.vrm\0\0\0")) {
             if (ImGuiFileDialog::Instance()->IsOk) {
               unload();
               input_filename = ImGuiFileDialog::Instance()->GetFilepathName();
@@ -399,6 +399,14 @@ class app {
           precompute_hardware_skinning_data(mesh_skeleton_graph, model_matrix,
                                             joint_matrices, flat_joint_list,
                                             inverse_bind_matrices);
+
+          const glm::quat camera_rotation(
+              glm::vec3(glm::radians(gui_parameters.rot_pitch), 0.f,
+                        glm::radians(gui_parameters.rot_yaw)));
+
+          view_matrix =
+              glm::lookAt(camera_rotation * camera_position, glm::vec3(0.f),
+                          camera_rotation * glm::vec3(0, 1.f, 0));
 
           glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
           glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
@@ -532,7 +540,7 @@ class app {
     const std::string ext = GetFilePathExtension(input_filename);
 
     bool ret = false;
-    if (ext.compare("glb") == 0) {
+    if (ext.compare("glb") == 0 || ext.compare("vrm") == 0) {
       std::cout << "Reading binary glTF" << std::endl;
       // assume binary glTF.
       ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn,
@@ -713,23 +721,24 @@ class app {
     float vecTranslation[3], vecRotation[3], vecScale[3];
     static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::ROTATE);
     static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
+    static bool do_manipulate = true;
 
     ImGuizmo::DecomposeMatrixToComponents(
         glm::value_ptr(model_matrix), vecTranslation, vecRotation, vecScale);
 
-    transform_window(view_matrix, camera_position, my_user_pointer,
-                     vecTranslation, vecRotation, vecScale,
-                     mCurrentGizmoOperation);
+    transform_window(vecTranslation, vecRotation, vecScale,
+                     mCurrentGizmoOperation, &do_manipulate);
 
     ImGuizmo::RecomposeMatrixFromComponents(
         vecTranslation, vecRotation, vecScale, glm::value_ptr(model_matrix));
 
-    auto io = ImGui::GetIO();
+    auto& io = ImGui::GetIO();
     ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-    ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
-                         glm::value_ptr(projection_matrix),
-                         mCurrentGizmoOperation, mCurrentGizmoMode,
-                         glm::value_ptr(model_matrix), NULL, NULL);
+    if (do_manipulate)
+      ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
+                           glm::value_ptr(projection_matrix),
+                           mCurrentGizmoOperation, mCurrentGizmoMode,
+                           glm::value_ptr(model_matrix), NULL, NULL);
   }
 
   void fill_sequencer(gltf_insight::AnimSequence& sequence,
