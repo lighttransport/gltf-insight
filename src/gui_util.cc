@@ -375,6 +375,8 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
 
+  glfwWindowHint(GLFW_SAMPLES, 16);
+
   window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
   glfwMakeContextCurrent(window);
   glfwSwapInterval(1);  // Enable vsync
@@ -404,6 +406,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
                         GL_TRUE);
 #endif
   glEnable(GL_DEPTH_TEST);
+  glEnable(GL_MULTISAMPLE);
 }
 
 void initialize_imgui(GLFWwindow* window) {
@@ -663,7 +666,7 @@ void utilities_window(bool& show_imgui_demo) {
 
 void camera_parameters_window(float& fovy, float& z_far) {
   if (ImGui::Begin("Camera Parameters")) {
-    ImGui::SliderFloat("FOV", &fovy, 45, 90, "%.1f");
+    ImGui::SliderFloat("FOV", &fovy, 15, 90, "%.1f");
     ImGui::SliderFloat("draw distance", &z_far, 100, 1000, "%.0f");
   }
   ImGui::End();
