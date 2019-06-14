@@ -34,22 +34,15 @@ class app {
  public:
   void unload() {
     asset_loaded = false;
-    // TODO cleanup what you can !
 
     // loaded opengl objects
-    if (!textures.empty())
-      glDeleteTextures(GLsizei(textures.size()), textures.data());
-    textures.clear();
+    glDeleteTextures(GLsizei(textures.size()), textures.data());
+    glDeleteVertexArrays(GLsizei(VAOs.size()), VAOs.data());
+    for (auto& VBO : VBOs) glDeleteBuffers(GLsizei(VBO.size()), VBO.data());
 
-    if (!VAOs.empty()) {
-      glDeleteVertexArrays(GLsizei(VAOs.size()), VAOs.data());
-    }
-    VAOs.clear();
-
-    for (auto& VBO : VBOs) {
-      glDeleteBuffers(GLsizei(VBO.size()), VBO.data());
-    }
     VBOs.clear();
+    VAOs.clear();
+    textures.clear();
 
     shader_list.clear();
     shader_names.clear();
