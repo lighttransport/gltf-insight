@@ -31,17 +31,15 @@ void gl_new_frame(GLFWwindow* window, ImVec4 clear_color, int& display_w,
 }
 
 void gl_gui_end_frame(GLFWwindow* window) {
-  glUseProgram(0);  // You may want this if using this code in an
-  // OpenGL 3+ context where shaders may be bound, but prefer using
-  // the GL3+ code.
+  glUseProgram(0);
 
   ImGui::Render();
   ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
-  // glfwSwapBuffers(window);
 
   glFlush();
+
   static int frameCount = 0;
-  double currentTime = glfwGetTime();
+  static double currentTime = glfwGetTime();
   static double previousTime = currentTime;
   static char title[256];
 

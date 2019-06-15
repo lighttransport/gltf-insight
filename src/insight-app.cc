@@ -77,19 +77,39 @@ void app::load() {
   const auto& mesh = model.meshes[mesh_node.mesh];
   if (mesh_node.skin < 0) {
     std::cerr << "The loaded gltf file doesn't have any skin in the mesh\n";
-    exit(EXIT_FAILURE);
-  }
-  const auto& skin = model.skins[mesh_node.skin];
-  auto skeleton = skin.skeleton;
+  } else {
+    const auto& skin = model.skins[mesh_node.skin];
+    auto skeleton = skin.skeleton;
 
-  while (skeleton == -1) {
-    for (int node : model.scenes[0].nodes) {
-      skeleton = find_skeleton_root(model, skin.joints, node);
-      if (skeleton != -1) {
-        // todo check skeleton root
-        break;
+    while (skeleton == -1) {
+      for (int node : model.scenes[0].nodes) {
+        skeleton = find_skeleton_root(model, skin.joints, node);
+        if (skeleton != -1) {
+          // todo check skeleton root
+          break;
+        }
       }
     }
+
+    nb_joints = int(skin.joints.size());
+    joint_matrices.resize(nb_joints);
+
+    // One : We need to know, for each joint, what is it's inverse bind
+    // matrix
+    genrate_joint_inverse_bind_matrix_map(skin, nb_joints,
+                                          joint_inverse_bind_matrix_map);
+
+    // Three : Load the skeleton graph. We need this to calculate the bones
+    // world transform
+    load_inverse_bind_matrix_array(model, skin, nb_joints,
+                                   inverse_bind_matrices);
+    populate_gltf_skeleton_subgraph(model, mesh_skeleton_graph, skeleton);
+    // Four : Get an array that is in the same order as the bones in the
+    // glTF to represent the whole skeletons. This is important for the
+    // joint matrix calculation
+    create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph,
+                          flat_joint_list);
+    // assert(flat_bone_list.size() == nb_joints);
   }
 
   const auto& primitives = mesh.primitives;
@@ -98,31 +118,12 @@ void app::load() {
   // fan...)
   const auto nb_submeshes = primitives.size();
 
-  const auto nb_joints = skin.joints.size();
-  joint_matrices.resize(nb_joints);
-
-  // One : We need to know, for each joint, what is it's inverse bind
-  // matrix
-  genrate_joint_inverse_bind_matrix_map(skin, nb_joints,
-                                        joint_inverse_bind_matrix_map);
-
   // Two : We load the actual animation data. We also initialize the
   // animation sequencer
   const auto nb_animations = model.animations.size();
   animations.resize(nb_animations);
   load_animations(model, animations);
   fill_sequencer(sequence, animations);
-
-  // Three : Load the skeleton graph. We need this to calculate the bones
-  // world transform
-  load_inverse_bind_matrix_array(model, skin, nb_joints, inverse_bind_matrices);
-  populate_gltf_skeleton_subgraph(model, mesh_skeleton_graph, skeleton);
-
-  // Four : Get an array that is in the same order as the bones in the
-  // glTF to represent the whole skeletons. This is important for the
-  // joint matrix calculation
-  create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph, flat_joint_list);
-  // assert(flat_bone_list.size() == nb_joints);
 
   // Five : For each animation loaded that is supposed to move the skeleton,
   // associate the animation channel targets with their gltf "node" here:

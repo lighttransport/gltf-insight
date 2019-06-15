@@ -103,7 +103,8 @@ class app {
   std::vector<std::vector<float>> vertex_coord, texture_coord, normals, weights,
       display_position, display_normal;
   std::vector<std::vector<unsigned short>> joints;
-  int nb_morph_targets;
+  int nb_morph_targets = 0;
+  int nb_joints = 0;
 
   // hidden methods
 
