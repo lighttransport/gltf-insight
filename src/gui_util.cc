@@ -37,7 +37,21 @@ void gl_gui_end_frame(GLFWwindow* window) {
 
   ImGui::Render();
   ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
-  glfwSwapBuffers(window);
+  // glfwSwapBuffers(window);
+
+  glFlush();
+  static int frameCount = 0;
+  double currentTime = glfwGetTime();
+  static double previousTime = currentTime;
+  static char title[256];
+
+  frameCount++;
+  if (currentTime - previousTime >= 1.0) {
+    sprintf(title, "glTF Insight GUI [%dFPS]", frameCount);
+    glfwSetWindowTitle(window, title);
+    frameCount = 0;
+    previousTime = currentTime;
+  }
 }
 
 bool ImGuiCombo(const char* label, int* current_item,
@@ -379,7 +393,8 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
 
-  glfwWindowHint(GLFW_SAMPLES, 16);
+  glfwWindowHint(GLFW_SAMPLES, 4);
+  glfwWindowHint(GLFW_DOUBLEBUFFER, GL_FALSE);
 
   window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
   glfwMakeContextCurrent(window);
