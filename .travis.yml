@@ -1,3 +1,4 @@
+dist: xenial
 language: cpp
 sudo: false
 matrix:
