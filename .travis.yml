@@ -14,6 +14,7 @@ matrix:
         - libxrender-dev
         - xorg-dev
         - libglu1-mesa-dev
+        - cmake
     compiler: clang
     env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug
   - addons: *1
@@ -29,6 +30,7 @@ matrix:
         - libxrender-dev
         - xorg-dev
         - libglu1-mesa-dev
+        - cmake
     compiler: gcc
     env: COMPILER_VERSION=4.9 BUILD_TYPE=Debug EXTRA_CXXFLAGS="-fsanitize=address"
   - addons: *2
@@ -39,8 +41,7 @@ matrix:
     env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
 
 before_install:
-  - git submodule init
-  - git submodule update
+  - git submodule update --init --recursive
 
 
 script:
@@ -50,4 +51,4 @@ script:
   - mkdir build
   - cd build
   - cmake ..
-  - make
+  - make -j 2
