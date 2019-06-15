@@ -392,7 +392,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][0]);
       glBufferData(GL_ARRAY_BUFFER,
                    vertex_coord[submesh].size() * sizeof(float),
-                   vertex_coord[submesh].data(), GL_STREAM_DRAW);
+                   vertex_coord[submesh].data(), GL_DYNAMIC_DRAW);
       glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(0);
@@ -400,7 +400,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       // Layout "1" = vertex normal
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][1]);
       glBufferData(GL_ARRAY_BUFFER, normals[submesh].size() * sizeof(float),
-                   normals[submesh].data(), GL_STREAM_DRAW);
+                   normals[submesh].data(), GL_DYNAMIC_DRAW);
       glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(1);

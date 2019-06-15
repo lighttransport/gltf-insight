@@ -502,6 +502,7 @@ void app::cpu_compute_morphed_display_mesh(
   // Get the base vector
   display_position[submesh_id][vertex] = vertex_coord[submesh_id][vertex];
   display_normal[submesh_id][vertex] = normals[submesh_id][vertex];
+
   // Accumulate the delta, v = v0 + w0 * m0 + w1 * m1 + w2 * m2 ...
   for (size_t w = 0; w < mesh_skeleton_graph.pose.blend_weights.size(); ++w) {
     const float weight = mesh_skeleton_graph.pose.blend_weights[w];
@@ -520,11 +521,11 @@ void app::gpu_update_morphed_submesh(
   glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][0]);
   glBufferData(GL_ARRAY_BUFFER,
                display_position[submesh_id].size() * sizeof(float),
-               display_position[submesh_id].data(), GL_STREAM_DRAW);
+               display_position[submesh_id].data(), GL_DYNAMIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][1]);
   glBufferData(GL_ARRAY_BUFFER,
                display_normal[submesh_id].size() * sizeof(float),
-               display_normal[submesh_id].data(), GL_STREAM_DRAW);
+               display_normal[submesh_id].data(), GL_DYNAMIC_DRAW);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -536,19 +537,62 @@ void app::perform_software_morphing(
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
     std::vector<std::array<GLuint, 6>>& VBOs) {
-  // If mesh has morph targets
+  // evaluation cache:
+  static std::vector<bool> clean;
+  static std::vector<std::vector<float>> cached_weights;
+
   if (mesh_skeleton_graph.pose.blend_weights.size() > 0) {
     assert(display_position[submesh_id].size() ==
            display_normal[submesh_id].size());
-    // Blend between morph targets on the CPU:
-    for (size_t vertex = 0; vertex < display_position[submesh_id].size();
-         ++vertex) {
-      cpu_compute_morphed_display_mesh(
-          mesh_skeleton_graph, submesh_id, morph_targets, vertex_coord, normals,
-          display_position, display_normal, vertex);
+
+    // We are dynamically keeping a cache of the morph targets weights. CPU-side
+    // evaluation of morphing is expensive, if the blending weights did not
+    // change, we don't want to re-evaluate the mesh. We are keeping a cache of
+    // the weights, and sedding a dirty flags if we need to recompute and
+    // reupload the mesh to the GPU
+
+    // To transparently handle the loading of a different file, we resize these
+    // arrays here
+    if (cached_weights.size() != display_position.size()) {
+      cached_weights.resize(display_position.size());
+      clean.resize(display_position.size());
+      std::generate(clean.begin(), clean.end(), [] { return false; });
     }
-    gpu_update_morphed_submesh(submesh_id, display_position, display_normal,
-                               VBOs);
+
+    // If the number of blendshape doesn't match, we are just copying the array
+    if (cached_weights[submesh_id].size() !=
+        mesh_skeleton_graph.pose.blend_weights.size()) {
+      clean[submesh_id] = false;
+      cached_weights[submesh_id] = mesh_skeleton_graph.pose.blend_weights;
+    }
+
+    // If the size matches, we are comparing all the elements, if they match, it
+    // means that mesh doesn't need to be evaluated
+    else if (cached_weights[submesh_id] ==
+             mesh_skeleton_graph.pose.blend_weights) {
+      clean[submesh_id] = true;
+    }
+
+    // In that case, we are updating the cache, and setting the flag dirty
+    else {
+      clean[submesh_id] = false;
+      cached_weights[submesh_id] = mesh_skeleton_graph.pose.blend_weights;
+    }
+
+    // If flag is dirty
+    if (!clean[submesh_id]) {
+      // Blend between morph targets on the CPU:
+      for (size_t vertex = 0; vertex < display_position[submesh_id].size();
+           ++vertex) {
+        cpu_compute_morphed_display_mesh(
+            mesh_skeleton_graph, submesh_id, morph_targets, vertex_coord,
+            normals, display_position, display_normal, vertex);
+      }
+
+      // Upload the new mesh data to the GPU
+      gpu_update_morphed_submesh(submesh_id, display_position, display_normal,
+                                 VBOs);
+    }
   }
 }
 
