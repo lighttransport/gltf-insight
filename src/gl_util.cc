@@ -121,6 +121,9 @@ void draw_space_base(GLuint shader, const float line_width,
 
 void load_shaders(const size_t nb_joints,
                   std::map<std::string, shader>& shaders) {
+  std::cerr << "Generating GLSL code for shader with " << nb_joints
+            << " joints.\n";
+
   // TODO put the GLSL code ouside of here, load them from files
   // Main vertex shader, that perform GPU skinning
   std::string vertex_shader_source_str = R"glsl(
@@ -213,7 +216,11 @@ uniform sampler2D diffuse_texture;
 
 void main()
 {
-  output_color = texture(diffuse_texture, interpolated_uv);
+  vec4 sampled_color = texture(diffuse_texture, interpolated_uv);
+
+  if(sampled_color.a != 1.0) discard;
+  
+  output_color = sampled_color;
 }
 )glsl";
 

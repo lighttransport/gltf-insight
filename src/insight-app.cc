@@ -7,38 +7,19 @@ void app::unload() {
 
   // loaded opengl objects
   glDeleteTextures(GLsizei(textures.size()), textures.data());
-  glDeleteVertexArrays(GLsizei(VAOs.size()), VAOs.data());
-  for (auto& VBO : VBOs) glDeleteBuffers(GLsizei(VBO.size()), VBO.data());
 
-  VBOs.clear();
-  VAOs.clear();
   textures.clear();
 
-  shader_list.clear();
   shader_names.clear();
   shader_to_use.clear();
   found_textured_shader = false;
 
   // loaded CPU side objects
-  joint_matrices.clear();
-  joint_inverse_bind_matrix_map.clear();
   animations.clear();
   animation_names.clear();
-  inverse_bind_matrices.clear();
-  morph_targets.clear();
-  indices.clear();
-  vertex_coord.clear();
-  texture_coord.clear();
-  normals.clear();
-  weights.clear();
-  display_position.clear();
-  display_normal.clear();
-  joints.clear();
-  draw_call_descriptors.clear();
-  flat_joint_list.clear();
 
-  empty_gltf_skeleton_subgraph(mesh_skeleton_graph);
-  mesh_skeleton_graph.local_xform = glm::mat4{1.f};
+  // empty_gltf_graph(mesh_skeleton_graph);
+  // mesh_skeleton_graph.local_xform = glm::mat4{1.f};
 
   // other number counters and things
   selectedEntry = -1;
@@ -50,9 +31,11 @@ void app::unload() {
 
   // file input information
   input_filename.clear();
+  loaded_meshes.clear();
 
   // library resources
   model = tinygltf::Model();
+  empty_gltf_graph(gltf_scene_tree);
 }
 
 void app::load() {
@@ -62,73 +45,106 @@ void app::load() {
   textures.resize(nb_textures);
   load_all_textures(model, nb_textures, textures);
 
-  // We are bypassing the actual glTF scene here, we are interested in a
-  // file that only represent a character with animations. Find the scene
-  // node that has a mesh attached to it:
-  const auto mesh_node_index = find_main_mesh_node(model);
-  if (mesh_node_index < 0) {
-    std::cerr << "The loaded gltf file doesn't have any findable mesh\n";
-    exit(EXIT_FAILURE);
-  }
+  const auto scene = find_main_scene(model);
 
-  // TODO (ybalrid) : refactor loading code outside of int main()
-  // Get access to the data
-  const auto& mesh_node = model.nodes[mesh_node_index];
-  const auto& mesh = model.meshes[mesh_node.mesh];
-  if (mesh_node.skin < 0) {
-    std::cerr << "The loaded gltf file doesn't have any skin in the mesh\n";
-  } else {
-    const auto& skin = model.skins[mesh_node.skin];
-    auto skeleton = skin.skeleton;
+  // TODO it looks like by the spec that, actually, a gltf scene could have...
+  // multiple root nodes?
+  const auto root_index = model.scenes[scene].nodes[0];
+  gltf_scene_tree.gltf_node_index = root_index;
 
-    while (skeleton == -1) {
-      for (int node : model.scenes[0].nodes) {
-        skeleton = find_skeleton_root(model, skin.joints, node);
-        if (skeleton != -1) {
-          // todo check skeleton root
-          break;
-        }
-      }
+  populate_gltf_graph(model, gltf_scene_tree, root_index);
+  set_mesh_attachement(model, gltf_scene_tree);
+  auto meshes_indices = get_list_of_mesh(gltf_scene_tree);
+
+  loaded_meshes.resize(meshes_indices.size());
+  for (size_t i = 0; i < meshes_indices.size(); ++i) {
+    loaded_meshes[i].instance = meshes_indices[i];
+    auto& current_mesh = loaded_meshes[i];
+    const auto skin_index = model.nodes[current_mesh.instance.node].skin;
+    if (skin_index >= 0) {
+      current_mesh.skinned = true;
+      const auto& gltf_skin = model.skins[skin_index];
+      current_mesh.nb_joints = gltf_skin.joints.size();
+      create_flat_bone_list(gltf_skin, current_mesh.nb_joints, gltf_scene_tree,
+                            current_mesh.flat_joint_list);
+      current_mesh.joint_matrices.resize(current_mesh.nb_joints);
+      load_inverse_bind_matrix_array(model, gltf_skin, current_mesh.nb_joints,
+                                     current_mesh.inverse_bind_matrices);
+      genrate_joint_inverse_bind_matrix_map(
+          gltf_skin, current_mesh.nb_joints,
+          current_mesh.joint_inverse_bind_matrix_map);
     }
 
-    nb_joints = int(skin.joints.size());
-    joint_matrices.resize(nb_joints);
+    const auto& gltf_mesh = model.meshes[current_mesh.instance.mesh];
 
-    // One : We need to know, for each joint, what is it's inverse bind
-    // matrix
-    genrate_joint_inverse_bind_matrix_map(skin, nb_joints,
-                                          joint_inverse_bind_matrix_map);
+    if (!gltf_mesh.name.empty())
+      current_mesh.name = gltf_mesh.name;
+    else
+      current_mesh.name = std::string("mesh_") + std::to_string(i);
 
-    // Three : Load the skeleton graph. We need this to calculate the bones
-    // world transform
-    load_inverse_bind_matrix_array(model, skin, nb_joints,
-                                   inverse_bind_matrices);
-    populate_gltf_skeleton_subgraph(model, mesh_skeleton_graph, skeleton);
-    // Four : Get an array that is in the same order as the bones in the
-    // glTF to represent the whole skeletons. This is important for the
-    // joint matrix calculation
-    create_flat_bone_list(skin, nb_joints, mesh_skeleton_graph,
-                          flat_joint_list);
-    // assert(flat_bone_list.size() == nb_joints);
+    const auto& gltf_mesh_primitives = gltf_mesh.primitives;
+    const auto nb_submeshes = gltf_mesh_primitives.size();
+
+    current_mesh.draw_call_descriptors.resize(nb_submeshes);
+    current_mesh.indices.resize(nb_submeshes);
+    current_mesh.vertex_coord.resize(nb_submeshes);
+    current_mesh.texture_coord.resize(nb_submeshes);
+    current_mesh.normals.resize(nb_submeshes);
+    current_mesh.weights.resize(nb_submeshes);
+    current_mesh.joints.resize(nb_submeshes);
+    current_mesh.VAOs.resize(nb_submeshes);
+    current_mesh.VBOs.resize(nb_submeshes);
+
+    // Create OpenGL objects for submehes
+    glGenVertexArrays(GLsizei(nb_submeshes), current_mesh.VAOs.data());
+    for (auto& VBO : current_mesh.VBOs) {
+      // We have 5 vertex attributes per vertex + 1 element array.
+      glGenBuffers(6, VBO.data());
+    }
+
+    // For each submesh of the mesh, load the data
+    load_geometry(model, textures, gltf_mesh_primitives,
+                  current_mesh.draw_call_descriptors, current_mesh.VAOs,
+                  current_mesh.VBOs, current_mesh.indices,
+                  current_mesh.vertex_coord, current_mesh.texture_coord,
+                  current_mesh.normals, current_mesh.weights,
+                  current_mesh.joints);
+
+    current_mesh.display_position = current_mesh.vertex_coord;
+    current_mesh.display_normal = current_mesh.normals;
+
+    // cleanup opengl state
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    current_mesh.shader_list = std::unique_ptr<std::map<std::string, shader>>(
+        new std::map<std::string, shader>);
+
+    current_mesh.morph_targets.resize(nb_submeshes);
+    for (int s = 0; s < nb_submeshes; ++s) {
+      current_mesh.morph_targets[s].resize(
+          gltf_mesh.primitives[s].targets.size());
+
+      load_morph_targets(model, gltf_mesh.primitives[s],
+                         current_mesh.morph_targets[s]);
+    }
+
+    current_mesh.nb_morph_targets = 0;
+    for (auto& target : current_mesh.morph_targets) {
+      current_mesh.nb_morph_targets =
+          std::max<int>(int(target.size()), current_mesh.nb_morph_targets);
+    }
+
+    load_shaders(current_mesh.nb_joints, *current_mesh.shader_list);
   }
 
-  const auto& primitives = mesh.primitives;
-  // I tend to call a "primitive" here a submesh, not to mix them with what
-  // OpenGL actually call a "primitive" (point, line, triangle, strip,
-  // fan...)
-  const auto nb_submeshes = primitives.size();
-
-  // Two : We load the actual animation data. We also initialize the
-  // animation sequencer
   const auto nb_animations = model.animations.size();
   animations.resize(nb_animations);
   load_animations(model, animations);
   fill_sequencer(sequence, animations);
 
-  // Five : For each animation loaded that is supposed to move the skeleton,
-  // associate the animation channel targets with their gltf "node" here:
   for (auto& animation : animations) {
-    animation.set_gltf_graph_targets(&mesh_skeleton_graph);
+    animation.set_gltf_graph_targets(&gltf_scene_tree);
 
 #if 0 && (defined(DEBUG) || defined(_DEBUG))
     // Animation playing depend on these values being absolutely consistent:
@@ -143,94 +159,76 @@ void app::load() {
 #endif
   }
 
-  // Six : Load morph targets:
-  // TODO we can probably only have one loop going through the submeshes
-  morph_targets.resize(nb_submeshes);
-  for (int i = 0; i < nb_submeshes; ++i) {
-    morph_targets[i].resize(mesh.primitives[i].targets.size());
-    load_morph_targets(model, mesh.primitives[i], morph_targets[i]);
+  // TODO this is ... mh... per node?
+  auto nb_morph_targets = loaded_meshes[0].nb_morph_targets;
+  for (int i = 1; i < loaded_meshes.size(); ++i) {
+    nb_morph_targets =
+        std::max(nb_morph_targets, loaded_meshes[i].nb_morph_targets);
   }
 
-  // Set the number of weights to animate
-  nb_morph_targets = 0;
-  for (auto& target : morph_targets) {
-    nb_morph_targets = std::max<int>(int(target.size()), nb_morph_targets);
-  }
-
-  // Create an array of blend weights in the main node, and fill it with
-  // zeroes
-  mesh_skeleton_graph.pose.blend_weights.resize(nb_morph_targets);
-  std::generate(mesh_skeleton_graph.pose.blend_weights.begin(),
-                mesh_skeleton_graph.pose.blend_weights.end(),
-                [] { return 0.f; });
-
-  // TODO technically there's a "default" pose of the glTF asset in therm of
-  // the value of theses weights. They are set to zero by default, but
-  // still.
-
-  // For each submesh, we need to know the draw operation, the VAO to
-  // bind, the textures to use and the element count. This array store all
-  // of these
-  draw_call_descriptors.resize(nb_submeshes);
-
-  // Create opengl objects
-  VAOs.resize(nb_submeshes);
-
-  VBOs.resize(nb_submeshes);
-  glGenVertexArrays(GLsizei(nb_submeshes), VAOs.data());
-  for (auto& VBO : VBOs) {
-    // We have 5 vertex attributes per vertex + 1 element array.
-    glGenBuffers(6, VBO.data());
-  }
-
-  // CPU sise storage for all vertex attributes
-  indices.resize(nb_submeshes);
-  vertex_coord.resize(nb_submeshes);
-  texture_coord.resize(nb_submeshes);
-  normals.resize(nb_submeshes);
-  weights.resize(nb_submeshes);
-  joints.resize(nb_submeshes);
-
-  // For each submesh of the mesh, load the data
-  load_geometry(model, textures, primitives, draw_call_descriptors, VAOs, VBOs,
-                indices, vertex_coord, texture_coord, normals, weights, joints);
-
-  // create a copy of the data for morphing. We will repeatidly upload
-  // theses arrays to the GPU, while preserving the value of the original
-  // vertex coordinates. Morph targets are only deltas from the default
-  // position.
-  display_position = vertex_coord;
-  display_normal = normals;
-
-  // Not doing this seems to break imgui in opengl2 mode...
-  // TODO maybe just move to the OpenGL 3.x code. This could help debuging
-  // as tools like nvidia nsights are less usefull on old style opengl
-  glBindBuffer(GL_ARRAY_BUFFER, 0);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-  load_shaders(nb_joints, shader_list);
-
-  // Main loop
+  gltf_scene_tree.pose.blend_weights.resize(nb_morph_targets);
+  std::generate(gltf_scene_tree.pose.blend_weights.begin(),
+                gltf_scene_tree.pose.blend_weights.end(), [] { return 0.f; });
 
   animation_names.resize(nb_animations);
   for (size_t i = 0; i < animations.size(); ++i)
     animation_names[i] = animations[i].name;
 
-  {
-    found_textured_shader = true;
-    int i = 0;
-    for (const auto& shader : shader_list) {
-      shader_names.push_back(shader.first);
-      if (found_textured_shader && shader.first == "textured") {
-        selected_shader = i;
-        found_textured_shader = false;
-      }
-      ++i;
-    }
-  }
-
   asset_loaded = true;
 }
+
+mesh::~mesh() {
+  for (auto& VBO : VBOs) glDeleteBuffers(6, VBO.data());
+  glDeleteVertexArrays(VAOs.size(), VAOs.data());
+
+  displayed = true, skinned = false;
+  // shader_list.reset(nullptr);
+
+  nb_joints = 0;
+  nb_morph_targets = 0;
+
+  joints.clear();
+  vertex_coord.clear();
+  texture_coord.clear();
+  normals.clear();
+  weights.clear();
+  display_position.clear();
+  display_normal.clear();
+  indices.clear();
+  flat_joint_list.clear();
+  joint_inverse_bind_matrix_map.clear();
+  joint_matrices.clear();
+  instance.mesh = -1;
+  instance.node = -1;
+  draw_call_descriptors.clear();
+}
+
+mesh& mesh::operator=(mesh&& o) throw() {
+  nb_joints = o.nb_joints;
+  nb_morph_targets = o.nb_morph_targets;
+  instance = o.instance;
+  joint_matrices = std::move(o.joint_matrices);
+  joint_inverse_bind_matrix_map = std::move(o.joint_inverse_bind_matrix_map);
+  flat_joint_list = std::move(o.flat_joint_list);
+  inverse_bind_matrices = std::move(o.inverse_bind_matrices);
+  morph_targets = std::move(o.morph_targets);
+  draw_call_descriptors = std::move(o.draw_call_descriptors);
+  indices = std::move(o.indices);
+  vertex_coord = std::move(o.vertex_coord);
+  texture_coord = std::move(o.texture_coord);
+  normals = std::move(o.normals);
+  weights = std::move(o.weights);
+  display_position = std::move(o.display_position);
+  display_normal = std::move(o.display_normal);
+  o.joints = std::move(o.joints);
+
+  shader_list = std::move(o.shader_list);
+  return *this;
+}
+
+mesh::mesh(mesh&& other) throw() { *this = std::move(other); }
+
+mesh::mesh() : instance() {}
 
 app::app(int argc, char** argv) {
   parse_command_line(argc, argv, debug_output, input_filename);
@@ -335,12 +333,18 @@ void app::main_loop() {
       if (asset_loaded) {
         // Draw all windows
         utilities_window(show_imgui_demo);
-        shader_selector_window(shader_names, selected_shader, shader_to_use);
+
+        selected_shader = 0;
+        shader_to_use = "textured";
+
+        // shader_selector_window(shader_names, selected_shader, shader_to_use);
         asset_images_window(textures);
         model_info_window(model);
         animation_window(animations);
-        skinning_data_window(weights, joints);
-        morph_target_window(mesh_skeleton_graph, nb_morph_targets);
+        // skinning_data_window(weights, joints);
+        mesh_display_window(loaded_meshes);
+        morph_target_window(gltf_scene_tree,
+                            loaded_meshes.front().nb_morph_targets);
         camera_parameters_window(fovy, z_far);
 
         // Animation player advances time and apply animation interpolation.
@@ -362,41 +366,46 @@ void app::main_loop() {
       run_3D_gizmo(view_matrix, projection_matrix, model_matrix,
                    camera_position, gui_parameters);
 
+      update_mesh_skeleton_graph_transforms(gltf_scene_tree);
+
+      const glm::quat camera_rotation(
+          glm::vec3(glm::radians(gui_parameters.rot_pitch), 0.f,
+                    glm::radians(gui_parameters.rot_yaw)));
+
+      view_matrix =
+          glm::lookAt(camera_rotation * camera_position, glm::vec3(0.f),
+                      camera_rotation * glm::vec3(0, 1.f, 0));
+
       if (asset_loaded) {
-        // Calculate all the needed matrices to render the frame, this
-        // includes the "model view projection" that transform the geometry to
-        // the screen space, the normal matrix, and the joint matrix array
-        // that is used to deform the skin with the bones
-        precompute_hardware_skinning_data(mesh_skeleton_graph, model_matrix,
-                                          joint_matrices, flat_joint_list,
-                                          inverse_bind_matrices);
+        for (auto& a_mesh : loaded_meshes) {
+          if (!a_mesh.displayed) continue;
+          // Calculate all the needed matrices to render the frame, this
+          // includes the "model view projection" that transform the geometry to
+          // the screen space, the normal matrix, and the joint matrix array
+          // that is used to deform the skin with the bones
+          precompute_hardware_skinning_data(
+              gltf_scene_tree, model_matrix, a_mesh.joint_matrices,
+              a_mesh.flat_joint_list, a_mesh.inverse_bind_matrices);
 
-        const glm::quat camera_rotation(
-            glm::vec3(glm::radians(gui_parameters.rot_pitch), 0.f,
-                      glm::radians(gui_parameters.rot_yaw)));
+          glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
+          glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
+          update_uniforms(*a_mesh.shader_list, shader_to_use, mvp, normal,
+                          a_mesh.joint_matrices);
 
-        view_matrix =
-            glm::lookAt(camera_rotation * camera_position, glm::vec3(0.f),
-                        camera_rotation * glm::vec3(0, 1.f, 0));
-
-        glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
-        glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
-        update_uniforms(shader_list, shader_to_use, mvp, normal,
-                        joint_matrices);
-
-        // Draw all of the submeshes of the object
-        for (size_t submesh = 0; submesh < draw_call_descriptors.size();
-             ++submesh) {
-          const auto& draw_call = draw_call_descriptors[submesh];
-          perform_software_morphing(mesh_skeleton_graph, submesh, morph_targets,
-                                    vertex_coord, normals, display_position,
-                                    display_normal, VBOs);
-          perform_draw_call(draw_call);
+          // Draw all of the submeshes of the object
+          for (size_t submesh = 0;
+               submesh < a_mesh.draw_call_descriptors.size(); ++submesh) {
+            const auto& draw_call = a_mesh.draw_call_descriptors[submesh];
+            perform_software_morphing(gltf_scene_tree, submesh,
+                                      a_mesh.morph_targets, a_mesh.vertex_coord,
+                                      a_mesh.normals, a_mesh.display_position,
+                                      a_mesh.display_normal, a_mesh.VBOs);
+            perform_draw_call(draw_call);
+          }
         }
-
         // Then draw 2D bones and joints on top of that
-        draw_bone_overlay(mesh_skeleton_graph, view_matrix, projection_matrix,
-                          shader_list);
+        draw_bone_overlay(gltf_scene_tree, view_matrix, projection_matrix,
+                          *loaded_meshes[0].shader_list);
       }
     }
     // Render all ImGui, then swap buffers
@@ -542,7 +551,8 @@ void app::perform_software_morphing(
   static std::vector<bool> clean;
   static std::vector<std::vector<float>> cached_weights;
 
-  if (mesh_skeleton_graph.pose.blend_weights.size() > 0) {
+  if (mesh_skeleton_graph.pose.blend_weights.size() > 0 &&
+      morph_targets[submesh_id].size() > 0) {
     assert(display_position[submesh_id].size() ==
            display_normal[submesh_id].size());
 
@@ -617,7 +627,7 @@ void app::precompute_hardware_skinning_data(
     std::vector<glm::mat4>& inverse_bind_matrices) {
   // This goes through the skeleton hierarchy, and compute the global
   // transform of each joint
-  update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
+  // update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
 
   // This compute the individual joint matrices that are uploaded to the
   // GPU. Detailed explanations about skinning can be found in this tutorial

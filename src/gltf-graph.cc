@@ -1,10 +1,10 @@
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
 #endif
-
 #include "gltf-graph.hh"
 
 #include "gl_util.hh"
+#include "tiny_gltf_util.h"
 
 bool draw_joint_point = true;
 bool draw_bone_segment = true;
@@ -17,11 +17,11 @@ gltf_node::gltf_node(node_type t, gltf_node* p)
     : type(t),
       local_xform(1.f),
       world_xform(1.f),
-      gltf_model_node_index(-1),
+      gltf_node_index(-1),
       parent(p) {}
 
-void gltf_node::add_child_bone(glm::mat4 local_xform) {
-  gltf_node* child = new gltf_node(node_type::bone);
+void gltf_node::add_child(glm::mat4 local_xform) {
+  gltf_node* child = new gltf_node(node_type::empty);
   child->local_xform = local_xform;
   child->parent = this;
   children.emplace_back(child);
@@ -30,7 +30,7 @@ void gltf_node::add_child_bone(glm::mat4 local_xform) {
 gltf_node* gltf_node::get_ptr() { return this; }
 
 gltf_node* find_index_in_children(gltf_node* node, int index) {
-  if (node->gltf_model_node_index == index) return node;
+  if (node->gltf_node_index == index) return node;
 
   gltf_node* found = nullptr;
   for (auto child : node->children) {
@@ -45,7 +45,7 @@ gltf_node* gltf_node::get_node_with_index(int index) {
   auto* node = find_index_in_children(this, index);
 
   if (node) {
-    assert(node->gltf_model_node_index == index);
+    assert(node->gltf_node_index == index);
   }
   return node;
 }
@@ -99,10 +99,11 @@ void update_mesh_skeleton_graph_transforms(gltf_node& node,
 // skin as a node index as "skeleton". You need to pass that "skeleton"
 // integer to this function as skeleton_index. This returns a flat array of
 // the bones to be used by the skinning code
-void populate_gltf_skeleton_subgraph(const tinygltf::Model& model,
-                                     gltf_node& graph_root,
-                                     int skeleton_index) {
-  const auto& skeleton_node = model.nodes[skeleton_index];
+void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
+                         int gltf_index)
+
+{
+  const auto& root_node = model.nodes[gltf_index];
 
   // Holder for the data.
   glm::mat4 xform(1.f);
@@ -112,12 +113,12 @@ void populate_gltf_skeleton_subgraph(const tinygltf::Model& model,
   // A node can store both a transform matrix and separate translation, rotation
   // and scale. We need to load them if they are present. tiny_gltf signal this
   // by either having empty vectors, or vectors of the expected size.
-  const auto& node_matrix = skeleton_node.matrix;
+  const auto& node_matrix = root_node.matrix;
   if (node_matrix.size() == 16)  // 4x4 matrix
   {
     double tmp[16];
     float tmpf[16];
-    memcpy(tmp, skeleton_node.matrix.data(), 16 * sizeof(double));
+    memcpy(tmp, root_node.matrix.data(), 16 * sizeof(double));
 
     // Convert a double array to a float array
     for (int i = 0; i < 16; ++i) {
@@ -130,21 +131,21 @@ void populate_gltf_skeleton_subgraph(const tinygltf::Model& model,
   }
 
   // Do the same for translation rotation and scale.
-  const auto& node_translation = skeleton_node.translation;
+  const auto& node_translation = root_node.translation;
   if (node_translation.size() == 3)  // 3D vector
   {
     for (glm::vec3::length_type i = 0; i < 3; ++i)
       translation[i] = float(node_translation[i]);
   }
 
-  const auto& node_scale = skeleton_node.scale;
+  const auto& node_scale = root_node.scale;
   if (node_scale.size() == 3)  // 3D vector
   {
     for (glm::vec3::length_type i = 0; i < 3; ++i)
       scale[i] = float(node_scale[i]);
   }
 
-  const auto& node_rotation = skeleton_node.rotation;
+  const auto& node_rotation = root_node.rotation;
   if (node_rotation.size() == 4)  // Quaternion
   {
     rotation.w = float(node_rotation[3]);
@@ -165,13 +166,49 @@ void populate_gltf_skeleton_subgraph(const tinygltf::Model& model,
   // both transform has to be applied.
   xform = xform * reconstructed_matrix;
 
-  graph_root.add_child_bone(xform);
+  graph_root.add_child(xform);
   auto& new_bone = *graph_root.children.back().get();
-  new_bone.gltf_model_node_index = skeleton_index;
+  new_bone.gltf_node_index = gltf_index;
 
-  for (int child : skeleton_node.children) {
-    populate_gltf_skeleton_subgraph(model, new_bone, child);
+  for (int child : root_node.children) {
+    populate_gltf_graph(model, new_bone, child);
   }
+}
+
+void set_mesh_attachement(const tinygltf::Model& model, gltf_node& graph_root) {
+  const auto& node = model.nodes[graph_root.gltf_node_index];
+
+  if (has_mesh(node)) {
+    graph_root.gltf_mesh_id = node.mesh;
+    graph_root.type = gltf_node::node_type::mesh;
+  }
+
+  for (auto& child : graph_root.children) set_mesh_attachement(model, *child);
+}
+
+void get_number_of_meshes_recur(const gltf_node& root, size_t& number) {
+  if (root.type == gltf_node::node_type::mesh) ++number;
+  for (auto child : root.children) {
+    get_number_of_meshes_recur(*child, number);
+  }
+}
+
+void get_list_of_mesh_recur(const gltf_node& root,
+                            std::vector<gltf_mesh_instance>& meshes) {
+  if (root.type == gltf_node::node_type::mesh) {
+    gltf_mesh_instance inst;
+    inst.mesh = root.gltf_mesh_id;
+    inst.node = root.gltf_node_index;
+    meshes.push_back(inst);
+  }
+
+  for (auto child : root.children) get_list_of_mesh_recur(*child, meshes);
+}
+
+std::vector<gltf_mesh_instance> get_list_of_mesh(const gltf_node& root) {
+  std::vector<gltf_mesh_instance> meshes;
+  get_list_of_mesh_recur(root, meshes);
+  return meshes;
 }
 
 // TODO use this snipet in a fragment shader to draw a cirle instead of a
@@ -221,11 +258,17 @@ void draw_bones(gltf_node& root, GLuint shader, glm::mat4 view_matrix,
 }
 
 void create_flat_bone_array(gltf_node& root,
-                            std::vector<gltf_node*>& flat_array) {
-  if (root.type == gltf_node::node_type::bone)
+                            std::vector<gltf_node*>& flat_array,
+                            const std::vector<int>& skin_joints) {
+  const auto find_result =
+      std::find(skin_joints.cbegin(), skin_joints.cend(), root.gltf_node_index);
+  if (find_result != skin_joints.cend()) {
+    root.type = gltf_node::node_type::bone;
     flat_array.push_back(root.get_ptr());
+  }
 
-  for (auto& child : root.children) create_flat_bone_array(*child, flat_array);
+  for (auto& child : root.children)
+    create_flat_bone_array(*child, flat_array, skin_joints);
 }
 
 void sort_bone_array(std::vector<gltf_node*>& bone_array,
@@ -234,9 +277,9 @@ void sort_bone_array(std::vector<gltf_node*>& bone_array,
   for (size_t counter = 0;
        counter < std::min(bone_array.size(), skin_object.joints.size());
        ++counter) {
-    int index_to_find = skin_object.joints[counter];
+    const int index_to_find = skin_object.joints[counter];
     for (size_t bone_index = 0; bone_index < bone_array.size(); ++bone_index) {
-      if (bone_array[bone_index]->gltf_model_node_index == index_to_find) {
+      if (bone_array[bone_index]->gltf_node_index == index_to_find) {
         std::swap(bone_array[counter], bone_array[bone_index]);
         break;
       }
@@ -248,13 +291,13 @@ void create_flat_bone_list(const tinygltf::Skin& skin,
                            const std::vector<int>::size_type nb_joints,
                            gltf_node mesh_skeleton_graph,
                            std::vector<gltf_node*>& flatened_bone_list) {
-  create_flat_bone_array(mesh_skeleton_graph, flatened_bone_list);
+  create_flat_bone_array(mesh_skeleton_graph, flatened_bone_list, skin.joints);
   sort_bone_array(flatened_bone_list, skin);
 }
 
-// This is useful because mesh.skeleton isn't required to point to the skeleton
-// root. We still want to find the skeleton root, so we are going to search for
-// it by hand.
+// This is useful because mesh.skeleton isn't required to point to the
+// skeleton root. We still want to find the skeleton root, so we are going to
+// search for it by hand.
 int find_skeleton_root(const tinygltf::Model& model,
                        const std::vector<int>& joints, int start_node) {
   // Get the node to get the children
@@ -265,8 +308,8 @@ int find_skeleton_root(const tinygltf::Model& model,
     for (int joint : joints) {
       if (joint == child) return joint;
     }
-    // try to find in children, if found return the child's child's parent (so,
-    // here, the retunred value by find_skeleton_root)
+    // try to find in children, if found return the child's child's parent
+    // (so, here, the retunred value by find_skeleton_root)
     const int result = find_skeleton_root(model, joints, child);
     if (result != -1) return result;
   }

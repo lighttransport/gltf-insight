@@ -36,6 +36,7 @@ void gl_gui_end_frame(GLFWwindow* window) {
   ImGui::Render();
   ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 
+  glfwSwapBuffers(window);
   glFlush();
 
   static int frameCount = 0;
@@ -44,6 +45,7 @@ void gl_gui_end_frame(GLFWwindow* window) {
   static char title[256];
 
   frameCount++;
+  currentTime = glfwGetTime();
   if (currentTime - previousTime >= 1.0) {
     sprintf(title, "glTF Insight GUI [%dFPS]", frameCount);
     glfwSetWindowTitle(window, title);
@@ -326,6 +328,15 @@ void animation_window(const std::vector<animation>& animations) {
   ImGui::End();
 }
 
+#include "insight-app.hh"
+void mesh_display_window(std::vector<gltf_insight::mesh>& meshes) {
+  if (ImGui::Begin("Mesh visibility")) {
+    for (auto& mesh : meshes)
+      ImGui::Checkbox(mesh.name.c_str(), &mesh.displayed);
+  }
+  ImGui::End();
+}
+
 void skinning_data_window(
     const std::vector<std::vector<float>>& weights,
     const std::vector<std::vector<unsigned short>>& joints) {
@@ -391,12 +402,12 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
 
-  glfwWindowHint(GLFW_SAMPLES, 4);
-  glfwWindowHint(GLFW_DOUBLEBUFFER, GL_FALSE);
+  glfwWindowHint(GLFW_SAMPLES, 16);
+  glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
 
   window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
   glfwMakeContextCurrent(window);
-  glfwSwapInterval(1);  // Enable vsync
+  glfwSwapInterval(0);  // Enable vsync
   glfwSetKeyCallback(window, key_callback);
 
   // glad must be called after glfwMakeContextCurrent()
@@ -424,6 +435,8 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 #endif
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_MULTISAMPLE);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void initialize_imgui(GLFWwindow* window) {

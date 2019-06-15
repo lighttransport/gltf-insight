@@ -31,43 +31,76 @@
 
 /// Main application class
 namespace gltf_insight {
+
+struct mesh {
+  gltf_mesh_instance instance;
+  std::vector<glm::mat4> joint_matrices;
+  std::map<int, int> joint_inverse_bind_matrix_map;
+  std::vector<gltf_node*> flat_joint_list;
+  std::vector<glm::mat4> inverse_bind_matrices;
+  std::vector<std::vector<morph_target>> morph_targets;
+  std::vector<draw_call_submesh> draw_call_descriptors;
+  std::vector<std::vector<unsigned>> indices;
+  std::vector<std::vector<float>> vertex_coord, texture_coord, normals, weights,
+      display_position, display_normal;
+  std::vector<std::vector<unsigned short>> joints;
+  int nb_morph_targets = 0;
+  int nb_joints = 0;
+
+  // OpenGL objects
+  std::vector<GLuint> VAOs;
+  std::vector<std::array<GLuint, 6>> VBOs;
+  std::unique_ptr<std::map<std::string, shader>> shader_list;
+
+  bool skinned = false;
+
+  bool displayed = true;
+
+  std::string name;
+
+  ~mesh();
+
+  mesh(const mesh&) = delete;
+  mesh& operator=(const mesh&) = delete;
+
+  mesh& operator=(mesh&& o) throw();
+  mesh(mesh&& other) throw();
+  mesh();
+};
+
 class app {
  public:
-  void unload();
-
-  void load();
-
   app(int argc, char** argv);
-
   ~app();
 
+  void unload();
+  void load();
   void main_loop();
 
  private:
+  std::vector<mesh> loaded_meshes;
+
   // Application state
   bool asset_loaded = false;
   bool found_textured_shader = false;
-  gltf_node mesh_skeleton_graph{gltf_node::node_type::mesh};
+
+  gltf_node gltf_scene_tree{gltf_node::node_type::empty};
+
   ImVec4 viewport_background_color = ImVec4(0.25f, 0.25f, 0.25f, 1.00f);
   tinygltf::Model model;
   tinygltf::TinyGLTF gltf_ctx;
 
   // display parameters
-  std::map<std::string, shader> shader_list;
   std::vector<std::string> shader_names;
   int selected_shader = 0;
   std::string shader_to_use;
   glm::mat4 view_matrix{1.f}, projection_matrix{1.f};
-  glm::mat4& model_matrix = mesh_skeleton_graph.local_xform;
+  glm::mat4& model_matrix = gltf_scene_tree.local_xform;
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 7.f};
   float fovy = 45.f;
   float z_near = 1.f;
   float z_far = 100.f;
-
-  // OpenGL objects
-  std::vector<GLuint> VAOs;
-  std::vector<std::array<GLuint, 6>> VBOs;
 
   // user interface state
   bool open_file_dialog = false;
@@ -91,20 +124,8 @@ class app {
 
   // Loaded data
   std::vector<GLuint> textures;
-  std::vector<glm::mat4> joint_matrices;
-  std::map<int, int> joint_inverse_bind_matrix_map;
-  std::vector<gltf_node*> flat_joint_list;
   std::vector<animation> animations;
   std::vector<std::string> animation_names;
-  std::vector<glm::mat4> inverse_bind_matrices;
-  std::vector<std::vector<morph_target>> morph_targets;
-  std::vector<draw_call_submesh> draw_call_descriptors;
-  std::vector<std::vector<unsigned>> indices;
-  std::vector<std::vector<float>> vertex_coord, texture_coord, normals, weights,
-      display_position, display_normal;
-  std::vector<std::vector<unsigned short>> joints;
-  int nb_morph_targets = 0;
-  int nb_joints = 0;
 
   // hidden methods
 

@@ -72,6 +72,10 @@ void model_info_window(const tinygltf::Model& model);
 
 // Window that display data about the animations in the model
 void animation_window(const std::vector<animation>& animations);
+namespace gltf_insight {
+struct mesh;
+}
+void mesh_display_window(std::vector<gltf_insight::mesh>& mesh);
 
 // Window that display joint and weights asignements of the gltf asset
 void skinning_data_window(
