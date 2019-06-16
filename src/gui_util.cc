@@ -381,7 +381,14 @@ void skinning_data_window(
 void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets) {
   if (ImGui::Begin("Morph Target blend weights")) {
     for (int w = 0; w < nb_morph_targets; ++w) {
-      const std::string name = "Morph Target [" + std::to_string(w) + "]";
+      std::string name;
+
+      if (mesh_skeleton_graph.pose.target_names.empty() ||
+          mesh_skeleton_graph.pose.target_names[w].empty())
+        name = "Morph Target [" + std::to_string(w) + "]";
+      else
+        name = mesh_skeleton_graph.pose.target_names[w];
+
       ImGui::SliderFloat(
           name.c_str(), &mesh_skeleton_graph.pose.blend_weights[w], 0, 1, "%f");
       mesh_skeleton_graph.pose.blend_weights[w] =
@@ -437,6 +444,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glEnable(GL_MULTISAMPLE);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glFrontFace(GL_CCW);
 }
 
 void initialize_imgui(GLFWwindow* window) {

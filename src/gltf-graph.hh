@@ -56,6 +56,7 @@ struct gltf_node {
 
     // TODO sore here arrays of weights for each morph targets?
     std::vector<float> blend_weights;
+    std::vector<std::string> target_names;
 
     // Sets default for a "neutral pose"
     animation_state()

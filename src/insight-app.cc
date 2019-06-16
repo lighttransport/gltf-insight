@@ -134,6 +134,9 @@ void app::load() {
       current_mesh.nb_morph_targets =
           std::max<int>(int(target.size()), current_mesh.nb_morph_targets);
     }
+    std::vector<std::string> target_names(current_mesh.nb_morph_targets);
+    load_morph_target_names(model, gltf_mesh, target_names);
+    gltf_scene_tree.pose.target_names = target_names;
 
     load_shaders(current_mesh.nb_joints, *current_mesh.shader_list);
   }
