@@ -72,8 +72,9 @@ bool ImGuiCombo(const char* label, int* current_item,
       static_cast<int>(items.size()), static_cast<int>(items.size()));
 }
 
-void asset_images_window(const std::vector<GLuint>& textures) {
-  if (ImGui::Begin("glTF Images", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+void asset_images_window(const std::vector<GLuint>& textures, bool* open) {
+  if (!*open) return;
+  if (ImGui::Begin("glTF Images", open, ImGuiWindowFlags_AlwaysAutoResize)) {
     ImGui::Text("Number of textures [%zu]", textures.size());
     ImGui::BeginChild("##ScrollableRegion0", ImVec2(256, 286), false,
                       ImGuiWindowFlags_AlwaysVerticalScrollbar);
@@ -122,9 +123,10 @@ void describe_node_topology_in_imgui_tree(const tinygltf::Model& model,
   }
 }
 
-void model_info_window(const tinygltf::Model& model) {
+void model_info_window(const tinygltf::Model& model, bool* open) {
+  if (!*open) return;
   // TODO also cache info found here
-  if (ImGui::Begin("Model information")) {
+  if (ImGui::Begin("Model information", open)) {
     const auto main_node_index = find_main_mesh_node(model);
     if (main_node_index < 0) {
       ImGui::Text("Could not find a node with a mesh in your glTF file!");
@@ -151,8 +153,9 @@ void model_info_window(const tinygltf::Model& model) {
   ImGui::End();
 }
 
-void animation_window(const std::vector<animation>& animations) {
-  ImGui::Begin("Animations");
+void animation_window(const std::vector<animation>& animations, bool* open) {
+  if (!*open) return;
+  ImGui::Begin("Animations", open);
 
   if (animations.size() == 0) {
     ImGui::Text("No animations in glTF");
@@ -329,8 +332,9 @@ void animation_window(const std::vector<animation>& animations) {
 }
 
 #include "insight-app.hh"
-void mesh_display_window(std::vector<gltf_insight::mesh>& meshes) {
-  if (ImGui::Begin("Mesh visibility")) {
+void mesh_display_window(std::vector<gltf_insight::mesh>& meshes, bool* open) {
+  if (!*open) return;
+  if (ImGui::Begin("Mesh visibility", open)) {
     for (auto& mesh : meshes)
       ImGui::Checkbox(mesh.name.c_str(), &mesh.displayed);
   }
@@ -378,8 +382,10 @@ void skinning_data_window(
   ImGui::End();
 }
 
-void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets) {
-  if (ImGui::Begin("Morph Target blend weights")) {
+void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets,
+                         bool* open) {
+  if (!*open) return;
+  if (ImGui::Begin("Morph Target blend weights", open)) {
     for (int w = 0; w < nb_morph_targets; ++w) {
       std::string name;
 
@@ -576,8 +582,9 @@ void deinitialize_gui_and_window(GLFWwindow* window) {
 void transform_window(float vecTranslation[3], float vecRotation[3],
                       float vecScale[3],
                       ImGuizmo::OPERATION& mCurrentGizmoOperation,
-                      bool* show_gizmo) {
-  if (ImGui::Begin("Transform manipulator")) {
+                      bool* show_gizmo, bool* open) {
+  if (!*open) return;
+  if (ImGui::Begin("Transform manipulator", open)) {
     ImGui::InputFloat3("Tr", vecTranslation, 3);
     ImGui::InputFloat3("Rt", vecRotation, 3);
     ImGui::InputFloat3("Sc", vecScale, 3);
@@ -615,12 +622,13 @@ void transform_window(float vecTranslation[3], float vecRotation[3],
   ImGui::End();
 }
 
-void sequencer_window(gltf_insight::AnimSequence loaded_sequence,
-                      bool& playing_state, bool& need_to_update_pose,
-                      bool& looping, int& selectedEntry, int& firstFrame,
-                      bool& expanded, int& currentFrame,
-                      double& currentPlayTime) {
-  if (ImGui::Begin("Sequencer")) {
+void timeline_window(gltf_insight::AnimSequence loaded_sequence,
+                     bool& playing_state, bool& need_to_update_pose,
+                     bool& looping, int& selectedEntry, int& firstFrame,
+                     bool& expanded, int& currentFrame, double& currentPlayTime,
+                     bool* open) {
+  if (!*open) return;
+  if (ImGui::Begin("Timeline", open)) {
     const auto adjust_time = [&] {
       currentPlayTime = double(currentFrame) / ANIMATION_FPS;
       need_to_update_pose = true;
@@ -651,7 +659,9 @@ void sequencer_window(gltf_insight::AnimSequence loaded_sequence,
     }
 
     ImGui::SameLine();
-    ImGui::Checkbox(ICON_II_LOOP, &looping);
+    ImGui::Checkbox(ICON_II_LOOP " looping", &looping);
+
+    ImGui::SameLine();
 
     ImGui::PushItemWidth(180);
     ImGui::InputInt("Frame Min ", &loaded_sequence.mFrameMin);
@@ -691,16 +701,9 @@ void shader_selector_window(const std::vector<std::string>& shader_names,
   ImGui::End();
 }
 
-void utilities_window(bool& show_imgui_demo) {
-  if (ImGui::Begin("Utilities")) {
-    ImGui::Checkbox("Show ImGui Demo Window?", &show_imgui_demo);
-    if (show_imgui_demo) ImGui::ShowDemoWindow(&show_imgui_demo);
-  }
-  ImGui::End();
-}
-
-void camera_parameters_window(float& fovy, float& z_far) {
-  if (ImGui::Begin("Camera Parameters")) {
+void camera_parameters_window(float& fovy, float& z_far, bool* open) {
+  if (!*open) return;
+  if (ImGui::Begin("Camera Parameters", open)) {
     ImGui::SliderFloat("FOV", &fovy, 15, 90, "%.1f");
     ImGui::SliderFloat("draw distance", &z_far, 100, 1000, "%.0f");
   }

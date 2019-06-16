@@ -8,8 +8,9 @@
 
 bool draw_joint_point = true;
 bool draw_bone_segment = true;
-bool draw_mesh_anchor_point = true;
-bool draw_bone_axes = true;
+bool draw_childless_bone_extension = true;
+bool draw_mesh_anchor_point = false;
+bool draw_bone_axes = false;
 
 gltf_node::~gltf_node() = default;
 
@@ -211,13 +212,22 @@ std::vector<gltf_mesh_instance> get_list_of_mesh(const gltf_node& root) {
   return meshes;
 }
 
-// TODO use this snipet in a fragment shader to draw a cirle instead of a
-// square vec2 coord = gl_PointCoord - vec2(0.5);  //from [0,1] to
-// [-0.5,0.5] if(length(coord) > 0.5)                  //outside of circle
-// radius?
-//    discard;
-void draw_bones(gltf_node& root, GLuint shader, glm::mat4 view_matrix,
+void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end,
+               const glm::vec4 draw_color, const float line_width) {
+  glUseProgram(shader);
+  glLineWidth(line_width);
+  glUniform4f(glGetUniformLocation(shader, "debug_color"), draw_color.r,
+              draw_color.g, draw_color.b, draw_color.a);
+  glBegin(GL_LINES);
+  glVertex4f(end.x, end.y, end.z, 1);
+  glVertex4f(origin.x, origin.y, origin.z, 1);
+  glEnd();
+}
+
+void draw_bones(gltf_node& root, const std::vector<gltf_node*>& flat_bone_list,
+                GLuint shader, glm::mat4 view_matrix,
                 glm::mat4 projection_matrix) {
+  // set shader in the coordinate space
   glUseProgram(shader);
   glm::mat4 mvp = projection_matrix * view_matrix * root.world_xform;
   glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
@@ -229,30 +239,40 @@ void draw_bones(gltf_node& root, GLuint shader, glm::mat4 view_matrix,
   if (draw_bone_axes) draw_space_base(shader, line_width, axis_scale);
 
   for (auto& child : root.children) {
-    if (root.type != gltf_node::node_type::mesh && draw_bone_segment) {
-      glUseProgram(shader);
-      glLineWidth(8);
-      glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 0.5, 0.5, 1);
-      glBegin(GL_LINES);
-      glVertex4f(0, 0, 0, 1);
-      const auto child_position = child->local_xform[3];
-      glVertex4f(child_position.x, child_position.y, child_position.z, 1);
-      glEnd();
-    }
-    draw_bones(*child, shader, view_matrix, projection_matrix);
+    draw_bones(*child, flat_bone_list, shader, view_matrix, projection_matrix);
   }
 
   glUseProgram(shader);
   glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
                      glm::value_ptr(mvp));
-  if (draw_joint_point && root.type == gltf_node::node_type::bone) {
-    glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
 
-    draw_space_origin_point(10);
-  } else if (draw_mesh_anchor_point &&
-             root.type == gltf_node::node_type::mesh) {
-    glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 1, 0, 1);
-    draw_space_origin_point(10);
+  if (root.type == gltf_node::node_type::bone) {
+    if (draw_bone_segment) {
+      for (auto child : root.children)
+        if (root.type == gltf_node::node_type::bone &&
+            child->type == gltf_node::node_type::bone) {
+          const auto child_position = child->local_xform[3];
+          const glm::vec4 draw_color{0.f, 0.5f, 0.5f, 1.f};
+          draw_line(shader, glm::vec3(0.f), child_position, draw_color, 8);
+        }
+
+      // The "last" bone of many rig doesn't have a child joint. Draw a line in
+      // another color to show it anyway
+      if (draw_childless_bone_extension && root.children.empty()) {
+        draw_line(shader, glm::vec3(0.f), glm::vec3(0.f, 0.25f, 0.f),
+                  glm::vec4(0.5f, 0.75f, 0.5f, 1.f), 6);
+      }
+    }
+
+    if (draw_joint_point) {
+      glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
+      draw_space_origin_point(10);
+    }
+  } else if (root.type == gltf_node::node_type::mesh) {
+    if (draw_mesh_anchor_point) {
+      glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 1, 0, 1);
+      draw_space_origin_point(10);
+    }
   }
   glUseProgram(0);
 }
@@ -323,6 +343,8 @@ void bone_display_window() {
   if (ImGui::Begin("Skeleton drawing options")) {
     ImGui::Checkbox("Draw joint points", &draw_joint_point);
     ImGui::Checkbox("Draw Bone as segments", &draw_bone_segment);
+    ImGui::Checkbox("Draw childlest joint extnesion",
+                    &draw_childless_bone_extension);
     ImGui::Checkbox("Draw Bone's base axes", &draw_bone_axes);
     ImGui::Checkbox("Draw Skeleton's Mesh base", &draw_mesh_anchor_point);
   }

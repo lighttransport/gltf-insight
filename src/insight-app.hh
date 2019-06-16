@@ -78,6 +78,20 @@ class app {
   void main_loop();
 
  private:
+  ImGuizmo::OPERATION mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+  ImGuizmo::MODE mCurrentGizmoMode = ImGuizmo::WORLD;
+
+  bool show_asset_image_window = true;
+  bool show_model_info_window = true;
+  bool show_animation_window = true;
+  bool show_mesh_display_window = true;
+  bool show_morph_target_window = true;
+  bool show_camera_parameter_window = true;
+  bool show_transform_window = true;
+  bool show_timeline = true;
+
+  bool show_gizmo = true;
+
   std::vector<mesh> loaded_meshes;
 
   // Application state
@@ -168,6 +182,7 @@ class app {
       std::vector<std::array<GLuint, 6>>& VBOs);
 
   void draw_bone_overlay(gltf_node& mesh_skeleton_graph,
+                         const std::vector<gltf_node*> flat_bone_list,
                          const glm::mat4& view_matrix,
                          const glm::mat4& projection_matrix,
                          std::map<std::string, shader>& shaders);
@@ -178,11 +193,12 @@ class app {
       std::vector<gltf_node*>& flat_joint_list,
       std::vector<glm::mat4>& inverse_bind_matrices);
 
-  void run_animation_player(gltf_insight::AnimSequence& sequence, bool& looping,
-                            int& selectedEntry, int& firstFrame, bool& expanded,
-                            int& currentFrame, double& currentPlayTime,
-                            double& last_frame_time, bool& playing_state,
-                            std::vector<animation>& animations);
+  void run_animation_timeline(gltf_insight::AnimSequence& sequence,
+                              bool& looping, int& selectedEntry,
+                              int& firstFrame, bool& expanded,
+                              int& currentFrame, double& currentPlayTime,
+                              double& last_frame_time, bool& playing_state,
+                              std::vector<animation>& animations);
 
   void run_3D_gizmo(glm::mat4& view_matrix, const glm::mat4& projection_matrix,
                     glm::mat4& model_matrix, glm::vec3& camera_position,

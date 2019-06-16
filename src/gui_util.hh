@@ -31,7 +31,7 @@ struct application_parameters {
   glm::vec3& camera_position;
   bool button_states[3]{false};
   double last_mouse_x{0}, last_mouse_y{0};
-  double rot_pitch{0}, rot_yaw{0};
+  double rot_pitch{-45}, rot_yaw{45};
   double rotation_scale = 0.2;
   application_parameters(glm::vec3& cam_pos) : camera_position(cam_pos) {}
 };
@@ -48,7 +48,8 @@ bool ImGuiCombo(const char* label, int* current_item,
                 const std::vector<std::string>& items);
 
 // Window that display all the images inside the gltf asset
-void asset_images_window(const std::vector<GLuint>& textures);
+void asset_images_window(const std::vector<GLuint>& textures,
+                         bool* open = nullptr);
 
 // Display error output from glfw to standard output
 void glfw_error_callback(int error, const char* description);
@@ -68,14 +69,16 @@ void cursor_pos_callback(GLFWwindow* window, double mouse_x, double mouse_y);
 void describe_node_topology_in_imgui_tree(const tinygltf::Model& model,
                                           int node_index);
 // Window that display general informations
-void model_info_window(const tinygltf::Model& model);
+void model_info_window(const tinygltf::Model& model, bool* open = nullptr);
 
 // Window that display data about the animations in the model
-void animation_window(const std::vector<animation>& animations);
+void animation_window(const std::vector<animation>& animations,
+                      bool* open = nullptr);
 namespace gltf_insight {
 struct mesh;
 }
-void mesh_display_window(std::vector<gltf_insight::mesh>& mesh);
+void mesh_display_window(std::vector<gltf_insight::mesh>& mesh,
+                         bool* open = nullptr);
 
 // Window that display joint and weights asignements of the gltf asset
 void skinning_data_window(
@@ -83,7 +86,8 @@ void skinning_data_window(
     const std::vector<std::vector<unsigned short>>& joints);
 
 // Window that display the morph target and their current weights
-void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets);
+void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets,
+                         bool* open = nullptr);
 
 // Call this to initialize a window, and an opengl context in it
 void initialize_glfw_opengl_window(GLFWwindow*& window);
@@ -97,17 +101,17 @@ void deinitialize_gui_and_window(GLFWwindow* window);
 void transform_window(float vecTranslation[3], float vecRotation[3],
                       float vecScale[3],
                       ImGuizmo::OPERATION& mCurrentGizmoOperation,
-                      bool* show_gizmo);
+                      bool* show_gizmo, bool* open = nullptr);
 
-void sequencer_window(gltf_insight::AnimSequence loaded_sequence,
-                      bool& playing_state, bool& need_to_update_pose,
-                      bool& looping, int& selectedEntry, int& firstFrame,
-                      bool& expanded, int& currentFrame,
-                      double& currentPlayTime);
+void timeline_window(gltf_insight::AnimSequence loaded_sequence,
+                     bool& playing_state, bool& need_to_update_pose,
+                     bool& looping, int& selectedEntry, int& firstFrame,
+                     bool& expanded, int& currentFrame, double& currentPlayTime,
+                     bool* open = nullptr);
 
 void shader_selector_window(const std::vector<std::string>& shader_names,
                             int& selected_shader, std::string& shader_to_use);
 
 void utilities_window(bool& show_imgui_demo);
 
-void camera_parameters_window(float& fovy, float& z_far);
+void camera_parameters_window(float& fovy, float& z_far, bool* open = nullptr);

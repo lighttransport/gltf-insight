@@ -135,7 +135,7 @@ void app::load() {
           std::max<int>(int(target.size()), current_mesh.nb_morph_targets);
     }
     std::vector<std::string> target_names(current_mesh.nb_morph_targets);
-    load_morph_target_names(model, gltf_mesh, target_names);
+    load_morph_target_names(gltf_mesh, target_names);
     gltf_scene_tree.pose.target_names = target_names;
 
     load_shaders(current_mesh.nb_joints, *current_mesh.shader_list);
@@ -264,11 +264,6 @@ void app::main_loop() {
       // GUI
       gui_new_frame();
 
-      ImGui::Begin("Icon test");
-      ImGui::Text("%s %s %s", ICON_II_ANDROID_FOLDER_OPEN,
-                  ICON_II_ANDROID_DOCUMENT, ICON_II_ANDROID_ARROW_FORWARD);
-      ImGui::End();
-
       // TODO put main menu in it's own function wen done
       ImGui::BeginMainMenuBar();
       if (ImGui::BeginMenu("File")) {
@@ -283,6 +278,40 @@ void app::main_loop() {
         if (ImGui::MenuItem("Quit")) {
           glfwSetWindowShouldClose(window, GLFW_TRUE);
         }
+        ImGui::EndMenu();
+      }
+
+      if (ImGui::BeginMenu("Edit")) {
+        ImGui::Text("Transform type:");
+        if (ImGui::RadioButton("Translate",
+                               mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+          mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+        if (ImGui::RadioButton("Rotate",
+                               mCurrentGizmoOperation == ImGuizmo::ROTATE))
+          mCurrentGizmoOperation = ImGuizmo::ROTATE;
+        if (ImGui::RadioButton("Scale",
+                               mCurrentGizmoOperation == ImGuizmo::SCALE))
+          mCurrentGizmoOperation = ImGuizmo::SCALE;
+        ImGui::Separator();
+        ImGui::EndMenu();
+      }
+
+      if (ImGui::BeginMenu("View")) {
+        ImGui::MenuItem("Show ImGui Demo window", nullptr, &show_imgui_demo);
+        ImGui::Separator();
+        ImGui::Text("Toggle window display:");
+        ImGui::MenuItem("Images", 0, &show_asset_image_window);
+        ImGui::MenuItem("Model info", 0, &show_model_info_window);
+        ImGui::MenuItem("Animations", 0, &show_animation_window);
+        ImGui::MenuItem("Mesh Visibility", 0, &show_mesh_display_window);
+        ImGui::MenuItem("Morph Target blend weights", 0,
+                        &show_morph_target_window);
+        ImGui::MenuItem("Camera parameters", 0, &show_camera_parameter_window);
+        ImGui::MenuItem("TransformWindow", 0, &show_transform_window);
+        ImGui::MenuItem("Timeline", 0, &show_timeline);
+        ImGui::Separator();
+        ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
+
         ImGui::EndMenu();
       }
 
@@ -325,6 +354,9 @@ void app::main_loop() {
         }
       }
 
+      if (show_imgui_demo) {
+        ImGui::ShowDemoWindow(&show_imgui_demo);
+      }
 #if defined(DEBUG) || defined(_DEBUG)
       if (ImGui::BeginMenu("DEBUG")) {
         if (ImGui::MenuItem("call unload()")) unload();
@@ -335,26 +367,26 @@ void app::main_loop() {
 
       if (asset_loaded) {
         // Draw all windows
-        utilities_window(show_imgui_demo);
 
         selected_shader = 0;
         shader_to_use = "textured";
 
         // shader_selector_window(shader_names, selected_shader, shader_to_use);
-        asset_images_window(textures);
-        model_info_window(model);
-        animation_window(animations);
+        asset_images_window(textures, &show_asset_image_window);
+        model_info_window(model, &show_model_info_window);
+        animation_window(animations, &show_animation_window);
         // skinning_data_window(weights, joints);
-        mesh_display_window(loaded_meshes);
+        mesh_display_window(loaded_meshes, &show_mesh_display_window);
         morph_target_window(gltf_scene_tree,
-                            loaded_meshes.front().nb_morph_targets);
-        camera_parameters_window(fovy, z_far);
+                            loaded_meshes.front().nb_morph_targets,
+                            &show_morph_target_window);
+        camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
 
         // Animation player advances time and apply animation interpolation.
         // It also display the sequencer timeline and controls on screen
-        run_animation_player(sequence, looping, selectedEntry, firstFrame,
-                             expanded, currentFrame, currentPlayTime,
-                             last_frame_time, playing_state, animations);
+        run_animation_timeline(sequence, looping, selectedEntry, firstFrame,
+                               expanded, currentFrame, currentPlayTime,
+                               last_frame_time, playing_state, animations);
       }
     }
 
@@ -372,8 +404,8 @@ void app::main_loop() {
       update_mesh_skeleton_graph_transforms(gltf_scene_tree);
 
       const glm::quat camera_rotation(
-          glm::vec3(glm::radians(gui_parameters.rot_pitch), 0.f,
-                    glm::radians(gui_parameters.rot_yaw)));
+          glm::vec3(glm::radians(gui_parameters.rot_pitch),
+                    glm::radians(gui_parameters.rot_yaw), 0.f));
 
       view_matrix =
           glm::lookAt(camera_rotation * camera_position, glm::vec3(0.f),
@@ -405,10 +437,11 @@ void app::main_loop() {
                                       a_mesh.display_normal, a_mesh.VBOs);
             perform_draw_call(draw_call);
           }
+          // Then draw 2D bones and joints on top of that
+          draw_bone_overlay(gltf_scene_tree, a_mesh.flat_joint_list,
+                            view_matrix, projection_matrix,
+                            *loaded_meshes[0].shader_list);
         }
-        // Then draw 2D bones and joints on top of that
-        draw_bone_overlay(gltf_scene_tree, view_matrix, projection_matrix,
-                          *loaded_meshes[0].shader_list);
       }
     }
     // Render all ImGui, then swap buffers
@@ -611,6 +644,7 @@ void app::perform_software_morphing(
 }
 
 void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
+                            const std::vector<gltf_node*> flat_bone_list,
                             const glm::mat4& view_matrix,
                             const glm::mat4& projection_matrix,
                             std::map<std::string, shader>& shaders) {
@@ -619,8 +653,9 @@ void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
 
   bone_display_window();
   shaders["debug_color"].use();
-  draw_bones(mesh_skeleton_graph, shaders["debug_color"].get_program(),
-             view_matrix, projection_matrix);
+  draw_bones(mesh_skeleton_graph, flat_bone_list,
+             shaders["debug_color"].get_program(), view_matrix,
+             projection_matrix);
 }
 
 void app::precompute_hardware_skinning_data(
@@ -647,12 +682,12 @@ void app::precompute_hardware_skinning_data(
   }
 }
 
-void app::run_animation_player(gltf_insight::AnimSequence& sequence,
-                               bool& looping, int& selectedEntry,
-                               int& firstFrame, bool& expanded,
-                               int& currentFrame, double& currentPlayTime,
-                               double& last_frame_time, bool& playing_state,
-                               std::vector<animation>& animations) {
+void app::run_animation_timeline(gltf_insight::AnimSequence& sequence,
+                                 bool& looping, int& selectedEntry,
+                                 int& firstFrame, bool& expanded,
+                                 int& currentFrame, double& currentPlayTime,
+                                 double& last_frame_time, bool& playing_state,
+                                 std::vector<animation>& animations) {
   // let's create the sequencer
   double current_time = glfwGetTime();
   bool need_to_update_pose = false;
@@ -661,9 +696,9 @@ void app::run_animation_player(gltf_insight::AnimSequence& sequence,
   }
 
   currentFrame = int(ANIMATION_FPS * currentPlayTime);
-  sequencer_window(sequence, playing_state, need_to_update_pose, looping,
-                   selectedEntry, firstFrame, expanded, currentFrame,
-                   currentPlayTime);
+  timeline_window(sequence, playing_state, need_to_update_pose, looping,
+                  selectedEntry, firstFrame, expanded, currentFrame,
+                  currentPlayTime, &show_timeline);
 
   // loop the sequencer now: TODO replace that true with a "is looping"
   // boolean
@@ -687,22 +722,19 @@ void app::run_3D_gizmo(glm::mat4& view_matrix,
                        glm::mat4& model_matrix, glm::vec3& camera_position,
                        application_parameters& my_user_pointer) {
   float vecTranslation[3], vecRotation[3], vecScale[3];
-  static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::ROTATE);
-  static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
-  static bool do_manipulate = true;
 
   ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(model_matrix),
                                         vecTranslation, vecRotation, vecScale);
 
   transform_window(vecTranslation, vecRotation, vecScale,
-                   mCurrentGizmoOperation, &do_manipulate);
+                   mCurrentGizmoOperation, &show_gizmo, &show_transform_window);
 
   ImGuizmo::RecomposeMatrixFromComponents(vecTranslation, vecRotation, vecScale,
                                           glm::value_ptr(model_matrix));
 
   auto& io = ImGui::GetIO();
   ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-  if (do_manipulate)
+  if (show_gizmo)
     ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
                          glm::value_ptr(projection_matrix),
                          mCurrentGizmoOperation, mCurrentGizmoMode,

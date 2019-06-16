@@ -92,7 +92,8 @@ inline void empty_gltf_graph(gltf_node& graph_root) {
 // [-0.5,0.5] if(length(coord) > 0.5)                  //outside of circle
 // radius?
 //    discard;
-void draw_bones(gltf_node& root, GLuint shader, glm::mat4 view_matrix,
+void draw_bones(gltf_node& root, const std::vector<gltf_node*>& flat_bone_list,
+                GLuint shader, glm::mat4 view_matrix,
                 glm::mat4 projection_matrix);
 
 void create_flat_bone_array(gltf_node& root,
