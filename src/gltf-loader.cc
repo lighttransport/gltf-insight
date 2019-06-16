@@ -584,8 +584,7 @@ void load_morph_targets(const tinygltf::Model& model,
   }
 }
 
-void load_morph_target_names(const tinygltf::Model& model,
-                             const tinygltf::Mesh& mesh,
+void load_morph_target_names(const tinygltf::Mesh& mesh,
                              std::vector<std::string>& names) {
   if (mesh.extras.IsObject() && mesh.extras.Has("targetNames")) {
     const auto& targetNames = mesh.extras.Get("targetNames");
