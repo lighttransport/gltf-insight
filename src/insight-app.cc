@@ -665,6 +665,11 @@ void app::precompute_hardware_skinning_data(
     std::vector<glm::mat4>& joint_matrices,
     std::vector<gltf_node*>& flat_joint_list,
     std::vector<glm::mat4>& inverse_bind_matrices) {
+  if (flat_joint_list.size() ==
+      0) {  // TODO temp bodge trying to load a VRM file
+    return;
+  }
+
   // This goes through the skeleton hierarchy, and compute the global
   // transform of each joint
   // update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
@@ -677,6 +682,7 @@ void app::precompute_hardware_skinning_data(
   // we can put it out of the loop. I borrowed this slight optimization from
   // Sascha Willems's "vulkan-glTF-PBR" code...
   // https://github.com/SaschaWillems/Vulkan-glTF-PBR/blob/master/base/VulkanglTFModel.hpp
+
   glm::mat4 inverse_model = glm::inverse(model_matrix);
   for (size_t i = 0; i < joint_matrices.size(); ++i) {
     joint_matrices[i] = inverse_model * flat_joint_list[i]->world_xform *
