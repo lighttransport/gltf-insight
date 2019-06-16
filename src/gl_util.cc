@@ -86,7 +86,10 @@ void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
   std::cout << "\n\n";
 }
 
-void draw_space_origin_point(float point_size) {
+void draw_space_origin_point(float point_size, GLuint shader,
+                             const glm::vec4& color) {
+  glUniform4f(glGetUniformLocation(shader, "debug_color"), color.r, color.g,
+              color.b, color.a);
   // set the size
   glPointSize(point_size);
 
@@ -275,18 +278,26 @@ void main()
 )glsl";
 
   shaders["textured"] =
-      shader("textured", vertex_shader_source, fragment_shader_source_textured);
+      shader("textured",
+             nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,
+             fragment_shader_source_textured);
   shaders["debug_color"] = shader("debug_color", vertex_shader_no_skinning,
                                   fragment_shader_source_draw_debug_color);
   shaders["debug_uv"] =
-      shader("debug_uv", vertex_shader_source, fragment_shader_source_uv);
-  shaders["debug_normals"] = shader("debug_normals", vertex_shader_source,
-                                    fragment_shader_source_normals);
+      shader("debug_uv",
+             nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,
+             fragment_shader_source_uv);
+  shaders["debug_normals"] =
+      shader("debug_normals",
+             nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,
+             fragment_shader_source_normals);
   shaders["no_skinning_tex"] =
       shader("no_skinning_tex", vertex_shader_no_skinning,
              fragment_shader_source_textured);
   shaders["weights"] =
-      shader("weights", vertex_shader_source, fragment_shader_weights);
+      shader("weights",
+             nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,
+             fragment_shader_weights);
 }
 
 void update_uniforms(std::map<std::string, shader>& shaders,

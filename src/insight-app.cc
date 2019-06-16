@@ -64,7 +64,7 @@ void app::load() {
     if (skin_index >= 0) {
       current_mesh.skinned = true;
       const auto& gltf_skin = model.skins[skin_index];
-      current_mesh.nb_joints = gltf_skin.joints.size();
+      current_mesh.nb_joints = int(gltf_skin.joints.size());
       create_flat_bone_list(gltf_skin, current_mesh.nb_joints, gltf_scene_tree,
                             current_mesh.flat_joint_list);
       current_mesh.joint_matrices.resize(current_mesh.nb_joints);
@@ -182,7 +182,7 @@ void app::load() {
 
 mesh::~mesh() {
   for (auto& VBO : VBOs) glDeleteBuffers(6, VBO.data());
-  glDeleteVertexArrays(VAOs.size(), VAOs.data());
+  glDeleteVertexArrays(GLsizei(VAOs.size()), VAOs.data());
 
   displayed = true, skinned = false;
   // shader_list.reset(nullptr);
@@ -435,9 +435,12 @@ void app::main_loop() {
                                       a_mesh.morph_targets, a_mesh.vertex_coord,
                                       a_mesh.normals, a_mesh.display_position,
                                       a_mesh.display_normal, a_mesh.VBOs);
+            glEnable(GL_DEPTH_TEST);
+            glFrontFace(GL_CCW);
             perform_draw_call(draw_call);
           }
           // Then draw 2D bones and joints on top of that
+
           draw_bone_overlay(gltf_scene_tree, a_mesh.flat_joint_list,
                             view_matrix, projection_matrix,
                             *loaded_meshes[0].shader_list);
@@ -653,9 +656,8 @@ void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
 
   bone_display_window();
   shaders["debug_color"].use();
-  draw_bones(mesh_skeleton_graph, flat_bone_list,
-             shaders["debug_color"].get_program(), view_matrix,
-             projection_matrix);
+  draw_bones(mesh_skeleton_graph, shaders["debug_color"].get_program(),
+             view_matrix, projection_matrix);
 }
 
 void app::precompute_hardware_skinning_data(
@@ -750,9 +752,11 @@ void app::fill_sequencer(gltf_insight::AnimSequence& sequence,
         int(ANIMATION_FPS * animation.max_time), false, animation.name});
   }
 
-  auto max_time = sequence.myItems[0].mFrameEnd;
-  for (auto& item : sequence.myItems) {
-    max_time = std::max(max_time, item.mFrameEnd);
+  if (sequence.myItems.size() > 0) {
+    auto max_time = sequence.myItems[0].mFrameEnd;
+    for (auto& item : sequence.myItems) {
+      max_time = std::max(max_time, item.mFrameEnd);
+    }
+    sequence.mFrameMax = max_time;
   }
-  sequence.mFrameMax = max_time;
 }

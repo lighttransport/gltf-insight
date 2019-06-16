@@ -320,7 +320,8 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
     }
 
     // VERTEX JOINTS ASSIGNMENT
-    {
+    if (primitive.attributes.find("JOINTS_0") !=
+        std::end(primitive.attributes)) {
       const auto joint = primitive.attributes.at("JOINTS_0");
       const auto& joints_accessor = model.accessors[joint];
       const auto& joints_buffer_view =
@@ -345,7 +346,8 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
     }
 
     // VERTEX BONE WEIGHTS
-    {
+    if (primitive.attributes.find("WEIGHTS_0") !=
+        std::end(primitive.attributes)) {
       const auto weight = primitive.attributes.at("WEIGHTS_0");
       const auto& weights_accessor = model.accessors[weight];
       const auto& weights_buffer_view =
@@ -592,7 +594,7 @@ void load_morph_target_names(const tinygltf::Mesh& mesh,
       assert(names.size() == targetNames.ArrayLen());
       for (size_t i = 0; i < names.size(); ++i) {
         assert(targetNames.Get(i).IsString());
-        names[i] = targetNames.Get(i).Get<std::string>();
+        names[i] = targetNames.Get(int(i)).Get<std::string>();
       }
     }
   }

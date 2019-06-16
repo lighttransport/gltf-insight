@@ -14,8 +14,8 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
 
 /// Draw a point as the origin of the current space (model/view/projection
 /// matrix set to shader)
-void draw_space_origin_point(float point_size);
-
+void draw_space_origin_point(float point_size, GLuint shader,
+                             const glm::vec4& color);
 /// Draw the X, Y and Z unit vectors of the current space (model/view/projection
 /// matrix set to shader)
 void draw_space_base(GLuint shader, const float line_width,
