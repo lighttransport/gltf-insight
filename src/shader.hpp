@@ -91,30 +91,48 @@ class shader {
   const char* get_name() const { return shader_name_.c_str(); }
 
   void set_uniform(const char* name, const glm::vec4& v) const {
-    glUniform4f(glGetUniformLocation(program_, name), v.x, v.y, v.z, v.w);
+    if (!name) return;
+
+    const auto location = glGetUniformLocation(program_, name);
+    if (location != -1) glUniform4f(location, v.x, v.y, v.z, v.w);
   }
 
   void set_uniform(const char* name, const glm::mat4& m) const {
-    glUniformMatrix4fv(glGetUniformLocation(program_, name), 1, GL_FALSE,
-                       glm::value_ptr(m));
+    if (!name) return;
+    const auto location = glGetUniformLocation(program_, name);
+
+    if (location != -1)
+      glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(m));
   }
 
   void set_uniform(const char* name, const glm::mat3& m) const {
-    glUniformMatrix3fv(glGetUniformLocation(program_, name), 1, GL_FALSE,
-                       glm::value_ptr(m));
+    if (!name) return;
+    const auto location = glGetUniformLocation(program_, name);
+
+    if (location != -1)
+      glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(m));
   }
 
   void set_uniform(const char* name,
                    const std::vector<glm::mat4>& matrices) const {
-    glUniformMatrix4fv(glGetUniformLocation(program_, name),
-                       GLsizei(matrices.size()), GL_FALSE,
-                       glm::value_ptr(matrices[0]));
+    if (!name) return;
+    if (matrices.empty()) return;
+
+    const auto location = glGetUniformLocation(program_, name);
+    if (location != -1)
+      glUniformMatrix4fv(location, GLsizei(matrices.size()), GL_FALSE,
+                         glm::value_ptr(matrices[0]));
   }
 
   void set_uniform(const char* name, size_t number_of_matrices,
                    float* data) const {
-    glUniformMatrix4fv(glGetUniformLocation(program_, name),
-                       GLsizei(number_of_matrices), GL_FALSE, data);
+    if (!name) return;
+    if (!number_of_matrices) return;
+    if (!data) return;
+
+    const auto location = glGetUniformLocation(program_, name);
+    if (location != -1)
+      glUniformMatrix4fv(location, GLsizei(number_of_matrices), GL_FALSE, data);
   }
 
   GLuint get_program() const { return program_; }
