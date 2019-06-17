@@ -25,7 +25,7 @@
 #include "gltf-graph.hh"
 #include "gltf-loader.hh"
 #include "gui_util.hh"
-#include "shader.hpp"
+#include "shader.hh"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
 

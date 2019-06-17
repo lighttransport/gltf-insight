@@ -5,7 +5,7 @@
 #include <string>
 
 #include "glad/include/glad/glad.h"
-#include "shader.hpp"
+#include "shader.hh"
 
 /// Debug output
 void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
