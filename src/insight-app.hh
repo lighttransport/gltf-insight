@@ -2,6 +2,7 @@
 
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#include "animation.hh"
 #endif
 
 // This includes opengl for us, along side debuging callbacks
@@ -182,7 +183,6 @@ class app {
       std::vector<std::array<GLuint, 6>>& VBOs);
 
   void draw_bone_overlay(gltf_node& mesh_skeleton_graph,
-                         const std::vector<gltf_node*> flat_bone_list,
                          const glm::mat4& view_matrix,
                          const glm::mat4& projection_matrix,
                          std::map<std::string, shader>& shaders);

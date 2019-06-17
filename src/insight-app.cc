@@ -441,11 +441,9 @@ void app::main_loop() {
             perform_draw_call(draw_call);
           }
           // Then draw 2D bones and joints on top of that
-
-          draw_bone_overlay(gltf_scene_tree, a_mesh.flat_joint_list,
-                            view_matrix, projection_matrix,
-                            *loaded_meshes[0].shader_list);
         }
+        draw_bone_overlay(gltf_scene_tree, view_matrix, projection_matrix,
+                          *loaded_meshes[0].shader_list);
       }
     }
     // Render all ImGui, then swap buffers
@@ -648,7 +646,6 @@ void app::perform_software_morphing(
 }
 
 void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
-                            const std::vector<gltf_node*> flat_bone_list,
                             const glm::mat4& view_matrix,
                             const glm::mat4& projection_matrix,
                             std::map<std::string, shader>& shaders) {
