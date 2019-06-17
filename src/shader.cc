@@ -1,6 +1,6 @@
 #include "shader.hh"
 
-shader::shader(shader&& other) { *this = std::move(other); }
+shader::shader(shader&& other) throw() { *this = std::move(other); }
 
 shader& shader::operator=(shader&& other) {
   program_ = other.program_;
@@ -13,7 +13,7 @@ shader::~shader() {
   if (glIsProgram(program_) == GL_TRUE) glDeleteProgram(program_);
 }
 
-shader::shader() {}
+shader::shader() throw() {}
 
 shader::shader(const char* shader_name, const char* vertex_shader_source_code,
                const char* fragment_shader_source_code)
