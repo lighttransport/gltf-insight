@@ -90,31 +90,91 @@ class shader {
   void use() const { glUseProgram(program_); }
   const char* get_name() const { return shader_name_.c_str(); }
 
-  void set_uniform(const char* name, const glm::vec4& v) const {
-    glUniform4f(glGetUniformLocation(program_, name), v.x, v.y, v.z, v.w);
+  bool set_uniform(const char* name, const glm::vec4& v) const {
+	  if (name == nullptr) {
+		  return false;
+	  }
+	  
+	GLint idx  = glGetUniformLocation(program_, name);
+
+	if (idx < 0) {
+		return false;
+	}
+
+	glUniform4f(idx, v.x, v.y, v.z, v.w);
+}
+
+  bool set_uniform(const char* name, const glm::mat4& m) const {
+    if (name == nullptr) {
+		return false;
+	}
+	
+	GLint idx = glGetUniformLocation(program_, name);
+	
+	if (idx < 0) {
+		return false;
+	}
+
+	glUniformMatrix4fv(idx, 1, GL_FALSE,
+		glm::value_ptr(m));
   }
 
-  void set_uniform(const char* name, const glm::mat4& m) const {
-    glUniformMatrix4fv(glGetUniformLocation(program_, name), 1, GL_FALSE,
-                       glm::value_ptr(m));
+  bool set_uniform(const char* name, const glm::mat3& m) const {
+	if (name == nullptr) {
+		return false;
+	}
+
+	GLint idx = glGetUniformLocation(program_, name);
+	  
+	if (idx < 0) {
+		return false;
+	}
+
+	glUniformMatrix3fv(idx, 1, GL_FALSE,
+                    glm::value_ptr(m));
+
   }
 
-  void set_uniform(const char* name, const glm::mat3& m) const {
-    glUniformMatrix3fv(glGetUniformLocation(program_, name), 1, GL_FALSE,
-                       glm::value_ptr(m));
-  }
-
-  void set_uniform(const char* name,
+  bool set_uniform(const char* name,
                    const std::vector<glm::mat4>& matrices) const {
-    glUniformMatrix4fv(glGetUniformLocation(program_, name),
-                       GLsizei(matrices.size()), GL_FALSE,
+
+    if (name == nullptr) {
+		return false;
+	}
+
+    if (matrices.size() > 0) {
+		return false;
+	}
+
+	GLint idx = glGetUniformLocation(program_, name);
+
+	if (idx < 0) {
+		return false;
+	}
+
+	glUniformMatrix4fv(idx, 
+		               GLsizei(matrices.size()), GL_FALSE,
                        glm::value_ptr(matrices[0]));
+
+	return true;
   }
 
-  void set_uniform(const char* name, size_t number_of_matrices,
+  bool set_uniform(const char* name, size_t number_of_matrices,
                    float* data) const {
-    glUniformMatrix4fv(glGetUniformLocation(program_, name),
-                       GLsizei(number_of_matrices), GL_FALSE, data);
+    if ((name == nullptr) || (data == nullptr) || (number_of_matrices < 1)) {
+      return false;
+	}
+
+    GLint idx = glGetUniformLocation(program_, name);
+
+	if (idx < 0) {
+		return false;
+	}
+
+	glUniformMatrix4fv(idx,
+		GLsizei(number_of_matrices), GL_FALSE, data);
+
+	return true;
   }
 
   GLuint get_program() const { return program_; }

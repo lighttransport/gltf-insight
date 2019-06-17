@@ -593,7 +593,7 @@ void load_morph_target_names(const tinygltf::Mesh& mesh,
     if (targetNames.IsArray()) {
       assert(names.size() == targetNames.ArrayLen());
       for (size_t i = 0; i < names.size(); ++i) {
-        assert(targetNames.Get(i).IsString());
+        assert(targetNames.Get(int(i)).IsString());
         names[i] = targetNames.Get(int(i)).Get<std::string>();
       }
     }
