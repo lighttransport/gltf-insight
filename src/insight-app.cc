@@ -357,12 +357,10 @@ void app::main_loop() {
       if (show_imgui_demo) {
         ImGui::ShowDemoWindow(&show_imgui_demo);
       }
-#if defined(DEBUG) || defined(_DEBUG)
       if (ImGui::BeginMenu("DEBUG")) {
         if (ImGui::MenuItem("call unload()")) unload();
         ImGui::EndMenu();
       }
-#endif
       ImGui::EndMainMenuBar();
 
       if (asset_loaded) {
