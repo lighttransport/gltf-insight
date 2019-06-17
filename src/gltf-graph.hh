@@ -41,7 +41,7 @@ struct gltf_node {
   gltf_node(node_type t, gltf_node* p = nullptr);
 
   /// Construct and attach a bone
-  void add_child(glm::mat4 local_xform);
+  void add_child();
 
   /// Get `this` easily
   gltf_node* get_ptr();
@@ -79,7 +79,8 @@ struct gltf_mesh_instance {
   int node;
   int mesh;
 };
-std::vector<gltf_mesh_instance> get_list_of_mesh(const gltf_node& root);
+std::vector<gltf_mesh_instance> get_list_of_mesh_instances(
+    const gltf_node& root);
 
 inline void empty_gltf_graph(gltf_node& graph_root) {
   for (auto& child : graph_root.children) empty_gltf_graph(*child);

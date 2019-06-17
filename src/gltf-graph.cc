@@ -17,9 +17,8 @@ gltf_node::~gltf_node() = default;
 gltf_node::gltf_node(node_type t, gltf_node* p)
     : type(t), local_xform(1.f), world_xform(1.f), parent(p) {}
 
-void gltf_node::add_child(glm::mat4 local_xform) {
+void gltf_node::add_child() {
   gltf_node* child = new gltf_node(node_type::empty);
-  child->local_xform = local_xform;
   child->parent = this;
   children.emplace_back(child);
 }
@@ -100,6 +99,7 @@ void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
                          int gltf_index)
 
 {
+  // get the gltf node object
   const auto& root_node = model.nodes[gltf_index];
 
   // Holder for the data.
@@ -163,12 +163,17 @@ void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
   // both transform has to be applied.
   xform = xform * reconstructed_matrix;
 
-  graph_root.add_child(xform);
-  auto& new_bone = *graph_root.children.back().get();
-  new_bone.gltf_node_index = gltf_index;
+  // set data inside root
+  graph_root.local_xform = xform;
+  graph_root.gltf_node_index = gltf_index;
 
   for (int child : root_node.children) {
-    populate_gltf_graph(model, new_bone, child);
+    // push a new children
+    graph_root.add_child();
+    // get the children object
+    auto& new_node = *graph_root.children.back().get();
+    // recurse
+    populate_gltf_graph(model, new_node, child);
   }
 }
 
@@ -202,7 +207,8 @@ void get_list_of_mesh_recur(const gltf_node& root,
   for (auto child : root.children) get_list_of_mesh_recur(*child, meshes);
 }
 
-std::vector<gltf_mesh_instance> get_list_of_mesh(const gltf_node& root) {
+std::vector<gltf_mesh_instance> get_list_of_mesh_instances(
+    const gltf_node& root) {
   std::vector<gltf_mesh_instance> meshes;
   get_list_of_mesh_recur(root, meshes);
   return meshes;

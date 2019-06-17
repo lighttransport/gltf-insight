@@ -134,7 +134,7 @@ class app {
   int currentFrame;
   double currentPlayTime = 0;
   double last_frame_time = 0;
-  bool playing_state = true;
+  bool playing_state = false;
 
   // Loaded data
   std::vector<GLuint> textures;

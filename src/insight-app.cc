@@ -9,7 +9,6 @@ void app::unload() {
   glDeleteTextures(GLsizei(textures.size()), textures.data());
 
   textures.clear();
-
   shader_names.clear();
   shader_to_use.clear();
   found_textured_shader = false;
@@ -17,9 +16,6 @@ void app::unload() {
   // loaded CPU side objects
   animations.clear();
   animation_names.clear();
-
-  // empty_gltf_graph(mesh_skeleton_graph);
-  // mesh_skeleton_graph.local_xform = glm::mat4{1.f};
 
   // other number counters and things
   selectedEntry = -1;
@@ -31,11 +27,18 @@ void app::unload() {
 
   // file input information
   input_filename.clear();
+
+  // mesh data
+  empty_gltf_graph(gltf_scene_tree);
   loaded_meshes.clear();
 
   // library resources
   model = tinygltf::Model();
-  empty_gltf_graph(gltf_scene_tree);
+
+  looping = true;
+  selectedEntry = -1;
+  firstFrame = 0;
+  expanded = true;
 }
 
 void app::load() {
@@ -54,7 +57,7 @@ void app::load() {
 
   populate_gltf_graph(model, gltf_scene_tree, root_index);
   set_mesh_attachement(model, gltf_scene_tree);
-  auto meshes_indices = get_list_of_mesh(gltf_scene_tree);
+  auto meshes_indices = get_list_of_mesh_instances(gltf_scene_tree);
 
   loaded_meshes.resize(meshes_indices.size());
   for (size_t i = 0; i < meshes_indices.size(); ++i) {
