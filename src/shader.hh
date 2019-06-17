@@ -15,8 +15,8 @@ class shader {
   std::string shader_name_;
 
  public:
-  shader(shader&& other) throw();
-  shader& operator=(shader&& other) throw();
+  shader(shader&& other);
+  shader& operator=(shader&& other);
   shader(const shader&) = delete;
   shader& operator=(const shader&) = delete;
   shader();
