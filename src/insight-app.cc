@@ -48,14 +48,19 @@ void app::load() {
   textures.resize(nb_textures);
   load_all_textures(model, nb_textures, textures);
 
-  const auto scene = find_main_scene(model);
+  const auto scene_index = find_main_scene(model);
 
-  // TODO it looks like by the spec that, actually, a gltf scene could have...
-  // multiple root nodes?
-  const auto root_index = model.scenes[scene].nodes[0];
-  gltf_scene_tree.gltf_node_index = root_index;
+  const auto& scene = model.scenes[scene_index];
 
-  populate_gltf_graph(model, gltf_scene_tree, root_index);
+  gltf_scene_tree.gltf_node_index = -1;
+
+  // dummy "all parent" node
+  for (size_t i = 0; i < scene.nodes.size(); ++i) {
+    const auto root_index = scene.nodes[i];
+    gltf_scene_tree.add_child();
+    populate_gltf_graph(model, *gltf_scene_tree.children.back(), root_index);
+  }
+
   set_mesh_attachement(model, gltf_scene_tree);
   auto meshes_indices = get_list_of_mesh_instances(gltf_scene_tree);
 

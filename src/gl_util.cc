@@ -127,6 +127,11 @@ void load_shaders(const size_t nb_joints,
   std::cerr << "Generating GLSL code for shader with " << nb_joints
             << " joints.\n";
 
+  if (nb_joints > 180)
+    std::cerr << "Warning: This is a lot of joints, model may be unsuited for "
+                 "GPU based skinning.\n//TODO investigate dual quaternion "
+                 "based skinning\n";
+
   // TODO put the GLSL code ouside of here, load them from files
   // Main vertex shader, that perform GPU skinning
   std::string vertex_shader_source_str = R"glsl(
