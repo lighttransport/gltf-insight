@@ -305,8 +305,6 @@ void update_uniforms(std::map<std::string, shader>& shaders,
                      const glm::mat3& normal,
                      const std::vector<glm::mat4>& joint_matrices) {
   shaders[shader_to_use].use();
-  
-  // TODO(LTE): Check return value
   shaders[shader_to_use].set_uniform("joint_matrix", joint_matrices);
   shaders[shader_to_use].set_uniform("mvp", mvp);
   shaders[shader_to_use].set_uniform("normal", normal);
