@@ -45,6 +45,13 @@ In the genral case, just run CMake to generate a build system for your own envir
 
 Please run `vcsetup.bat` to generate project files.
 
+#### From a git for Windows(mintty)
+
+You can use `cmd //c` to call batch file from a mintty terminal.
+
+```
+$ cmd //c vcsetup.bat
+```
 
 ### Linux and macOS
 
