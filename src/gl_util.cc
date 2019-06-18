@@ -1,5 +1,6 @@
 #include "gl_util.hh"
 
+#include <cstring>
 #include <iostream>
 
 void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,

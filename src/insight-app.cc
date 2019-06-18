@@ -95,8 +95,8 @@ void app::load() {
 
     current_mesh.draw_call_descriptors.resize(nb_submeshes);
     current_mesh.indices.resize(nb_submeshes);
-    current_mesh.vertex_coord.resize(nb_submeshes);
-    current_mesh.texture_coord.resize(nb_submeshes);
+    current_mesh.positions.resize(nb_submeshes);
+    current_mesh.uvs.resize(nb_submeshes);
     current_mesh.normals.resize(nb_submeshes);
     current_mesh.tangents.resize(nb_submeshes);
     current_mesh.weights.resize(nb_submeshes);
@@ -115,12 +115,12 @@ void app::load() {
     load_geometry(model, textures, gltf_mesh_primitives,
                   current_mesh.draw_call_descriptors, current_mesh.VAOs,
                   current_mesh.VBOs, current_mesh.indices,
-                  current_mesh.vertex_coord, current_mesh.texture_coord,
+                  current_mesh.positions, current_mesh.uvs,
                   current_mesh.normals, current_mesh.tangents,
                   current_mesh.weights, current_mesh.joints);
 
-    current_mesh.display_position = current_mesh.vertex_coord;
-    current_mesh.display_normal = current_mesh.normals;
+    current_mesh.display_position = current_mesh.positions;
+    current_mesh.display_normals = current_mesh.normals;
     current_mesh.display_tangents = current_mesh.tangents;
 
     // cleanup opengl state
@@ -201,12 +201,12 @@ mesh::~mesh() {
   nb_morph_targets = 0;
 
   joints.clear();
-  vertex_coord.clear();
-  texture_coord.clear();
+  positions.clear();
+  uvs.clear();
   normals.clear();
   weights.clear();
   display_position.clear();
-  display_normal.clear();
+  display_normals.clear();
   indices.clear();
   flat_joint_list.clear();
   joint_inverse_bind_matrix_map.clear();
@@ -220,6 +220,7 @@ mesh& mesh::operator=(mesh&& o) throw() {
   nb_joints = o.nb_joints;
   nb_morph_targets = o.nb_morph_targets;
   instance = o.instance;
+  displayed = o.displayed;
   joint_matrices = std::move(o.joint_matrices);
   joint_inverse_bind_matrix_map = std::move(o.joint_inverse_bind_matrix_map);
   flat_joint_list = std::move(o.flat_joint_list);
@@ -227,12 +228,14 @@ mesh& mesh::operator=(mesh&& o) throw() {
   morph_targets = std::move(o.morph_targets);
   draw_call_descriptors = std::move(o.draw_call_descriptors);
   indices = std::move(o.indices);
-  vertex_coord = std::move(o.vertex_coord);
-  texture_coord = std::move(o.texture_coord);
+  positions = std::move(o.positions);
+  uvs = std::move(o.uvs);
   normals = std::move(o.normals);
   weights = std::move(o.weights);
+  tangents = std::move(o.tangents);
   display_position = std::move(o.display_position);
-  display_normal = std::move(o.display_normal);
+  display_normals = std::move(o.display_normals);
+  display_tangents = std::move(o.display_tangents);
   o.joints = std::move(o.joints);
 
   shader_list = std::move(o.shader_list);
@@ -440,9 +443,9 @@ void app::main_loop() {
                submesh < a_mesh.draw_call_descriptors.size(); ++submesh) {
             const auto& draw_call = a_mesh.draw_call_descriptors[submesh];
             perform_software_morphing(gltf_scene_tree, submesh,
-                                      a_mesh.morph_targets, a_mesh.vertex_coord,
+                                      a_mesh.morph_targets, a_mesh.positions,
                                       a_mesh.normals, a_mesh.display_position,
-                                      a_mesh.display_normal, a_mesh.VBOs);
+                                      a_mesh.display_normals, a_mesh.VBOs);
             glEnable(GL_DEPTH_TEST);
             glFrontFace(GL_CCW);
             perform_draw_call(draw_call);

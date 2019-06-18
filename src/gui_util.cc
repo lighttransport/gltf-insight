@@ -703,7 +703,7 @@ void shader_selector_window(const std::vector<std::string>& shader_names,
 void camera_parameters_window(float& fovy, float& z_far, bool* open) {
   if (!*open) return;
   if (ImGui::Begin("Camera Parameters", open)) {
-    ImGui::SliderFloat("FOV", &fovy, 15, 90, "%.1f");
+    ImGui::SliderFloat("FOV", &fovy, 5, 90, "%.1f");
     ImGui::SliderFloat("draw distance", &z_far, 100, 1000, "%.0f");
   }
   ImGui::End();

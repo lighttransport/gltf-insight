@@ -37,37 +37,37 @@ struct mesh {
   gltf_mesh_instance instance;
   std::string name;
 
+  // skinning and morph data
+  int nb_joints = 0;
+  std::vector<std::vector<unsigned short>> joints;
   std::vector<glm::mat4> joint_matrices;
   std::map<int, int> joint_inverse_bind_matrix_map;
   std::vector<gltf_node*> flat_joint_list;
   std::vector<glm::mat4> inverse_bind_matrices;
+  int nb_morph_targets = 0;
   std::vector<std::vector<morph_target>> morph_targets;
-  std::vector<draw_call_submesh> draw_call_descriptors;
+  // if true, mesh has skinning data
+  bool skinned = false;
+
+  // geometry data
   std::vector<std::vector<unsigned>> indices;
-  std::vector<std::vector<float>> vertex_coord;
-  std::vector<std::vector<float>> texture_coord;
+  std::vector<std::vector<float>> positions;
+  std::vector<std::vector<float>> uvs;
   std::vector<std::vector<float>> normals;
   std::vector<std::vector<float>> weights;
   std::vector<std::vector<float>> tangents;
   std::vector<std::vector<float>> display_position;
-  std::vector<std::vector<float>> display_normal;
+  std::vector<std::vector<float>> display_normals;
   std::vector<std::vector<float>> display_tangents;
 
-  std::vector<std::vector<unsigned short>> joints;
-  int nb_morph_targets = 0;
-  int nb_joints = 0;
-
-  // OpenGL objects
+  // Rendering
   std::vector<GLuint> VAOs;
   std::vector<std::array<GLuint, 7>> VBOs;
-
+  std::vector<draw_call_submesh> draw_call_descriptors;
   // The "material" is just defined as the shader used to render the object...
   // string = a standardized display mode
   // shader = shader object to use
   std::unique_ptr<std::map<std::string, shader>> shader_list;
-
-  // if true, mesh has skinning data
-  bool skinned = false;
 
   // is this mesh displayed on screen
   bool displayed = true;
