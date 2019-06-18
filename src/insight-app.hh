@@ -35,6 +35,8 @@ namespace gltf_insight {
 
 struct mesh {
   gltf_mesh_instance instance;
+  std::string name;
+
   std::vector<glm::mat4> joint_matrices;
   std::map<int, int> joint_inverse_bind_matrix_map;
   std::vector<gltf_node*> flat_joint_list;
@@ -42,31 +44,41 @@ struct mesh {
   std::vector<std::vector<morph_target>> morph_targets;
   std::vector<draw_call_submesh> draw_call_descriptors;
   std::vector<std::vector<unsigned>> indices;
-  std::vector<std::vector<float>> vertex_coord, texture_coord, normals, weights,
-      display_position, display_normal;
+  std::vector<std::vector<float>> vertex_coord;
+  std::vector<std::vector<float>> texture_coord;
+  std::vector<std::vector<float>> normals;
+  std::vector<std::vector<float>> weights;
+  std::vector<std::vector<float>> tangents;
+  std::vector<std::vector<float>> display_position;
+  std::vector<std::vector<float>> display_normal;
+  std::vector<std::vector<float>> display_tangents;
+
   std::vector<std::vector<unsigned short>> joints;
   int nb_morph_targets = 0;
   int nb_joints = 0;
 
   // OpenGL objects
   std::vector<GLuint> VAOs;
-  std::vector<std::array<GLuint, 6>> VBOs;
+  std::vector<std::array<GLuint, 7>> VBOs;
+
+  // The "material" is just defined as the shader used to render the object...
+  // string = a standardized display mode
+  // shader = shader object to use
   std::unique_ptr<std::map<std::string, shader>> shader_list;
 
+  // if true, mesh has skinning data
   bool skinned = false;
 
+  // is this mesh displayed on screen
   bool displayed = true;
 
-  std::string name;
-
-  ~mesh();
-
+  // Standard C++ stuff
   mesh(const mesh&) = delete;
   mesh& operator=(const mesh&) = delete;
-
   mesh& operator=(mesh&& o) throw();
   mesh(mesh&& other) throw();
   mesh();
+  ~mesh();
 };
 
 class app {
@@ -90,7 +102,6 @@ class app {
   bool show_camera_parameter_window = true;
   bool show_transform_window = true;
   bool show_timeline = true;
-
   bool show_gizmo = true;
 
   std::vector<mesh> loaded_meshes;
@@ -171,7 +182,7 @@ class app {
   void gpu_update_morphed_submesh(
       size_t submesh_id, std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
-      std::vector<std::array<GLuint, 6>>& VBOs);
+      std::vector<std::array<GLuint, 7>>& VBOs);
 
   void perform_software_morphing(
       gltf_node mesh_skeleton_graph, size_t submesh_id,
@@ -180,7 +191,7 @@ class app {
       const std::vector<std::vector<float>>& normals,
       std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
-      std::vector<std::array<GLuint, 6>>& VBOs);
+      std::vector<std::array<GLuint, 7>>& VBOs);
 
   void draw_bone_overlay(gltf_node& mesh_skeleton_graph,
                          const glm::mat4& view_matrix,

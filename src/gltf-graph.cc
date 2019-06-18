@@ -178,13 +178,14 @@ void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
 }
 
 void set_mesh_attachement(const tinygltf::Model& model, gltf_node& graph_root) {
-  const auto& node = model.nodes[graph_root.gltf_node_index];
+  if (graph_root.gltf_node_index != -1) {
+    const auto& node = model.nodes[graph_root.gltf_node_index];
 
-  if (has_mesh(node)) {
-    graph_root.gltf_mesh_id = node.mesh;
-    graph_root.type = gltf_node::node_type::mesh;
+    if (has_mesh(node)) {
+      graph_root.gltf_mesh_id = node.mesh;
+      graph_root.type = gltf_node::node_type::mesh;
+    }
   }
-
   for (auto& child : graph_root.children) set_mesh_attachement(model, *child);
 }
 

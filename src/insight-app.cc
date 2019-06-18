@@ -98,6 +98,7 @@ void app::load() {
     current_mesh.vertex_coord.resize(nb_submeshes);
     current_mesh.texture_coord.resize(nb_submeshes);
     current_mesh.normals.resize(nb_submeshes);
+    current_mesh.tangents.resize(nb_submeshes);
     current_mesh.weights.resize(nb_submeshes);
     current_mesh.joints.resize(nb_submeshes);
     current_mesh.VAOs.resize(nb_submeshes);
@@ -107,7 +108,7 @@ void app::load() {
     glGenVertexArrays(GLsizei(nb_submeshes), current_mesh.VAOs.data());
     for (auto& VBO : current_mesh.VBOs) {
       // We have 5 vertex attributes per vertex + 1 element array.
-      glGenBuffers(6, VBO.data());
+      glGenBuffers(7, VBO.data());
     }
 
     // For each submesh of the mesh, load the data
@@ -115,11 +116,12 @@ void app::load() {
                   current_mesh.draw_call_descriptors, current_mesh.VAOs,
                   current_mesh.VBOs, current_mesh.indices,
                   current_mesh.vertex_coord, current_mesh.texture_coord,
-                  current_mesh.normals, current_mesh.weights,
-                  current_mesh.joints);
+                  current_mesh.normals, current_mesh.tangents,
+                  current_mesh.weights, current_mesh.joints);
 
     current_mesh.display_position = current_mesh.vertex_coord;
     current_mesh.display_normal = current_mesh.normals;
+    current_mesh.display_tangents = current_mesh.tangents;
 
     // cleanup opengl state
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -569,7 +571,7 @@ void app::cpu_compute_morphed_display_mesh(
 void app::gpu_update_morphed_submesh(
     size_t submesh_id, std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<std::array<GLuint, 6>>& VBOs) {
+    std::vector<std::array<GLuint, 7>>& VBOs) {
   // upload to GPU
   glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][0]);
   glBufferData(GL_ARRAY_BUFFER,
@@ -589,7 +591,7 @@ void app::perform_software_morphing(
     const std::vector<std::vector<float>>& normals,
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<std::array<GLuint, 6>>& VBOs) {
+    std::vector<std::array<GLuint, 7>>& VBOs) {
   // evaluation cache:
   static std::vector<bool> clean;
   static std::vector<std::vector<float>> cached_weights;

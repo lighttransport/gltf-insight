@@ -1,28 +1,24 @@
 #pragma once
 
-#include <iostream>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "glad/include/glad/glad.h"
 #include "glm/glm.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/matrix.hpp"
 
 class shader {
   GLuint program_;
   std::string shader_name_;
 
  public:
-  shader(shader&& other);
-  shader& operator=(shader&& other);
-  shader(const shader&) = delete;
-  shader& operator=(const shader&) = delete;
   shader();
   shader(const char* shader_name, const char* vertex_shader_source_code,
          const char* fragment_shader_source_code);
   ~shader();
+  shader(shader&& other);
+  shader& operator=(shader&& other);
+  shader& operator=(const shader&) = delete;
+  shader(const shader&) = delete;
 
   void use() const;
   GLuint get_program() const;

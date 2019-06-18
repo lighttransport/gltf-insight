@@ -1,5 +1,11 @@
 #include "shader.hh"
 
+#include <iostream>
+#include <stdexcept>
+
+#include "glm/gtc/type_ptr.hpp"
+#include "glm/matrix.hpp"
+
 shader::shader(shader&& other) { *this = std::move(other); }
 
 shader& shader::operator=(shader&& other) {
@@ -19,10 +25,8 @@ shader::shader(const char* shader_name, const char* vertex_shader_source_code,
                const char* fragment_shader_source_code)
     : shader_name_(shader_name) {
   std::cout << "Creating " << shader_name << "\n";
-  // Create GL objects
-  GLint vertex_shader, fragment_shader;
-  vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+  const GLint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+  const GLint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
   program_ = glCreateProgram();
 
   // Load source code

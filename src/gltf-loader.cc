@@ -172,14 +172,16 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                    const std::vector<tinygltf::Primitive>& primitives,
                    std::vector<draw_call_submesh>& draw_call_descriptor,
                    std::vector<GLuint>& VAOs,
-                   std::vector<std::array<GLuint, 6>>& VBOs,
+                   std::vector<std::array<GLuint, 7>>& VBOs,
                    std::vector<std::vector<unsigned>>& indices,
                    std::vector<std::vector<float>>& vertex_coord,
                    std::vector<std::vector<float>>& texture_coord,
                    std::vector<std::vector<float>>& normals,
+                   std::vector<std::vector<float>>& tangents,
                    std::vector<std::vector<float>>& weights,
                    std::vector<std::vector<unsigned short>>& joints) {
   const auto nb_submeshes = primitives.size();
+
   for (size_t submesh = 0; submesh < nb_submeshes; ++submesh) {
     const auto& primitive = primitives[submesh];
 
@@ -188,6 +190,8 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
     // Primitive uses their own draw mode (eg: lines (for hairs?),
     // triangle fan/strip/list?)
     draw_call_descriptor[submesh].draw_mode = primitive.mode;
+
+    // TODO refcator the accessor -> array loading
 
     // INDEX BUFFER
     {
@@ -251,7 +255,8 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
     }
 
     // VERTEX NORMAL
-    {
+    bool generate_normals = false;
+    if (primitive.attributes.find("NORMAL") != primitive.attributes.end()) {
       const auto normal = primitive.attributes.at("NORMAL");
       const auto& normal_accessor = model.accessors[normal];
       const auto& normal_buffer_view =
@@ -282,6 +287,46 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                  byte_size_of_component * 3);
         }
       }
+    } else {
+      generate_normals = true;
+    }
+
+    // VERTEX tangent
+    bool generate_tangents = false;
+    if (primitive.attributes.find("TANGENT") != primitive.attributes.end()) {
+      const auto tangent = primitive.attributes.at("TANGENT");
+      const auto& tangent_accessor = model.accessors[tangent];
+      const auto& tangent_buffer_view =
+          model.bufferViews[tangent_accessor.bufferView];
+      const auto& tangent_buffer = model.buffers[tangent_buffer_view.buffer];
+      const auto tangent_stride =
+          tangent_accessor.ByteStride(tangent_buffer_view);
+      const auto tangent_start_pointer = tangent_buffer.data.data() +
+                                         tangent_buffer_view.byteOffset +
+                                         tangent_accessor.byteOffset;
+      const size_t byte_size_of_component =
+          tinygltf::GetComponentSizeInBytes(tangent_accessor.componentType);
+      assert(tangent_accessor.type == TINYGLTF_TYPE_VEC3);
+      assert(sizeof(double) >= byte_size_of_component);
+
+      tangents[submesh].resize(tangent_accessor.count * 3);
+      for (size_t i = 0; i < tangent_accessor.count; ++i) {
+        if (byte_size_of_component == sizeof(double)) {
+          double temp[3];
+          memcpy(&temp, tangent_start_pointer + i * tangent_stride,
+                 byte_size_of_component * 3);
+          for (size_t j = 0; j < 3; ++j) {
+            tangents[submesh][i * 3 + j] = float(temp[j]);  // downcast to
+            // float
+          }
+        } else if (byte_size_of_component == sizeof(float)) {
+          memcpy(&tangents[submesh][i * 3],
+                 tangent_start_pointer + i * tangent_stride,
+                 byte_size_of_component * 3);
+        }
+      }
+    } else {
+      generate_tangents = true;
     }
 
     // VERTEX UV
@@ -386,6 +431,14 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       }
     }
 
+    if (generate_normals) {
+      // TODO generate flat surface normal
+    }
+
+    if (generate_tangents) {
+      // TODO generate the tangent vectors for a model that doesn't have
+    }
+
     {
       // GPU upload and shader layout association
       glBindVertexArray(VAOs[submesh]);
@@ -419,25 +472,32 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
         glEnableVertexAttribArray(2);
       }
 
-      // Layout "3" joints assignment vector
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][3]);
+      glBufferData(GL_ARRAY_BUFFER, normals[submesh].size() * sizeof(float),
+                   normals[submesh].data(), GL_DYNAMIC_DRAW);
+      glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                            nullptr);
+      glEnableVertexAttribArray(3);
+
+      // Layout "3" joints assignment vector
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][4]);
       glBufferData(GL_ARRAY_BUFFER,
                    joints[submesh].size() * sizeof(unsigned short),
                    joints[submesh].data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(3, 4, GL_UNSIGNED_SHORT, GL_FALSE,
+      glVertexAttribPointer(4, 4, GL_UNSIGNED_SHORT, GL_FALSE,
                             4 * sizeof(unsigned short), nullptr);
-      glEnableVertexAttribArray(3);
-
-      // Layout "4" joints weights
-      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][4]);
-      glBufferData(GL_ARRAY_BUFFER, weights[submesh].size() * sizeof(float),
-                   weights[submesh].data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
-                            nullptr);
       glEnableVertexAttribArray(4);
 
+      // Layout "4" joints weights
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][5]);
+      glBufferData(GL_ARRAY_BUFFER, weights[submesh].size() * sizeof(float),
+                   weights[submesh].data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                            nullptr);
+      glEnableVertexAttribArray(5);
+
       // EBO
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][5]);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][6]);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                    indices[submesh].size() * sizeof(unsigned),
                    indices[submesh].data(), GL_STATIC_DRAW);

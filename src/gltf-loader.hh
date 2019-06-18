@@ -11,7 +11,7 @@ struct morph_target {
   // doesn't define this.
   // See: https://github.com/KhronosGroup/glTF/issues/1036
 
-  std::vector<float> position, normal /*, tangent*/;
+  std::vector<float> position, normal, tangent;
 };
 
 void load_animations(const tinygltf::Model& model,
@@ -21,11 +21,12 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                    const std::vector<tinygltf::Primitive>& primitives,
                    std::vector<draw_call_submesh>& draw_call_descriptor,
                    std::vector<GLuint>& VAOs,
-                   std::vector<std::array<GLuint, 6>>& VBOs,
+                   std::vector<std::array<GLuint, 7>>& VBOs,
                    std::vector<std::vector<unsigned>>& indices,
                    std::vector<std::vector<float>>& vertex_coord,
                    std::vector<std::vector<float>>& texture_coord,
                    std::vector<std::vector<float>>& normals,
+                   std::vector<std::vector<float>>& tangents,
                    std::vector<std::vector<float>>& weights,
                    std::vector<std::vector<unsigned short>>& joints);
 
