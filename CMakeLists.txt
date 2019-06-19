@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.5)
 
 set(BUILD_TARGET "gltf-insight")
 
@@ -69,7 +69,12 @@ endif()
 # [tinygltf]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf)
 
-file(GLOB SOURCES CONFIGURE_DEPENDS  src/*)
+if (CMAKE_VERSION VERSION_GREATER 3.12)
+  file(GLOB SOURCES CONFIGURE_DEPENDS  src/*)
+else()
+  file(GLOB SOURCES src/*)
+endif()
+
 add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES})
 target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/)
 add_sanitizers(${BUILD_TARGET})
@@ -92,7 +97,9 @@ if (WIN32)
 
   # For easier debugging in VS IDE(cmake 3.8.0 or later required)
   # Set working directory to $gltf-insight git repo root.
-  set_target_properties(${BUILD_TARGET} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  if (CMAKE_VERSION VERSION_GREATER 3.8.0)
+	set_target_properties(${BUILD_TARGET} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+  endif()
 endif ()
 
 # ImGui Font Compressor uitility
