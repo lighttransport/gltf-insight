@@ -49,17 +49,23 @@ Please run `vcsetup.bat` to generate project files.
 
 You can use `cmd //c` to call batch file from a mintty terminal.
 
-```
-$ cmd //c vcsetup.bat
+```cmd
+cmd //c vcsetup.bat
 ```
 
 ### Linux and macOS
 
+```bash
+mkdir build
+cd buid
+cmake ..
+make
 ```
-$ mkdir build
-$ cd buid
-$ cmake ..
-$ make
+
+On Ubuntu, you may need to install a few dependencies : 
+
+```bash
+sudo apt install mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcd-xinerama0 libxinerama-dev libxcursor-dev libxi-dev
 ```
 
 ## TODO
