@@ -139,7 +139,6 @@ void load_shaders(const size_t nb_joints,
 #version 140
 #extension GL_ARB_explicit_attrib_location : require
 
-
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
 layout (location = 2) in vec2 input_uv;
@@ -150,9 +149,14 @@ layout (location = 5) in vec4 input_weights;
 uniform mat4 mvp;
 uniform mat3 normal;
 
+//TODO this array of matrices can represent too much uniform data for some rigging schemes.
+//Should replace this with another skinning method (dual quaternion skinning?) to prevent that.
 uniform mat4 joint_matrix[$nb_joints];
 
 out vec3 interpolated_normal;
+out vec3 interpolated_tangent;
+out vec3 interpolated_bitangent;
+
 out vec2 interpolated_uv;
 out vec4 interpolated_weights;
 
@@ -168,8 +172,12 @@ void main()
   gl_Position = mvp * skin_matrix * vec4(input_position, 1.0);
 
   interpolated_normal = normal * input_normal;
-  interpolated_uv = input_uv;
+  interpolated_tangent = normal * input_tangent;
+  interpolated_bitangent = cross(interpolated_normal, interpolated_tangent);
+  
+  
   interpolated_weights = input_weights;
+  interpolated_uv = input_uv;
 }
 )glsl";
 
@@ -188,14 +196,22 @@ uniform mat4 mvp;
 uniform mat3 normal;
 
 out vec3 interpolated_normal;
+out vec3 interpolated_tangent;
+out vec3 interpolated_bitangent;
+
 out vec2 interpolated_uv;
+out vec4 interpolated_weights;
 
 void main()
 {
   gl_Position = mvp * vec4(input_position, 1.0);
 
   interpolated_normal = normal * input_normal;
+  interpolated_tangent = normal * input_tangent;
+  interpolated_bitangent = cross(interpolated_normal, interpolated_tangent);
+  
   interpolated_uv = input_uv;
+  interpolated_weights = input_weights;
 }
 )glsl";
 
@@ -215,10 +231,8 @@ void main()
   }
   const char* vertex_shader_source = vertex_shader_source_str.c_str();
 
-  const char* fragment_shader_source_textured = R"glsl(
+  const char* fragment_shader_source_textured_unlit = R"glsl(
 #version 140
-
-
 
 in vec2 interpolated_uv;
 in vec3 interpolated_normal;
@@ -288,7 +302,7 @@ void main()
   shaders["textured"] =
       shader("textured",
              nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,
-             fragment_shader_source_textured);
+             fragment_shader_source_textured_unlit);
   shaders["debug_color"] = shader("debug_color", vertex_shader_no_skinning,
                                   fragment_shader_source_draw_debug_color);
   shaders["debug_uv"] =
@@ -301,7 +315,7 @@ void main()
              fragment_shader_source_normals);
   shaders["no_skinning_tex"] =
       shader("no_skinning_tex", vertex_shader_no_skinning,
-             fragment_shader_source_textured);
+             fragment_shader_source_textured_unlit);
   shaders["weights"] =
       shader("weights",
              nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,

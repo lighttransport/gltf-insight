@@ -168,6 +168,17 @@ void load_animations(const tinygltf::Model& model,
   }
 }
 
+glm::vec3 generate_flat_normal_for_triangle(std::vector<float>& position,
+                                            const unsigned i0,
+                                            const unsigned i1,
+                                            const unsigned i2) {
+  const glm::vec3 v0(position[i0 + 0], position[i0 + 1], position[i0 + 2]);
+  const glm::vec3 v1(position[i1 + 0], position[i1 + 1], position[i1 + 2]);
+  const glm::vec3 v2(position[i2 + 0], position[i2 + 1], position[i2 + 2]);
+
+  return glm::normalize(glm::cross(v0 - v1, v1 - v2));
+}
+
 void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                    const std::vector<tinygltf::Primitive>& primitives,
                    std::vector<draw_call_submesh>& draw_call_descriptor,
@@ -432,11 +443,49 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
     }
 
     if (generate_normals) {
-      // TODO generate flat surface normal
+      // size of array should match
+      normals[submesh].resize(vertex_coord[submesh].size());
+
+      // TODO this assume primitve is TINYGLTF_MODE_TRIANGLES
+      // for each triangle
+      for (size_t tri = 0; tri < indices[submesh].size() / 3; ++tri) {
+        const auto i0 = indices[submesh][3 * tri + 0];
+        const auto i1 = indices[submesh][3 * tri + 1];
+        const auto i2 = indices[submesh][3 * tri + 2];
+
+        const glm::vec3 n = generate_flat_normal_for_triangle(
+            vertex_coord[submesh], i0, i1, i2);
+
+        normals[submesh][i0 + 0] = normals[submesh][i1 + 0] =
+            normals[submesh][i2 + 0] = n.x;
+        normals[submesh][i0 + 1] = normals[submesh][i1 + 1] =
+            normals[submesh][i2 + 1] = n.y;
+        normals[submesh][i0 + 2] = normals[submesh][i1 + 2] =
+            normals[submesh][i2 + 2] = n.z;
+      }
     }
 
     if (generate_tangents) {
-      // TODO generate the tangent vectors for a model that doesn't have
+      tangents[submesh].resize(normals[submesh].size());
+      const auto& normal = normals[submesh];
+      auto& tangent = tangents[submesh];
+
+      // TODO there's a "proper way" and a "not so proper way" to do so.
+      // In case you were gessing, that's not the proper way:
+      const glm::vec3 y(0.f, 1.f, 0.f);
+      const glm::vec3 z(0.f, 0.f, 1.f);
+      for (size_t tri = 0; tri < normal.size() / 3; ++tri) {
+        const glm::vec3 n = glm::vec3(normal[3 * tri + 0], normal[3 * tri + 1],
+                                      normal[3 * tri + 2]);
+
+        const auto t0 = glm::cross(n, y);
+        const auto t1 = glm::cross(n, z);
+        const auto t = glm::length(t0) > glm::length(t1) ? t0 : t1;
+
+        tangent[3 * tri + 0] = t.x;
+        tangent[3 * tri + 1] = t.y;
+        tangent[3 * tri + 2] = t.z;
+      }
     }
 
     {
