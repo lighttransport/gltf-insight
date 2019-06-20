@@ -3,11 +3,24 @@ image: Visual Studio 2017
 platform: x64
 before_build:
 - cmd: >-
+    git submodule init
 
-    git submodule update --init --recursive
+    git submodule update
 
     vcsetup.bat
 build:
   project: build\gltf-insight.sln
   parallel: true
   verbosity: minimal
+artifacts:
+- path: C:\projects\gltf-insight\build\RelWithDebInfo\gltf-insight.exe
+- path: C:\projects\gltf-insight\build\RelWithDebInfo\gltf-insight.pdb
+deploy:
+- provider: GitHub
+  tag: continuous
+  auth_token:
+    secure: 0ewOMT51w2I41galWFJsoJp/SQyOjtljI0RAn/P4Z62JbcOiOHVT06SWxpfWVODc
+  prerelease: true
+  force_update: true
+  on:
+    branch: devel
