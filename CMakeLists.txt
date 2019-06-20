@@ -76,7 +76,11 @@ else()
   file(GLOB SOURCES src/*)
 endif()
 
-add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES})
+if(WIN32)
+set(ICO_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/icons/icons.rc)
+endif()
+
+add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES})
 target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/)
 add_sanitizers(${BUILD_TARGET})
 

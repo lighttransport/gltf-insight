@@ -8,13 +8,20 @@
 #include "gl_util.hh"
 
 // Include embeded font data
+#include "gltf-insight-128.png.inc.hh"
+#include "gltf-insight-16.png.inc.hh"
+#include "gltf-insight-32.png.inc.hh"
+#include "gltf-insight-48.png.inc.hh"
+#include "gltf-insight-64.png.inc.hh"
+#include "gltf-insight-96.png.inc.hh"
+#include "gltf-insight.png.inc.hh"
 #include "ionicons_embed.inc.h"
 #include "roboto_embed.inc.h"
 #include "roboto_mono_embed.inc.h"
-#include "gltf-insight.png.inc.hh"
 
 // image loader
 #include "stb_image.h"
+GLFWimage images[7];
 
 void gui_new_frame() {
   glfwPollEvents();
@@ -455,17 +462,38 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   // glFrontFace(GL_CW);
 
-  //load a window icon
+  // load a window icon
 
-  GLFWimage images[1];
-
-  int x,y,c;
-  images[0].pixels = stbi_load_from_memory(gltf_insight_png, gltf_insight_png_len, &x,&y, &c, 4);
+  int x, y, c;
+  images[0].pixels = stbi_load_from_memory(gltf_insight_png,
+                                           gltf_insight_png_len, &x, &y, &c, 4);
   images[0].width = x;
   images[0].height = y;
-
-
-  glfwSetWindowIcon(window, 1, images);
+  images[1].pixels = stbi_load_from_memory(
+      gltf_insight_128_png, gltf_insight_32_png_len, &x, &y, &c, 4);
+  images[1].width = x;
+  images[1].height = y;
+  images[2].pixels = stbi_load_from_memory(
+      gltf_insight_96_png, gltf_insight_96_png_len, &x, &y, &c, 4);
+  images[2].width = x;
+  images[2].height = y;
+  images[3].pixels = stbi_load_from_memory(
+      gltf_insight_64_png, gltf_insight_64_png_len, &x, &y, &c, 4);
+  images[3].width = x;
+  images[3].height = y;
+  images[4].pixels = stbi_load_from_memory(
+      gltf_insight_48_png, gltf_insight_48_png_len, &x, &y, &c, 4);
+  images[4].width = x;
+  images[4].height = y;
+  images[5].pixels = stbi_load_from_memory(
+      gltf_insight_32_png, gltf_insight_32_png_len, &x, &y, &c, 4);
+  images[5].width = x;
+  images[5].height = y;
+  images[6].pixels = stbi_load_from_memory(
+      gltf_insight_16_png, gltf_insight_16_png_len, &x, &y, &c, 4);
+  images[6].width = x;
+  images[6].height = y;
+  glfwSetWindowIcon(window, 7, images);
 }
 
 void initialize_imgui(GLFWwindow* window) {
@@ -592,6 +620,8 @@ void deinitialize_gui_and_window(GLFWwindow* window) {
 
   glfwDestroyWindow(window);
   glfwTerminate();
+
+  for (auto image : images) stbi_image_free(image.pixels);
 }
 
 void transform_window(float* vecTranslation, float* vecRotation,
