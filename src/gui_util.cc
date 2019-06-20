@@ -21,7 +21,7 @@
 
 // image loader
 #include "stb_image.h"
-GLFWimage images[7];
+GLFWimage images[4];
 
 void gui_new_frame() {
   glfwPollEvents();
@@ -464,35 +464,28 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 
   // load a window icon
   int x, y, c;
-  images[0].pixels = stbi_load_from_memory(gltf_insight_png,
+
+  images[3].pixels = stbi_load_from_memory(
+      gltf_insight_128_png, gltf_insight_128_png_len, &x, &y, &c, 4);
+  images[3].width = x;
+  images[3].height = 7;
+
+  images[2].pixels = stbi_load_from_memory(gltf_insight_png,
                                            gltf_insight_png_len, &x, &y, &c, 4);
-  images[0].width = x;
-  images[0].height = y;
-  images[1].pixels = stbi_load_from_memory(
-      gltf_insight_128_png, gltf_insight_32_png_len, &x, &y, &c, 4);
-  images[1].width = x;
-  images[1].height = y;
-  images[2].pixels = stbi_load_from_memory(
-      gltf_insight_96_png, gltf_insight_96_png_len, &x, &y, &c, 4);
   images[2].width = x;
   images[2].height = y;
-  images[3].pixels = stbi_load_from_memory(
+
+  images[1].pixels = stbi_load_from_memory(
       gltf_insight_64_png, gltf_insight_64_png_len, &x, &y, &c, 4);
-  images[3].width = x;
-  images[3].height = y;
-  images[4].pixels = stbi_load_from_memory(
-      gltf_insight_48_png, gltf_insight_48_png_len, &x, &y, &c, 4);
-  images[4].width = x;
-  images[4].height = y;
-  images[5].pixels = stbi_load_from_memory(
-      gltf_insight_32_png, gltf_insight_32_png_len, &x, &y, &c, 4);
-  images[5].width = x;
-  images[5].height = y;
-  images[6].pixels = stbi_load_from_memory(
+  images[1].width = x;
+  images[1].height = y;
+
+  images[0].pixels = stbi_load_from_memory(
       gltf_insight_16_png, gltf_insight_16_png_len, &x, &y, &c, 4);
-  images[6].width = x;
-  images[6].height = y;
-  glfwSetWindowIcon(window, 7, images);
+  images[0].width = x;
+  images[0].height = y;
+
+  glfwSetWindowIcon(window, 4, images);
 }
 
 void initialize_imgui(GLFWwindow* window) {
