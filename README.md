@@ -65,7 +65,7 @@ make
 On Ubuntu, you may need to install a few dependencies : 
 
 ```bash
-sudo apt install mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcd-xinerama0 libxinerama-dev libxcursor-dev libxi-dev
+sudo apt install mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-xinerama0 libxinerama-dev libxcursor-dev libxi-dev
 ```
 
 ## TODO
