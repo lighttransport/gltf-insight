@@ -94,6 +94,10 @@ class app {
   ImGuizmo::OPERATION mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
   ImGuizmo::MODE mCurrentGizmoMode = ImGuizmo::WORLD;
 
+  enum selection_mode : int { manipulate_mesh = 0, manipulate_joint = 1 };
+
+  selection_mode current_mode = manipulate_mesh;
+
   bool show_asset_image_window = true;
   bool show_model_info_window = true;
   bool show_animation_window = true;
@@ -109,6 +113,7 @@ class app {
   // Application state
   bool asset_loaded = false;
   bool found_textured_shader = false;
+  int active_joint = 0;
 
   gltf_node gltf_scene_tree{gltf_node::node_type::empty};
 
@@ -193,7 +198,7 @@ class app {
       std::vector<std::vector<float>>& display_normal,
       std::vector<std::array<GLuint, 7>>& VBOs);
 
-  void draw_bone_overlay(gltf_node& mesh_skeleton_graph,
+  void draw_bone_overlay(gltf_node& mesh_skeleton_graph, int active_joint_node,
                          const glm::mat4& view_matrix,
                          const glm::mat4& projection_matrix,
                          std::map<std::string, shader>& shaders);
@@ -212,7 +217,8 @@ class app {
                               std::vector<animation>& animations);
 
   void run_3D_gizmo(glm::mat4& view_matrix, const glm::mat4& projection_matrix,
-                    glm::mat4& model_matrix, glm::vec3& camera_position,
+                    glm::mat4& model_matrix, gltf_node* active_bone,
+                    glm::vec3& camera_position,
                     application_parameters& my_user_pointer);
 
   void fill_sequencer(gltf_insight::AnimSequence& sequence,

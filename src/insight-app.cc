@@ -1,5 +1,8 @@
 #include "insight-app.hh"
 
+// need matrix decomposition for 3D gizmo
+#include "glm/gtx/matrix_decompose.hpp"
+
 using namespace gltf_insight;
 
 void app::unload() {
@@ -188,6 +191,19 @@ void app::load() {
     animation_names[i] = animations[i].name;
 
   asset_loaded = true;
+
+  if (!loaded_meshes.empty()) {
+    for (auto shader_it = loaded_meshes[0].shader_list->begin();
+         shader_it != loaded_meshes[0].shader_list->end(); ++shader_it)
+      shader_names.push_back(shader_it->first);
+
+    for (size_t i = 0; i < shader_names.size(); ++i) {
+      if (shader_names[i] == "textured") {
+        selected_shader = i;
+        break;
+      }
+    }
+  }
 }
 
 mesh::~mesh() {
@@ -379,8 +395,8 @@ void app::main_loop() {
       if (asset_loaded) {
         // Draw all windows
 
-        selected_shader = 0;
-        shader_to_use = "textured";
+        // selected_shader = 0;
+        // shader_to_use = "textured";
 
         // shader_selector_window(shader_names, selected_shader, shader_to_use);
         asset_images_window(textures, &show_asset_image_window);
@@ -392,6 +408,10 @@ void app::main_loop() {
                             loaded_meshes.front().nb_morph_targets,
                             &show_morph_target_window);
         camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
+        shader_selector_window(shader_names, selected_shader, shader_to_use);
+
+        ImGui::InputInt("Active joint", &active_joint, 1, 1);
+        glm::clamp(active_joint, 0, loaded_meshes[0].nb_joints);
 
         // Animation player advances time and apply animation interpolation.
         // It also display the sequencer timeline and controls on screen
@@ -409,8 +429,13 @@ void app::main_loop() {
             glm::radians(fovy), float(display_w) / float(display_h), z_near,
             z_far);
 
-      run_3D_gizmo(view_matrix, projection_matrix, model_matrix,
-                   camera_position, gui_parameters);
+      run_3D_gizmo(
+          view_matrix, projection_matrix, model_matrix,
+          asset_loaded && active_joint >= 0 &&
+                  active_joint < loaded_meshes[0].flat_joint_list.size()
+              ? loaded_meshes[0].flat_joint_list[active_joint]
+              : nullptr,
+          camera_position, gui_parameters);
 
       update_mesh_skeleton_graph_transforms(gltf_scene_tree);
 
@@ -423,8 +448,14 @@ void app::main_loop() {
                       camera_rotation * glm::vec3(0, 1.f, 0));
 
       if (asset_loaded) {
+        int active_bone_gltf_node = -1;
         for (auto& a_mesh : loaded_meshes) {
           if (!a_mesh.displayed) continue;
+
+          if (active_joint >= 0 && active_joint < a_mesh.flat_joint_list.size())
+            active_bone_gltf_node =
+                a_mesh.flat_joint_list[active_joint]->gltf_node_index;
+
           // Calculate all the needed matrices to render the frame, this
           // includes the "model view projection" that transform the geometry to
           // the screen space, the normal matrix, and the joint matrix array
@@ -435,8 +466,8 @@ void app::main_loop() {
 
           glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
           glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
-          update_uniforms(*a_mesh.shader_list, shader_to_use, mvp, normal,
-                          a_mesh.joint_matrices);
+          update_uniforms(*a_mesh.shader_list, active_joint, shader_to_use, mvp,
+                          normal, a_mesh.joint_matrices);
 
           // Draw all of the submeshes of the object
           for (size_t submesh = 0;
@@ -452,8 +483,8 @@ void app::main_loop() {
           }
           // Then draw 2D bones and joints on top of that
         }
-        draw_bone_overlay(gltf_scene_tree, view_matrix, projection_matrix,
-                          *loaded_meshes[0].shader_list);
+        draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
+                          projection_matrix, *loaded_meshes[0].shader_list);
       }
     }
     // Render all ImGui, then swap buffers
@@ -607,8 +638,8 @@ void app::perform_software_morphing(
     // We are dynamically keeping a cache of the morph targets weights. CPU-side
     // evaluation of morphing is expensive, if the blending weights did not
     // change, we don't want to re-evaluate the mesh. We are keeping a cache of
-    // the weights, and sedding a dirty flags if we need to recompute and
-    // reupload the mesh to the GPU
+    // the weights, and sending a dirty flags if we need to recompute and
+    // re-upload the mesh to the GPU
 
     // To transparently handle the loading of a different file, we resize these
     // arrays here
@@ -656,7 +687,7 @@ void app::perform_software_morphing(
 }
 
 void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
-                            const glm::mat4& view_matrix,
+                            int active_joint_node, const glm::mat4& view_matrix,
                             const glm::mat4& projection_matrix,
                             std::map<std::string, shader>& shaders) {
   glBindVertexArray(0);
@@ -664,8 +695,9 @@ void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
 
   bone_display_window();
   shaders["debug_color"].use();
-  draw_bones(mesh_skeleton_graph, shaders["debug_color"].get_program(),
-             view_matrix, projection_matrix);
+  draw_bones(mesh_skeleton_graph, active_joint_node,
+             shaders["debug_color"].get_program(), view_matrix,
+             projection_matrix);
 }
 
 void app::precompute_hardware_skinning_data(
@@ -735,26 +767,83 @@ void app::run_animation_timeline(gltf_insight::AnimSequence& sequence,
 
 void app::run_3D_gizmo(glm::mat4& view_matrix,
                        const glm::mat4& projection_matrix,
-                       glm::mat4& model_matrix, glm::vec3& camera_position,
+                       glm::mat4& model_matrix, gltf_node* active_bone,
+                       glm::vec3& camera_position,
                        application_parameters& my_user_pointer) {
-  float vecTranslation[3], vecRotation[3], vecScale[3];
+  glm::vec3 vecTranslation, vecRotation, vecScale;
+  glm::mat4 bone_world_xform;
 
-  ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(model_matrix),
-                                        vecTranslation, vecRotation, vecScale);
+  if (!active_bone) {
+    current_mode = manipulate_mesh;
+  } else {
+    bone_world_xform = active_bone->world_xform;
+  }
 
-  transform_window(vecTranslation, vecRotation, vecScale,
-                   mCurrentGizmoOperation, &show_gizmo, &show_transform_window);
+  const auto saved_mode = current_mode;
 
-  ImGuizmo::RecomposeMatrixFromComponents(vecTranslation, vecRotation, vecScale,
-                                          glm::value_ptr(model_matrix));
+  float* manipulated_matrix = glm::value_ptr(
+      current_mode == manipulate_mesh ? model_matrix : bone_world_xform);
+
+  ImGuizmo::DecomposeMatrixToComponents(
+      manipulated_matrix, glm::value_ptr(vecTranslation),
+      glm::value_ptr(vecRotation), glm::value_ptr(vecScale));
+
+  // This is used to check if user manipulated these values in the GUI
+  const glm::vec3 savedTr = vecTranslation, savedRot = vecRotation,
+                  savedScale = vecScale;
+
+  transform_window(glm::value_ptr(vecTranslation), glm::value_ptr(vecRotation),
+                   glm::value_ptr(vecScale), mCurrentGizmoOperation,
+                   mCurrentGizmoMode, (int*)&current_mode, &show_gizmo,
+                   &show_transform_window);
+  if (!active_bone) {
+    current_mode = manipulate_mesh;
+  }
+
+  if (current_mode != saved_mode)
+    return;  // If we just gone from mesh to bone, we are not manipulating the
+
+  if (savedTr != vecTranslation || savedRot != vecRotation ||
+      savedScale != vecScale)
+    ImGuizmo::RecomposeMatrixFromComponents(
+        glm::value_ptr(vecTranslation), glm::value_ptr(vecRotation),
+        glm::value_ptr(vecScale), manipulated_matrix);
 
   auto& io = ImGui::GetIO();
+
   ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
+
   if (show_gizmo)
-    ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
-                         glm::value_ptr(projection_matrix),
-                         mCurrentGizmoOperation, mCurrentGizmoMode,
-                         glm::value_ptr(model_matrix), NULL, NULL);
+    ImGuizmo::Manipulate(
+        glm::value_ptr(view_matrix), glm::value_ptr(projection_matrix),
+        mCurrentGizmoOperation, mCurrentGizmoMode, manipulated_matrix);
+
+  if (current_mode == 1) {
+    // todo modify active_bone->pose to match the new bone global matrix
+
+    gltf_node::animation_state& pose = active_bone->pose;
+    // we actually don't need the skew and perpective ones, but GLM API does
+    static glm::vec3 position, scale, skew;
+    static glm::quat rotation;
+    static glm::vec4 perspective;
+
+    // Get the referential
+    const auto bone_parent_world =
+        active_bone->parent ? active_bone->parent->world_xform : glm::mat4(1.f);
+
+    // Get the bone transform in paren't referential
+    const glm::mat4 bone_pose_xform =
+        glm::inverse(bone_parent_world) * bone_world_xform;
+
+    // Decompose that matrix into position rotation sacale
+    glm::decompose(bone_pose_xform, scale, rotation, position, skew,
+                   perspective);
+
+    // apply to pose
+    pose.translation = position;
+    pose.rotation = rotation;
+    pose.scale = scale;
+  }
 }
 
 void app::fill_sequencer(gltf_insight::AnimSequence& sequence,

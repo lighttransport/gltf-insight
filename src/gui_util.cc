@@ -578,26 +578,40 @@ void deinitialize_gui_and_window(GLFWwindow* window) {
   glfwTerminate();
 }
 
-void transform_window(float vecTranslation[3], float vecRotation[3],
-                      float vecScale[3],
-                      ImGuizmo::OPERATION& mCurrentGizmoOperation,
+void transform_window(float* vecTranslation, float* vecRotation,
+                      float* vecScale,
+                      ImGuizmo::OPERATION& current_gizmo_operation,
+                      ImGuizmo::MODE& current_gizmo_mode, int* mode,
                       bool* show_gizmo, bool* open) {
   if (!*open) return;
+
   if (ImGui::Begin("Transform manipulator", open)) {
+    if (ImGui::RadioButton("Mesh mode", *mode == 0)) *mode = 0;
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Bone mode", *mode == 1)) *mode = 1;
+    ImGui::Separator();
+
     ImGui::InputFloat3("Tr", vecTranslation, 3);
     ImGui::InputFloat3("Rt", vecRotation, 3);
     ImGui::InputFloat3("Sc", vecScale, 3);
 
     if (ImGui::Button("Reset transforms")) {
-      vecTranslation[0] = 0;
-      vecTranslation[1] = 0;
-      vecTranslation[2] = 0;
-      vecRotation[0] = 0;
-      vecRotation[1] = 0;
-      vecRotation[2] = 0;
-      vecScale[0] = 1;
-      vecScale[1] = 1;
-      vecScale[2] = 1;
+      if (*mode == 0) {
+        vecTranslation[0] = 0;
+        vecTranslation[1] = 0;
+        vecTranslation[2] = 0;
+        vecRotation[0] = 0;
+        vecRotation[1] = 0;
+        vecRotation[2] = 0;
+        vecScale[0] = 1;
+        vecScale[1] = 1;
+        vecScale[2] = 1;
+      } else {
+        // TODO do we reset to bone current animation pose, or do we reset to
+        // bone binding pose?
+
+        // also, we don't have the data to do that in this functions as of now
+      }
     }
 
     if (show_gizmo) {
@@ -608,15 +622,22 @@ void transform_window(float vecTranslation[3], float vecRotation[3],
     ImGui::Separator();
 
     if (ImGui::RadioButton("Translate",
-                           mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
-      mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+                           current_gizmo_operation == ImGuizmo::TRANSLATE))
+      current_gizmo_operation = ImGuizmo::TRANSLATE;
     ImGui::SameLine();
     if (ImGui::RadioButton("Rotate",
-                           mCurrentGizmoOperation == ImGuizmo::ROTATE))
-      mCurrentGizmoOperation = ImGuizmo::ROTATE;
+                           current_gizmo_operation == ImGuizmo::ROTATE))
+      current_gizmo_operation = ImGuizmo::ROTATE;
     ImGui::SameLine();
-    if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
-      mCurrentGizmoOperation = ImGuizmo::SCALE;
+    if (ImGui::RadioButton("Scale", current_gizmo_operation == ImGuizmo::SCALE))
+      current_gizmo_operation = ImGuizmo::SCALE;
+
+    ImGui::Separator();
+    if (ImGui::RadioButton("World", current_gizmo_mode == ImGuizmo::WORLD))
+      current_gizmo_mode = ImGuizmo::WORLD;
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Local", current_gizmo_mode == ImGuizmo::LOCAL))
+      current_gizmo_mode = ImGuizmo::LOCAL;
   }
   ImGui::End();
 }

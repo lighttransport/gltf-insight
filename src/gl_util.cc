@@ -148,6 +148,7 @@ layout (location = 5) in vec4 input_weights;
 
 uniform mat4 mvp;
 uniform mat3 normal;
+uniform int active_joint;
 
 //TODO this array of matrices can represent too much uniform data for some rigging schemes.
 //Should replace this with another skinning method (dual quaternion skinning?) to prevent that.
@@ -159,6 +160,48 @@ out vec3 interpolated_bitangent;
 
 out vec2 interpolated_uv;
 out vec4 interpolated_weights;
+
+vec3 float_to_rgb(float value)
+{
+ vec3 color = vec3(0,0,0);
+
+if(value < 0.00001) return color;
+
+ value *= 2;
+
+ if(value < 0.5)
+ {
+    color.b = 1.0 - (value + 0.5);
+    color.g = value + 0.5;
+ }
+ else
+ {
+    value = (value * 2.0) - 1.0;
+    color.g = 1.0 - (value + 0.5);
+    color.r = value + 0.5;
+ }
+
+  return color;
+}
+
+vec4 weight_color()
+{
+  vec3 color = vec3(0,0,0);
+
+  if(input_joints.x == active_joint)
+    color += float_to_rgb(input_weights.x);
+
+  if(input_joints.y == active_joint)
+    color += float_to_rgb(input_weights.y);
+
+  if(input_joints.z == active_joint)
+    color += float_to_rgb(input_weights.z);
+
+  if(input_joints.w == active_joint)
+    color += float_to_rgb(input_weights.w);
+
+  return vec4(color, 1);
+}
 
 void main()
 {
@@ -176,8 +219,10 @@ void main()
   interpolated_bitangent = cross(interpolated_normal, interpolated_tangent);
   
   
-  interpolated_weights = input_weights;
   interpolated_uv = input_uv;
+  interpolated_weights = weight_color();
+
+
 }
 )glsl";
 
@@ -281,7 +326,33 @@ out vec4 output_color;
 
 void main()
 {
-  output_color = vec4(interpolated_normal, 1);
+  output_color = vec4(normalize(interpolated_normal), 1);
+}
+
+)glsl";
+
+  const char* fragment_shader_source_tangents = R"glsl(
+#version 140
+
+in vec3 interpolated_tangent;
+out vec4 output_color;
+
+void main()
+{
+  output_color = vec4(normalize(interpolated_tangent), 1);
+}
+
+)glsl";
+
+  const char* fragment_shader_source_bitangent = R"glsl(
+#version 140
+
+in vec3 interpolated_bitangent;
+out vec4 output_color;
+
+void main()
+{
+  output_color = vec4(normalize(interpolated_bitangent), 1);
 }
 
 )glsl";
@@ -313,6 +384,17 @@ void main()
       shader("debug_normals",
              nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,
              fragment_shader_source_normals);
+
+  shaders["debug_tangent"] =
+      shader("debug_tangent",
+             nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,
+             fragment_shader_source_tangents);
+
+  shaders["debug_bitangent"] =
+      shader("debug_bitangent",
+             nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,
+             fragment_shader_source_bitangent);
+
   shaders["no_skinning_tex"] =
       shader("no_skinning_tex", vertex_shader_no_skinning,
              fragment_shader_source_textured_unlit);
@@ -323,10 +405,11 @@ void main()
 }
 
 void update_uniforms(std::map<std::string, shader>& shaders,
-                     const std::string& shader_to_use, const glm::mat4& mvp,
-                     const glm::mat3& normal,
+                     const int active_joint, const std::string& shader_to_use,
+                     const glm::mat4& mvp, const glm::mat3& normal,
                      const std::vector<glm::mat4>& joint_matrices) {
   shaders[shader_to_use].use();
+  shaders[shader_to_use].set_uniform("active_joint", active_joint);
   shaders[shader_to_use].set_uniform("joint_matrix", joint_matrices);
   shaders[shader_to_use].set_uniform("mvp", mvp);
   shaders[shader_to_use].set_uniform("normal", normal);

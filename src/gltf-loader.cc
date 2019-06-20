@@ -317,7 +317,11 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                                          tangent_accessor.byteOffset;
       const size_t byte_size_of_component =
           tinygltf::GetComponentSizeInBytes(tangent_accessor.componentType);
-      assert(tangent_accessor.type == TINYGLTF_TYPE_VEC3);
+      assert(tangent_accessor.type == TINYGLTF_TYPE_VEC4);
+
+      // TODO check 4th component of tangent for handedness of tangent space
+      // basis
+
       assert(sizeof(double) >= byte_size_of_component);
 
       tangents[submesh].resize(tangent_accessor.count * 3);
@@ -448,20 +452,26 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
 
       // TODO this assume primitve is TINYGLTF_MODE_TRIANGLES
       // for each triangle
-      for (size_t tri = 0; tri < indices[submesh].size() / 3; ++tri) {
-        const auto i0 = indices[submesh][3 * tri + 0];
-        const auto i1 = indices[submesh][3 * tri + 1];
-        const auto i2 = indices[submesh][3 * tri + 2];
+      if (primitive.mode == TINYGLTF_MODE_TRIANGLES) {
+        for (size_t tri = 0; tri < indices[submesh].size() / 3; ++tri) {
+          const auto i0 = indices[submesh][3 * tri + 0];
+          const auto i1 = indices[submesh][3 * tri + 1];
+          const auto i2 = indices[submesh][3 * tri + 2];
 
-        const glm::vec3 n = generate_flat_normal_for_triangle(
-            vertex_coord[submesh], i0, i1, i2);
+          const glm::vec3 n = generate_flat_normal_for_triangle(
+              vertex_coord[submesh], i0, i1, i2);
 
-        normals[submesh][i0 + 0] = normals[submesh][i1 + 0] =
-            normals[submesh][i2 + 0] = n.x;
-        normals[submesh][i0 + 1] = normals[submesh][i1 + 1] =
-            normals[submesh][i2 + 1] = n.y;
-        normals[submesh][i0 + 2] = normals[submesh][i1 + 2] =
-            normals[submesh][i2 + 2] = n.z;
+          normals[submesh][i0 + 0] = normals[submesh][i1 + 0] =
+              normals[submesh][i2 + 0] = n.x;
+          normals[submesh][i0 + 1] = normals[submesh][i1 + 1] =
+              normals[submesh][i2 + 1] = n.y;
+          normals[submesh][i0 + 2] = normals[submesh][i1 + 2] =
+              normals[submesh][i2 + 2] = n.z;
+        }
+      } else {
+        std::cerr << "WARN: a primitive of a mesh does not define "
+                     "normals, and is not TRIANGLE primitive. The unlikely "
+                     "scenario you were to lazy to implement happened.\n";
       }
     }
 
@@ -474,17 +484,16 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       // In case you were gessing, that's not the proper way:
       const glm::vec3 y(0.f, 1.f, 0.f);
       const glm::vec3 z(0.f, 0.f, 1.f);
-      for (size_t tri = 0; tri < normal.size() / 3; ++tri) {
-        const glm::vec3 n = glm::vec3(normal[3 * tri + 0], normal[3 * tri + 1],
-                                      normal[3 * tri + 2]);
+      const glm::vec3 r = glm::normalize(y + z);
+      for (size_t vec = 0; vec < normal.size() / 3; ++vec) {
+        const glm::vec3 n = glm::vec3(normal[3 * vec + 0], normal[3 * vec + 1],
+                                      normal[3 * vec + 2]);
 
-        const auto t0 = glm::cross(n, y);
-        const auto t1 = glm::cross(n, z);
-        const auto t = glm::length(t0) > glm::length(t1) ? t0 : t1;
+        const auto t0 = glm::cross(n, r);
 
-        tangent[3 * tri + 0] = t.x;
-        tangent[3 * tri + 1] = t.y;
-        tangent[3 * tri + 2] = t.z;
+        tangent[3 * vec + 0] = t0.x;
+        tangent[3 * vec + 1] = t0.y;
+        tangent[3 * vec + 2] = t0.z;
       }
     }
 
@@ -522,8 +531,8 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       }
 
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][3]);
-      glBufferData(GL_ARRAY_BUFFER, normals[submesh].size() * sizeof(float),
-                   normals[submesh].data(), GL_DYNAMIC_DRAW);
+      glBufferData(GL_ARRAY_BUFFER, tangents[submesh].size() * sizeof(float),
+                   tangents[submesh].data(), GL_DYNAMIC_DRAW);
       glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(3);

@@ -98,9 +98,10 @@ void initialize_imgui(GLFWwindow* window);
 // Cleaup the gui and the window systems
 void deinitialize_gui_and_window(GLFWwindow* window);
 
-void transform_window(float vecTranslation[3], float vecRotation[3],
-                      float vecScale[3],
-                      ImGuizmo::OPERATION& mCurrentGizmoOperation,
+void transform_window(float* vecTranslation, float* vecRotation,
+                      float* vecScale,
+                      ImGuizmo::OPERATION& current_gizmo_operation,
+                      ImGuizmo::MODE& current_gizmo_mode, int* mode,
                       bool* show_gizmo, bool* open = nullptr);
 
 void timeline_window(gltf_insight::AnimSequence loaded_sequence,

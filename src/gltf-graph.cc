@@ -49,10 +49,11 @@ gltf_node* gltf_node::get_node_with_index(int index) {
 void update_mesh_skeleton_graph_transforms(gltf_node& node,
                                            glm::mat4 parent_matrix) {
   // Calculate a matrix that apply the "animated pose" transform to the node
-  glm::mat4 pose_translation =
+  const glm::mat4 pose_translation =
       glm::translate(glm::mat4(1.f), node.pose.translation);
-  glm::mat4 pose_rotation = glm::toMat4(node.pose.rotation);
-  glm::mat4 pose_scale = glm::scale(glm::mat4(1.f), node.pose.scale);
+  const glm::mat4 pose_rotation = glm::toMat4(node.pose.rotation);
+  const glm::mat4 pose_scale = glm::scale(glm::mat4(1.f), node.pose.scale);
+
   glm::mat4 pose_matrix = pose_translation * pose_rotation * pose_scale;
 
   // The calculated "pose_matrix" is actually the absolute position on the local
@@ -81,7 +82,7 @@ void update_mesh_skeleton_graph_transforms(gltf_node& node,
    */
 
   node.world_xform = parent_matrix * node.local_xform *
-                     (node.type != gltf_node::node_type::mesh
+                     (node.type == gltf_node::node_type::bone
                           ? glm::inverse(node.local_xform) * pose_matrix
                           : glm::mat4(1.f));
 
@@ -227,11 +228,12 @@ void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end,
   glEnd();
 }
 
-void draw_bones(gltf_node& root, GLuint shader, glm::mat4 view_matrix,
-                glm::mat4 projection_matrix) {
+void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
+                glm::mat4 view_matrix, glm::mat4 projection_matrix) {
   // recurse down the scene tree
   for (auto& child : root.children)
-    draw_bones(*child, shader, view_matrix, projection_matrix);
+    draw_bones(*child, active_joint_node_index, shader, view_matrix,
+               projection_matrix);
 
   // on current node, set debug_shader model view projection to draw our local
   // space
@@ -250,7 +252,10 @@ void draw_bones(gltf_node& root, GLuint shader, glm::mat4 view_matrix,
       for (auto child : root.children) {
         if (child->type == gltf_node::node_type::bone) {
           draw_line(shader, glm::vec3(0.f), child->local_xform[3],
-                    glm::vec4(0.f, .5f, .5f, 1.f), 8);
+                    root.gltf_node_index == active_joint_node_index
+                        ? glm::vec4(1.f, .5f, .5f, 1.f)
+                        : glm::vec4(0.f, .5f, .5f, 1.f),
+                    8);
         }
       }
 
@@ -259,12 +264,18 @@ void draw_bones(gltf_node& root, GLuint shader, glm::mat4 view_matrix,
       if (draw_childless_bone_extension && root.children.empty())
         draw_line(shader, glm::vec3(0.f),
                   glm::vec3(0.f, .25f, 0.f) /*Y is length*/,
-                  glm::vec4(.5f, .75f, .5f, 1.f), 6);
+                  root.gltf_node_index == active_joint_node_index
+                      ? glm::vec4(.5f, .25f, .5f, 1.f)
+                      : glm::vec4(.5f, .75f, .5f, 1.f),
+                  6);
     }
 
     // Red dot on joint
     if (draw_joint_point)
-      draw_space_origin_point(10, shader, glm::vec4(1, 0, 0, 1));
+      draw_space_origin_point(10, shader,
+                              root.gltf_node_index == active_joint_node_index
+                                  ? glm::vec4(0, 1, 1, 1)
+                                  : glm::vec4(1, 0, 0, 1));
   }
 
   // Yellow dot on mesh pivot

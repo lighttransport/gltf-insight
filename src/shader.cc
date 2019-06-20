@@ -77,6 +77,13 @@ void shader::use() const { glUseProgram(program_); }
 
 const char* shader::get_name() const { return shader_name_.c_str(); }
 
+void shader::set_uniform(const char* name, const int value) const {
+  if (!name) return;
+
+  const auto location = glGetUniformLocation(program_, name);
+  if (location != -1) glUniform1i(location, value);
+}
+
 void shader::set_uniform(const char* name, const glm::vec4& v) const {
   if (!name) return;
 

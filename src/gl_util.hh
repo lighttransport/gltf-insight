@@ -27,8 +27,8 @@ void load_shaders(const size_t nb_joints,
 
 /// Update all shader's uniforms
 void update_uniforms(std::map<std::string, shader>& shaders,
-                     const std::string& shader_to_use, const glm::mat4& mvp,
-                     const glm::mat3& normal,
+                     const int active_joint, const std::string& shader_to_use,
+                     const glm::mat4& mvp, const glm::mat3& normal,
                      const std::vector<glm::mat4>& joint_matrices);
 
 /// Info needed to actually submit drawcall for a submesh
