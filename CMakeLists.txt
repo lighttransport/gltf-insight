@@ -57,7 +57,7 @@ list(APPEND UI_SOURCES
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
 	${CMAKE_CURRENT_SOURCE_DIR}/fonts/
-	${CMAKE_CURRENT_SOURCE_DIR}/linux/
+	${CMAKE_CURRENT_SOURCE_DIR}/icons/
 )
 # Required on non Unix platform to build ImGuiFileDialog
 if(WIN32)
@@ -91,8 +91,8 @@ install(TARGETS ${BUILD_TARGET} DESTINATION bin)
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 
-  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/gltf-insight.desktop DESTINATION share/applications)
-  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/gltf-insight.svg DESTINATION share/icons/hicolor/scalable/apps)
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/icons/gltf-insight.desktop DESTINATION share/applications)
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/icons/gltf-insight.svg DESTINATION share/icons)
 endif()
 
 # # Increase warning level for clang.
