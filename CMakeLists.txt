@@ -83,7 +83,10 @@ target_link_libraries(
     ${BUILD_TARGET}
     ${OPENGL_LIBRARIES}
     ${EXT_LIBRARIES}
-)
+    )
+
+# Install the built executable into (prefix)/bin
+install(TARGETS ${BUILD_TARGET} DESTINATION bin)
 
 # # Increase warning level for clang.
 # IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
