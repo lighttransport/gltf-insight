@@ -7,7 +7,10 @@
 // Need to access some OpenGL functions in there:
 #include "gl_util.hh"
 
-// Include embeded font data
+// Include embeded data.
+// These files defines each an array of bytes and a size.
+// They have been automatically generated from tools in the
+// fonts and icons directory.
 #include "gltf-insight-128.png.inc.hh"
 #include "gltf-insight-16.png.inc.hh"
 #include "gltf-insight-32.png.inc.hh"
@@ -342,6 +345,8 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
   ImGui::End();
 }
 
+//Need access to mesh type.
+//TODO create mesh.hh and extract this definition
 #include "insight-app.hh"
 void mesh_display_window(std::vector<gltf_insight::mesh>& meshes, bool* open) {
   if (!*open) return;
