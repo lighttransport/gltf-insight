@@ -463,7 +463,6 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   // glFrontFace(GL_CW);
 
   // load a window icon
-
   int x, y, c;
   images[0].pixels = stbi_load_from_memory(gltf_insight_png,
                                            gltf_insight_png_len, &x, &y, &c, 4);
