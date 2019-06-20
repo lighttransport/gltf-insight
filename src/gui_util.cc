@@ -11,7 +11,7 @@
 #include "ionicons_embed.inc.h"
 #include "roboto_embed.inc.h"
 #include "roboto_mono_embed.inc.h"
-#include "gltf_insight_png.inc.hh"
+#include "gltf-insight.png.inc.hh"
 
 // image loader
 #include "stb_image.h"
