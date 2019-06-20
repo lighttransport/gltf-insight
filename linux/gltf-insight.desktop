@@ -3,6 +3,6 @@
 Categories=Graphics;
 Exec=gltf-insight
 GenericName=glTF viewer
-Icon=gltf_insight
+Icon=gltf-insight
 Name=gltf-insight
 Type=Application
