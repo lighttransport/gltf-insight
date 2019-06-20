@@ -17,7 +17,7 @@ matrix:
         - xorg-dev
         - libgl1-mesa-dev 
         - libxrandr-dev 
-        - libxcd-xinerama0 
+        - libxcb-xinerama0 
         - libxinerama-dev 
         - libxcursor-dev 
         - libxi-dev
@@ -39,7 +39,7 @@ matrix:
         - xorg-dev
         - libgl1-mesa-dev 
         - libxrandr-dev 
-        - libxcd-xinerama0 
+        - libxcb-xinerama0 
         - libxinerama-dev 
         - libxcursor-dev 
         - libxi-dev
