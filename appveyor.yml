@@ -1,6 +1,7 @@
 version: 1.0.{build}
 skip_tags: true
 image: Visual Studio 2017
+configuration: RelWithDebInfo
 platform: x64
 before_build:
 - cmd: >-
