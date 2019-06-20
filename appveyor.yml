@@ -16,9 +16,7 @@ build:
   verbosity: minimal
 artifacts:
 - path: build\RelWithDebInfo\gltf-insight.exe
-  name: gltf-insight-x64-$(APPVEYOR_REPO_COMMIT).exe
 - path: build\RelWithDebInfo\gltf-insight.pdb
-  name: gltf-insight-x64-$(APPVEYOR_REPO_COMMIT).pdb
 deploy:
 - provider: GitHub
   tag: continuous
