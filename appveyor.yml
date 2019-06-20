@@ -15,8 +15,8 @@ build:
   parallel: true
   verbosity: minimal
 artifacts:
-- path: C:\projects\gltf-insight\build\RelWithDebInfo\gltf-insight.exe
-- path: C:\projects\gltf-insight\build\RelWithDebInfo\gltf-insight.pdb
+- path: build\RelWithDebInfo\gltf-insight.exe
+- path: build\RelWithDebInfo\gltf-insight.pdb
 deploy:
 - provider: GitHub
   tag: continuous
