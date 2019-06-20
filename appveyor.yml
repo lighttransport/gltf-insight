@@ -5,7 +5,7 @@ before_build:
 - cmd: >-
     git submodule init
 
-    git submodule update
+    git submodule update --init --recursive
 
     vcsetup.bat
 build:
