@@ -15,12 +15,12 @@ matrix:
         - cmake
         - mesa-common-dev 
         - xorg-dev
-	- libgl1-mesa-dev 
- 	- libxrandr-dev 
- 	- libxcd-xinerama0 
- 	- libxinerama-dev 
-	- libxcursor-dev 
- 	- libxi-dev
+        - libgl1-mesa-dev 
+        - libxrandr-dev 
+        - libxcd-xinerama0 
+        - libxinerama-dev 
+        - libxcursor-dev 
+        - libxi-dev
     compiler: clang
     env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug
   - addons: *1
@@ -33,10 +33,16 @@ matrix:
         - ubuntu-toolchain-r-test
         packages:
         - g++-4.9
-        - libxrender-dev
-        - xorg-dev
-        - libglu1-mesa-dev
+        - clang-3.9
         - cmake
+        - mesa-common-dev 
+        - xorg-dev
+        - libgl1-mesa-dev 
+        - libxrandr-dev 
+        - libxcd-xinerama0 
+        - libxinerama-dev 
+        - libxcursor-dev 
+        - libxi-dev
     compiler: gcc
     env: COMPILER_VERSION=4.9 BUILD_TYPE=Debug EXTRA_CXXFLAGS="-fsanitize=address"
   - addons: *2
