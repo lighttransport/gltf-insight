@@ -1,0 +1,8 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Categories=Graphics;
+Exec=gltf-insight
+GenericName=glTF viewer
+Icon=gltf_insight
+Name=gltf-insight
+Type=Application

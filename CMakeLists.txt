@@ -88,6 +88,12 @@ target_link_libraries(
 # Install the built executable into (prefix)/bin
 install(TARGETS ${BUILD_TARGET} DESTINATION bin)
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/gltf-insight.desktop DESTINATION share/applications)
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/linux/gltf-insight.svg DESTINATION share/icons/hicolor/scalable/apps)
+endif()
+
 # # Increase warning level for clang.
 # IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 #     target_compile_options(${BUILD_TARGET} PRIVATE -Weverything -Wno-system-headers -Werror -Wno-padded -Wno-c++98-compat-pedantic -Wno-documentation -Wno-documentation-unknown-command -Wno-reserved-id-macro)
