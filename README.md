@@ -95,3 +95,5 @@ MIT license
 * ionicons icon helper header : zlib licence
 * ionic framework icon font : MIT
 * Roboto icons : Apache 2
+
+*“glTF and the glTF logo are trademarks of the Khronos Group Inc.”*
