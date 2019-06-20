@@ -68,7 +68,7 @@ script:
   - ls AppDir
   - wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
   - chmod +x linuxdeploy-x86_64.AppImage
-  - ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage -d ../linux/gltf-insight.desktop -i ../linux/gltf-insight.svg
+  - ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage -d ../icons/gltf-insight.desktop -i ../icons/gltf-insight.svg
 
  
 
