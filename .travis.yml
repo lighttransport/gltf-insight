@@ -70,8 +70,7 @@ script:
   - chmod +x linuxdeploy-x86_64.AppImage
   - ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage -d ../icons/gltf-insight.desktop -i ../icons/gltf-insight.svg
 
- 
- after_success:
+after_success:
   - ls -lh *.AppImage # Assuming you have some files in out/ that you would like to upload
   - wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
   - bash upload.sh gltf-insight*.AppImage
