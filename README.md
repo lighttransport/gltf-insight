@@ -1,12 +1,16 @@
 # Simple C++11 based glTF 2.0 data insight tool [![Build Status](https://travis-ci.org/lighttransport/gltf-insight.svg?branch=devel)](https://travis-ci.org/lighttransport/gltf-insight) [![Build status](https://ci.appveyor.com/api/projects/status/pb5f6g3qwxrrnxga/branch/devel?svg=true)](https://ci.appveyor.com/project/Ybalrid/gltf-insight/branch/devel)
 
+<img align="left" width="256" height="256" src="icons/gltf-insight.png">
+
 `gltf-insight` is a C++11 based data insight tool for glTF 2.0 model.
 
 For example, you can display and tweak animation prameters this tool(since glTF 2.0 spec does not allow ASCII serialization for animation parameters)
 
 `gltf-insight` also could be another reference viewer for glTF animation and PBR shading.
 
-`gltf-insight` uses TinyGLTF for load/save glTF model and ImGUI for GUI.
+`gltf-insight` uses [TinyGLTF](https://github.com/syoyo/tinygltf) for load/save glTF model and ImGUI for GUI.
+
+
 
 ## Status
 
@@ -16,7 +20,7 @@ Work-in-progress.
 
 * CMake
 * C++11 compiler
-* OpenGL 2.0(just for GUI stuff)
+* OpenGL 3.0
 
 ## Supported platforms
 
@@ -26,9 +30,10 @@ Work-in-progress.
 
 ## Features
 
-* glTF animation with CPU evaluation
-  * [x] skin
-  * [x] morph
+* glTF animation evaluation
+  * [x] morph - Software blending between any number of morph targets
+  * [x] skin - Hardware blending with max 4 joint attributes per vertex
+  * [ ] skin - Software blending between an arbitrary number of joints per vertex
 * Data visualization
   * [x] Skin weight
 
@@ -65,7 +70,7 @@ make
 On Ubuntu, you may need to install a few dependencies : 
 
 ```bash
-sudo apt install mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-xinerama0 libxinerama-dev libxcursor-dev libxi-dev
+sudo apt install git cmake mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-xinerama0 libxinerama-dev libxcursor-dev libxi-dev
 ```
 
 ## TODO
@@ -74,7 +79,7 @@ sudo apt install mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-xinerama0 
 * [ ] Animation curve display : https://github.com/ocornut/imgui/issues/786
 * [ ] Edit animation parameters in GUI
 * [ ] Better GUI for animations.
-* [ ] GPU skinning and morph.
+* [ ] CPU skinning.
 * [ ] Draco compressed mesh support. https://github.com/google/draco
 * [ ] basis_universal texture compression support. https://github.com/binomialLLC/basis_universal
 
@@ -91,6 +96,8 @@ MIT license
 * glfw : zlib/png license
 * glm : MIT license
 * ImGUI : MIT license
+* ImGuiFileDialog : MIT license
+* dirent for Win32 : MIT license
 * cxxopts : MIT license
 * ionicons icon helper header : zlib licence
 * ionic framework icon font : MIT
