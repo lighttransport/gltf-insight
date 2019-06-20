@@ -11,6 +11,10 @@
 #include "ionicons_embed.inc.h"
 #include "roboto_embed.inc.h"
 #include "roboto_mono_embed.inc.h"
+#include "gltf_insight_png.inc.hh"
+
+// image loader
+#include "stb_image.h"
 
 void gui_new_frame() {
   glfwPollEvents();
@@ -450,6 +454,18 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   // glEnable(GL_BLEND);
   // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   // glFrontFace(GL_CW);
+
+  //load a window icon
+
+  GLFWimage images[1];
+
+  int x,y,c;
+  images[0].pixels = stbi_load_from_memory(gltf_insight_png, gltf_insight_png_len, &x,&y, &c, 4);
+  images[0].width = x;
+  images[0].height = y;
+
+
+  glfwSetWindowIcon(window, 1, images);
 }
 
 void initialize_imgui(GLFWwindow* window) {

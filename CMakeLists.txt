@@ -57,6 +57,7 @@ list(APPEND UI_SOURCES
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
 	${CMAKE_CURRENT_SOURCE_DIR}/fonts/
+	${CMAKE_CURRENT_SOURCE_DIR}/linux/
 )
 # Required on non Unix platform to build ImGuiFileDialog
 if(WIN32)
