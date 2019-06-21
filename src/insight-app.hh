@@ -153,6 +153,8 @@ class app {
   double last_frame_time = 0;
   bool playing_state = false;
 
+  GLuint logo = 0;
+
   // Loaded data
   std::vector<GLuint> textures;
   std::vector<animation> animations;

@@ -1,0 +1,6 @@
+#pragma once
+
+#define CMAKE_CI @IS_CI@
+#define CMAKE_GIT_COMMIT "@GIT_COMMIT@"
+#define CMAKE_GIT_COMMIT_SHORT "@GIT_COMMIT_SHORT@"
+#define CMAKE_CI_NAME "@CI_NAME@"

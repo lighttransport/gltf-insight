@@ -344,8 +344,8 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
   ImGui::End();
 }
 
-//Need access to mesh type.
-//TODO create mesh.hh and extract this definition
+// Need access to mesh type.
+// TODO create mesh.hh and extract this definition
 #include "insight-app.hh"
 void mesh_display_window(std::vector<gltf_insight::mesh>& meshes, bool* open) {
   if (!*open) return;
@@ -780,6 +780,54 @@ void camera_parameters_window(float& fovy, float& z_far, bool* open) {
   ImGui::End();
 }
 
+#include "IconsIonicons.h"
+#include "cmake_config.hh"
+void about_window(GLuint logo, bool* open) {
+  if (open && !*open) return;
+  if (ImGui::Begin("About glTF-insight", open, ImVec2(1024, 315))) {
+    ImGui::SetWindowFontScale(1.25);
+    ImGui::Columns(2);
+    ImGui::SetColumnWidth(-1, 256 + ImGui::GetStyle().WindowPadding.x);
+    ImGui::Image((ImTextureID)(size_t)logo, ImVec2(256, 256));
+    ImGui::NextColumn();
+    ImGui::Text("glTF-insight\n\n");
+    ImGui::Text("Built from git commit " CMAKE_GIT_COMMIT_SHORT);
+    if (CMAKE_CI) ImGui::Text("Continuous Built from " CMAKE_CI_NAME);
+    ImGui::Text("\n");
+    ImGui::Text(
+        u8"\u00A9"  // (c) symbol
+        " "
+        "2018-2019 Light Transport Entertainment, Inc.; "
+        "Syoyo Fujita; "
+        "Arthur Brainville; "
+        "and contributors."
+        "\n");
+
+    ImGui::Text(
+        "\t"
+        "Licensed under the terms of the MIT license agreement"
+        "\n\n");
+
+    ImGui::Text(
+        "This program is Free (Libre) and Open-Source. It's development is "
+        "hosted on GitHub");
+
+    ImGui::Text("\t" ICON_II_SOCIAL_GITHUB);
+    ImGui::SameLine();
+    ImGui::TextColored(ImVec4(0, 1, 1, 1),
+                       " "
+                       "https://github.com/lighttransport/gltf-insight"
+                       "\n\n");
+
+    ImGui::Text(
+        "glTF and the glTF logo are trademarks of the Khronos Group Inc.");
+    ImGui::NextColumn();
+    ImGui::Columns();
+    ImGui::SetWindowFontScale(1);
+  }
+  ImGui::End();
+}
+
 void mouse_button_callback(GLFWwindow* window, int button, int action,
                            int mods) {
   auto* param = reinterpret_cast<application_parameters*>(
@@ -814,4 +862,24 @@ void cursor_pos_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
 
   param->last_mouse_x = mouse_x;
   param->last_mouse_y = mouse_y;
+}
+
+GLuint load_gltf_insight_icon() {
+  int w, h, c;
+  stbi_uc* data = nullptr;
+  GLuint gl_image;
+  data = stbi_load_from_memory(gltf_insight_256_png, gltf_insight_256_png_len,
+                               &w, &h, &c, 4);
+
+  if (!data) throw std::runtime_error("Could not load gltf-insight logo!");
+
+  glCreateTextures(GL_TEXTURE_2D, 1, &gl_image);
+  glBindTexture(GL_TEXTURE_2D, gl_image);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               data);
+  glGenerateMipmap(GL_TEXTURE_2D);
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  stbi_image_free(data);
+  return gl_image;
 }

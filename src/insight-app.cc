@@ -280,6 +280,8 @@ app::app(int argc, char** argv) {
       unload();
     }
   }
+
+  logo = load_gltf_insight_icon();
 }
 
 app::~app() {
@@ -390,7 +392,16 @@ void app::main_loop() {
         if (ImGui::MenuItem("call unload()")) unload();
         ImGui::EndMenu();
       }
+
+      static bool about_open = false;
+      if (ImGui::BeginMenu("Help")) {
+        if (ImGui::MenuItem("About...")) about_open = true;
+        ImGui::EndMenu();
+      }
+
       ImGui::EndMainMenuBar();
+
+      about_window(logo, &about_open);
 
       if (asset_loaded) {
         // Draw all windows

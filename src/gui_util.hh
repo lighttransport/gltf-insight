@@ -116,3 +116,6 @@ void shader_selector_window(const std::vector<std::string>& shader_names,
 void utilities_window(bool& show_imgui_demo);
 
 void camera_parameters_window(float& fovy, float& z_far, bool* open = nullptr);
+
+GLuint load_gltf_insight_icon();
+void about_window(GLuint logo, bool* open = nullptr);

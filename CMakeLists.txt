@@ -65,7 +65,40 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
 	${CMAKE_CURRENT_SOURCE_DIR}/fonts/
 	${CMAKE_CURRENT_SOURCE_DIR}/icons/
+	${CMAKE_CURRENT_SOURCE_DIR}/config/
 )
+
+
+if(DEFINED $ENV{TRAVIS_COMMIT})
+ set(IS_CI true)
+ set(CI_NAME "Travis-CI")
+ set(GIT_COMMIT "$ENV{TRAVIS_COMMIT}")
+
+elseif(DEFINED $ENV{APPVEYOR_REPO_COMMIT})
+ set(IS_CI true)
+ set(CI_NAME "AppVeyor")
+ set(GIT_COMMIT "$ENV{APPVEYOR_REPO_COMMIT}")
+
+else()
+ set(IS_CI false)
+ set (CI_NAME "ThisIsNotACIBuild")
+ execute_process(
+ COMMAND git log -1 --format=%H
+ WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+ OUTPUT_VARIABLE GIT_COMMIT
+ OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+endif()
+ execute_process(
+ COMMAND git log -1 --format=%h
+ WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+ OUTPUT_VARIABLE GIT_COMMIT_SHORT
+ OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+configure_file(
+ ${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh.template
+ ${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh)
+
 # Required on non Unix platform to build ImGuiFileDialog
 if(WIN32)
 include_directories(
@@ -84,10 +117,12 @@ else()
 endif()
 
 if(WIN32)
-set(ICO_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/icons/icons.rc)
+  set(ICO_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/icons/icons.rc)
 endif()
 
-add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES})
+add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES}
+	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
+)
 target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/)
 add_sanitizers(${BUILD_TARGET})
 
