@@ -75,7 +75,7 @@ if(DEFINED ENV{TRAVIS_COMMIT})
  set(CI_NAME "Travis-CI")
  set(GIT_COMMIT "$ENV{TRAVIS_COMMIT}")
 
-elseif(DEFINED $ENV{APPVEYOR_REPO_COMMIT})
+elseif(DEFINED ENV{APPVEYOR_REPO_COMMIT})
  set(IS_CI true)
  message(STATUS "This is an appveyor build")
  set(CI_NAME "AppVeyor")
