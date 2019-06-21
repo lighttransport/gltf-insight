@@ -136,7 +136,7 @@ void load_shaders(const size_t nb_joints,
   // TODO put the GLSL code ouside of here, load them from files
   // Main vertex shader, that perform GPU skinning
   std::string vertex_shader_source_str = R"glsl(
-#version 140
+#version 130
 #extension GL_ARB_explicit_attrib_location : require
 
 layout (location = 0) in vec3 input_position;
@@ -227,7 +227,7 @@ void main()
 )glsl";
 
   const char* vertex_shader_no_skinning = R"glsl(
-#version 140
+#version 130
 #extension GL_ARB_explicit_attrib_location : require
 
 layout (location = 0) in vec3 input_position;
@@ -277,7 +277,7 @@ void main()
   const char* vertex_shader_source = vertex_shader_source_str.c_str();
 
   const char* fragment_shader_source_textured_unlit = R"glsl(
-#version 140
+#version 130
 
 in vec2 interpolated_uv;
 in vec3 interpolated_normal;
@@ -295,7 +295,7 @@ void main()
 )glsl";
 
   const char* fragment_shader_source_draw_debug_color = R"glsl(
-#version 140
+#version 130
 
 out vec4 output_color;
 uniform vec4 debug_color;
@@ -307,7 +307,7 @@ void main()
 )glsl";
 
   const char* fragment_shader_source_uv = R"glsl(
-#version 140
+#version 130
 
 out vec4 output_color;
 in vec2 interpolated_uv;
@@ -319,7 +319,7 @@ void main()
 )glsl";
 
   const char* fragment_shader_source_normals = R"glsl(
-#version 140
+#version 130
 
 in vec3 interpolated_normal;
 out vec4 output_color;
@@ -332,7 +332,7 @@ void main()
 )glsl";
 
   const char* fragment_shader_source_tangents = R"glsl(
-#version 140
+#version 130
 
 in vec3 interpolated_tangent;
 out vec4 output_color;
@@ -345,7 +345,7 @@ void main()
 )glsl";
 
   const char* fragment_shader_source_bitangent = R"glsl(
-#version 140
+#version 130
 
 in vec3 interpolated_bitangent;
 out vec4 output_color;
@@ -358,7 +358,7 @@ void main()
 )glsl";
 
   const char* fragment_shader_weights = R"glsl(
-#version 140
+#version 130
 
 in vec4 interpolated_weights;
 out vec4 output_color;
