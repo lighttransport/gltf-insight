@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
 set(BUILD_TARGET "gltf-insight")
-
 project(${BUILD_TARGET})
 
 if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include")
@@ -16,6 +15,14 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/sanitizers)
 find_package(Sanitizers) # Address sanitizer (-DSANITIZE_ADDRESS=ON)
 
 set (CMAKE_CXX_STANDARD 11)
+
+#Use the statically linked runtime on Windows
+if(MSVC)
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+  set(CMAKE_C_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
+  set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+endif(MSVC)
 
 find_package(OpenGL REQUIRED)
 # OpenGL
