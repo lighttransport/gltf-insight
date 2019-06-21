@@ -69,17 +69,20 @@ include_directories(
 )
 
 
-if(DEFINED $ENV{TRAVIS_COMMIT})
+if(DEFINED ENV{TRAVIS_COMMIT})
  set(IS_CI true)
+ message(STATUS "This is a travis build")
  set(CI_NAME "Travis-CI")
  set(GIT_COMMIT "$ENV{TRAVIS_COMMIT}")
 
 elseif(DEFINED $ENV{APPVEYOR_REPO_COMMIT})
  set(IS_CI true)
+ message(STATUS "This is an appveyor build")
  set(CI_NAME "AppVeyor")
  set(GIT_COMMIT "$ENV{APPVEYOR_REPO_COMMIT}")
 
 else()
+message(STATUS "This is not a CI build")
  set(IS_CI false)
  set (CI_NAME "ThisIsNotACIBuild")
  execute_process(
