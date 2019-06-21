@@ -4,7 +4,7 @@
 #include <map>
 #include <string>
 
-#include "glad/include/glad/glad.h"
+#include "glad/glad.h"
 #include "shader.hh"
 
 /// Debug output

@@ -27,7 +27,7 @@
 
 void gui_new_frame() {
   glfwPollEvents();
-  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplOpenGL2_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
   ImGuizmo::BeginFrame();
@@ -47,7 +47,7 @@ void gl_gui_end_frame(GLFWwindow* window) {
   glUseProgram(0);
 
   ImGui::Render();
-  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 
   glfwSwapBuffers(window);
   glFlush();
@@ -545,7 +545,7 @@ void initialize_imgui(GLFWwindow* window) {
 
   // Setup Platform/Renderer bindings
   ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL3_Init("#version 140");
+  ImGui_ImplOpenGL2_Init(/*"#version 140"*/);
 
 #ifndef FORCE_DEFAULT_STYLE
   // Setup Style
@@ -622,7 +622,7 @@ void initialize_imgui(GLFWwindow* window) {
 
 void deinitialize_gui_and_window(GLFWwindow* window) {
   // Cleanup
-  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplOpenGL2_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
 
