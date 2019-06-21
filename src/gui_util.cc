@@ -885,7 +885,7 @@ GLuint load_gltf_insight_icon() {
 
   if (!data) throw std::runtime_error("Could not load gltf-insight logo!");
 
-  glCreateTextures(GL_TEXTURE_2D, 1, &gl_image);
+  glGenTextures(1, &gl_image);
   glBindTexture(GL_TEXTURE_2D, gl_image);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                data);
