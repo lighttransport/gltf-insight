@@ -138,6 +138,7 @@ void load_shaders(const size_t nb_joints,
   std::string vertex_shader_source_str = R"glsl(
 #version 130
 #extension GL_ARB_explicit_attrib_location : require
+#extension GL_ARB_gpu_shader5 : enable
 
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
@@ -211,18 +212,16 @@ void main()
   + input_weights.y * joint_matrix[int(input_joints.y)]
   + input_weights.z * joint_matrix[int(input_joints.z)]
   + input_weights.w * joint_matrix[int(input_joints.w)];
+  mat4 normal_skin_matrix = transpose(inverse(skin_matrix));
 
   gl_Position = mvp * skin_matrix * vec4(input_position, 1.0);
 
-  interpolated_normal = normal * input_normal;
-  interpolated_tangent = normal * input_tangent;
+  interpolated_normal = normal * vec3(normal_skin_matrix * vec4(input_normal, 1.0));
+  interpolated_tangent = normal *  vec3(normal_skin_matrix * vec4(input_tangent, 1.0));
   interpolated_bitangent = cross(interpolated_normal, interpolated_tangent);
-  
   
   interpolated_uv = input_uv;
   interpolated_weights = weight_color();
-
-
 }
 )glsl";
 
