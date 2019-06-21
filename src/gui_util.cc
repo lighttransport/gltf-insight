@@ -13,18 +13,17 @@
 // fonts and icons directory.
 #include "gltf-insight-128.png.inc.hh"
 #include "gltf-insight-16.png.inc.hh"
+#include "gltf-insight-256.png.inc.hh"
 #include "gltf-insight-32.png.inc.hh"
 #include "gltf-insight-48.png.inc.hh"
 #include "gltf-insight-64.png.inc.hh"
 #include "gltf-insight-96.png.inc.hh"
-#include "gltf-insight.png.inc.hh"
 #include "ionicons_embed.inc.h"
 #include "roboto_embed.inc.h"
 #include "roboto_mono_embed.inc.h"
 
 // image loader
 #include "stb_image.h"
-GLFWimage images[4];
 
 void gui_new_frame() {
   glfwPollEvents();
@@ -420,6 +419,38 @@ void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets,
   ImGui::End();
 }
 
+void load_and_set_window_icons(GLFWwindow*& window) {
+  int x, y, c;
+  std::array<GLFWimage, 3> images;
+
+  // https://www.glfw.org/docs/3.2/group__window.html#gadd7ccd39fe7a7d1f0904666ae5932dc5
+
+  // We are loading only a few sizes of the availalbe icons
+
+  images[2].pixels = stbi_load_from_memory(
+      gltf_insight_48_png, gltf_insight_48_png_len, &x, &y, &c, 4);
+  assert(x == 48 && y == 48 && "loaded data should be 48px icon");
+  images[2].width = x;
+  images[2].height = y;
+
+  images[1].pixels = stbi_load_from_memory(
+      gltf_insight_32_png, gltf_insight_32_png_len, &x, &y, &c, 4);
+  assert(x == 32 && y == 32 && "loaded data should be 32px icon");
+  images[1].width = x;
+  images[1].height = y;
+
+  images[0].pixels = stbi_load_from_memory(
+      gltf_insight_16_png, gltf_insight_16_png_len, &x, &y, &c, 4);
+  assert(x == 16 && y == 16 && "loaded data should be 16px icon");
+  images[0].width = x;
+  images[0].height = y;
+
+  // glfw actually copies these images
+  glfwSetWindowIcon(window, 3, images.data());
+
+  for (auto image : images) stbi_image_free(image.pixels);
+}
+
 void initialize_glfw_opengl_window(GLFWwindow*& window) {
   // Setup window
   glfwSetErrorCallback(error_callback);
@@ -468,29 +499,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   // glFrontFace(GL_CW);
 
   // load a window icon
-  int x, y, c;
-
-  images[3].pixels = stbi_load_from_memory(
-      gltf_insight_128_png, gltf_insight_128_png_len, &x, &y, &c, 4);
-  images[3].width = x;
-  images[3].height = 7;
-
-  images[2].pixels = stbi_load_from_memory(gltf_insight_png,
-                                           gltf_insight_png_len, &x, &y, &c, 4);
-  images[2].width = x;
-  images[2].height = y;
-
-  images[1].pixels = stbi_load_from_memory(
-      gltf_insight_64_png, gltf_insight_64_png_len, &x, &y, &c, 4);
-  images[1].width = x;
-  images[1].height = y;
-
-  images[0].pixels = stbi_load_from_memory(
-      gltf_insight_16_png, gltf_insight_16_png_len, &x, &y, &c, 4);
-  images[0].width = x;
-  images[0].height = y;
-
-  glfwSetWindowIcon(window, 4, images);
+  load_and_set_window_icons(window);
 }
 
 void initialize_imgui(GLFWwindow* window) {
@@ -617,8 +626,6 @@ void deinitialize_gui_and_window(GLFWwindow* window) {
 
   glfwDestroyWindow(window);
   glfwTerminate();
-
-  for (auto image : images) stbi_image_free(image.pixels);
 }
 
 void transform_window(float* vecTranslation, float* vecRotation,
