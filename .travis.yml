@@ -57,6 +57,7 @@ before_install:
 
 
 script:
+  - echo Building commit : $TRAVIS_COMMIT  
   - export CC="${CC}-${COMPILER_VERSION}"
   - export CXX="${CXX}-${COMPILER_VERSION}"
   - ${CC} -v
