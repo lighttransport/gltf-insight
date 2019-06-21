@@ -127,7 +127,7 @@ add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
 )
 
-add_compile_definitions(${BUILD_TARGET} PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLAD)
+add_definitions( -DIMGUI_IMPL_OPENGL_LOADER_GLAD)
 target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
 add_sanitizers(${BUILD_TARGET})
 
