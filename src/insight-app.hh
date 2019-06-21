@@ -117,6 +117,7 @@ class app {
   bool show_transform_window = true;
   bool show_timeline = true;
   bool show_gizmo = true;
+  bool show_bone_selector = true;
 
   std::vector<mesh> loaded_meshes;
 

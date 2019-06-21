@@ -350,6 +350,7 @@ void app::run_view_menu() {
     ImGui::MenuItem("Morph Target blend weights", 0, &show_morph_target_window);
     ImGui::MenuItem("Camera parameters", 0, &show_camera_parameter_window);
     ImGui::MenuItem("TransformWindow", 0, &show_transform_window);
+    ImGui::MenuItem("Bone selector", 0, &show_bone_selector);
     ImGui::MenuItem("Timeline", 0, &show_timeline);
     ImGui::Separator();
     ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
@@ -429,9 +430,11 @@ void app::main_loop() {
       create_transparent_docking_area(
           ImVec2(0, 20),
           ImVec2(display_size.x,
-                 display_size.y - 10 -
-                     std::min(lower_docked_prop_size * display_size.y,
-                              lower_docked_max_px_size)),
+                 !show_timeline
+                     ? display_size.y - 20
+                     : display_size.y - 20 -
+                           std::min(lower_docked_prop_size * display_size.y,
+                                    lower_docked_max_px_size)),
           "main_dockspace");
 
       about_window(logo, &about_open);
@@ -478,24 +481,27 @@ void app::main_loop() {
           save_file_dialog = false;
         }
       }
+
+      camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
+
       if (asset_loaded) {
         // Draw all windows
         // shader_selector_window(shader_names, selected_shader, shader_to_use);
-        asset_images_window(textures, &show_asset_image_window);
         model_info_window(model, &show_model_info_window);
+        asset_images_window(textures, &show_asset_image_window);
         animation_window(animations, &show_animation_window);
         // skinning_data_window(weights, joints);
         mesh_display_window(loaded_meshes, &show_mesh_display_window);
         morph_target_window(gltf_scene_tree,
                             loaded_meshes.front().nb_morph_targets,
                             &show_morph_target_window);
-        camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
         shader_selector_window(shader_names, selected_shader, shader_to_use);
 
-        static bool joint_select_window_open = true;
-        if (ImGui::Begin("Bone selector", &joint_select_window_open))
-          ImGui::InputInt("Active joint", &active_joint, 1, 1);
-        ImGui::End();
+        if (show_bone_selector) {
+          if (ImGui::Begin("Bone selector", &show_bone_selector))
+            ImGui::InputInt("Active joint", &active_joint, 1, 1);
+          ImGui::End();
+        }
 
         active_joint = glm::clamp(active_joint, 0, loaded_meshes[0].nb_joints);
       }
