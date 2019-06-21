@@ -13,7 +13,7 @@
 #include "ImSequencer.h"
 #include "animation.hh"
 #include "examples/imgui_impl_glfw.h"
-#include "examples/imgui_impl_opengl2.h"
+#include "examples/imgui_impl_opengl3.h"
 #include "glm/glm.hpp"
 #include "gltf-graph.hh"
 #include "imgui.h"
@@ -108,7 +108,8 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
                      bool& playing_state, bool& need_to_update_pose,
                      bool& looping, int& selectedEntry, int& firstFrame,
                      bool& expanded, int& currentFrame, double& currentPlayTime,
-                     bool* open = nullptr);
+                     bool* open = nullptr, float docked_size_prop = 0.25f,
+                     float docked_size_max_pixel = 300.f);
 
 void shader_selector_window(const std::vector<std::string>& shader_names,
                             int& selected_shader, std::string& shader_to_use);

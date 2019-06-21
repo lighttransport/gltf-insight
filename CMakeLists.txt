@@ -52,7 +52,7 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_widgets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_draw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_glfw.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_opengl2.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_opengl3.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_demo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImSequencer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImCurveEdit.cpp
@@ -126,7 +126,9 @@ endif()
 add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
 )
-target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/)
+
+add_compile_definitions(${BUILD_TARGET} PRIVATE IMGUI_IMPL_OPENGL_LOADER_GLAD)
+target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
 add_sanitizers(${BUILD_TARGET})
 
 target_link_libraries(

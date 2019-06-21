@@ -289,61 +289,155 @@ app::~app() {
   deinitialize_gui_and_window(window);
 }
 
+void app::run_file_menu() {
+  if (ImGui::BeginMenu("File")) {
+    // TODO use ImGuiFileDialog
+    if (ImGui::MenuItem("Open glTF...")) {
+      open_file_dialog = true;
+    }
+    if (ImGui::MenuItem("Save as...")) {
+      save_file_dialog = true;
+    }
+    ImGui::Separator();
+    if (ImGui::MenuItem("Quit")) {
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
+    ImGui::EndMenu();
+  }
+}
+
+void app::run_edit_menu() {
+  if (ImGui::BeginMenu("Edit")) {
+    ImGui::Text("Selection Mode:");
+    if (ImGui::RadioButton("Mesh", current_mode == manipulate_mesh))
+      current_mode = manipulate_mesh;
+    if (ImGui::RadioButton("Bone", current_mode == manipulate_joint))
+      current_mode = manipulate_joint;
+    ImGui::Separator();
+
+    ImGui::Text("Transform type:");
+    if (ImGui::RadioButton("Translate",
+                           mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+      mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+    if (ImGui::RadioButton("Rotate",
+                           mCurrentGizmoOperation == ImGuizmo::ROTATE))
+      mCurrentGizmoOperation = ImGuizmo::ROTATE;
+    if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
+      mCurrentGizmoOperation = ImGuizmo::SCALE;
+    ImGui::Separator();
+
+    ImGui::Text("Transform space:");
+
+    if (ImGui::RadioButton("World", mCurrentGizmoMode == ImGuizmo::WORLD))
+      mCurrentGizmoMode = ImGuizmo::WORLD;
+
+    if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
+      mCurrentGizmoMode = ImGuizmo::LOCAL;
+    ImGui::Separator();
+    ImGui::EndMenu();
+  }
+}
+
+void app::run_view_menu() {
+  if (ImGui::BeginMenu("View")) {
+    ImGui::MenuItem("Show ImGui Demo window", nullptr, &show_imgui_demo);
+    ImGui::Separator();
+    ImGui::Text("Toggle window display:");
+    ImGui::MenuItem("Images", 0, &show_asset_image_window);
+    ImGui::MenuItem("Model info", 0, &show_model_info_window);
+    ImGui::MenuItem("Animations", 0, &show_animation_window);
+    ImGui::MenuItem("Mesh Visibility", 0, &show_mesh_display_window);
+    ImGui::MenuItem("Morph Target blend weights", 0, &show_morph_target_window);
+    ImGui::MenuItem("Camera parameters", 0, &show_camera_parameter_window);
+    ImGui::MenuItem("TransformWindow", 0, &show_transform_window);
+    ImGui::MenuItem("Timeline", 0, &show_timeline);
+    ImGui::Separator();
+    ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
+
+    ImGui::EndMenu();
+  }
+}
+
+void app::run_debug_menu() {
+  if (ImGui::BeginMenu("DEBUG")) {
+    if (ImGui::MenuItem("call unload()")) unload();
+    ImGui::EndMenu();
+  }
+}
+
+void app::run_help_menu(bool& about_open) {
+  if (ImGui::BeginMenu("Help")) {
+    if (ImGui::MenuItem("About...")) about_open = true;
+    ImGui::EndMenu();
+  }
+}
+
+void app::run_menubar(bool& about_open) {
+  ImGui::BeginMainMenuBar();
+  run_file_menu();
+  run_edit_menu();
+  run_view_menu();
+  run_debug_menu();
+  run_help_menu(about_open);
+
+  ImGui::EndMainMenuBar();
+}
+
+void app::create_transparent_docking_area(const ImVec2 pos, const ImVec2 size,
+                                          std::string name) {
+  using namespace ImGui;
+
+  const auto window_name = name + "_window";
+  const auto dockspace_name = name + "_dock";
+
+  ImGuiDockNodeFlags dockspace_flags =
+      ImGuiDockNodeFlags_PassthruCentralNode |
+      ImGuiDockNodeFlags_NoDockingInCentralNode;
+
+  SetNextWindowPos(pos);
+  SetNextWindowSize(size);
+
+  ImGuiWindowFlags host_window_flags =
+      ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBringToFrontOnFocus |
+      ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoBackground;
+
+  PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+  PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+  PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+  Begin(window_name.c_str(), NULL, host_window_flags);
+  PopStyleVar(3);  // we had 3 things added on the stack
+
+  const ImGuiID dockspace_id = GetID(dockspace_name.c_str());
+  DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+
+  End();
+}
+
 void app::main_loop() {
   while (!glfwWindowShouldClose(window)) {
     {
       // GUI
       gui_new_frame();
 
-      // TODO put main menu in it's own function wen done
-      ImGui::BeginMainMenuBar();
-      if (ImGui::BeginMenu("File")) {
-        // TODO use ImGuiFileDialog
-        if (ImGui::MenuItem("Open glTF...")) {
-          open_file_dialog = true;
-        }
-        if (ImGui::MenuItem("Save as...")) {
-          save_file_dialog = true;
-        }
-        ImGui::Separator();
-        if (ImGui::MenuItem("Quit")) {
-          glfwSetWindowShouldClose(window, GLFW_TRUE);
-        }
-        ImGui::EndMenu();
-      }
+      static bool about_open = false;
+      run_menubar(about_open);
 
-      if (ImGui::BeginMenu("Edit")) {
-        ImGui::Text("Transform type:");
-        if (ImGui::RadioButton("Translate",
-                               mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
-          mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-        if (ImGui::RadioButton("Rotate",
-                               mCurrentGizmoOperation == ImGuizmo::ROTATE))
-          mCurrentGizmoOperation = ImGuizmo::ROTATE;
-        if (ImGui::RadioButton("Scale",
-                               mCurrentGizmoOperation == ImGuizmo::SCALE))
-          mCurrentGizmoOperation = ImGuizmo::SCALE;
-        ImGui::Separator();
-        ImGui::EndMenu();
-      }
+      const auto display_size = ImGui::GetIO().DisplaySize;
+      create_transparent_docking_area(
+          ImVec2(0, 20),
+          ImVec2(display_size.x,
+                 display_size.y - 10 -
+                     std::min(lower_docked_prop_size * display_size.y,
+                              lower_docked_max_px_size)),
+          "main_dockspace");
 
-      if (ImGui::BeginMenu("View")) {
-        ImGui::MenuItem("Show ImGui Demo window", nullptr, &show_imgui_demo);
-        ImGui::Separator();
-        ImGui::Text("Toggle window display:");
-        ImGui::MenuItem("Images", 0, &show_asset_image_window);
-        ImGui::MenuItem("Model info", 0, &show_model_info_window);
-        ImGui::MenuItem("Animations", 0, &show_animation_window);
-        ImGui::MenuItem("Mesh Visibility", 0, &show_mesh_display_window);
-        ImGui::MenuItem("Morph Target blend weights", 0,
-                        &show_morph_target_window);
-        ImGui::MenuItem("Camera parameters", 0, &show_camera_parameter_window);
-        ImGui::MenuItem("TransformWindow", 0, &show_transform_window);
-        ImGui::MenuItem("Timeline", 0, &show_timeline);
-        ImGui::Separator();
-        ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
+      about_window(logo, &about_open);
 
-        ImGui::EndMenu();
+      if (show_imgui_demo) {
+        ImGui::ShowDemoWindow(&show_imgui_demo);
       }
 
       if (open_file_dialog) {
@@ -384,31 +478,8 @@ void app::main_loop() {
           save_file_dialog = false;
         }
       }
-
-      if (show_imgui_demo) {
-        ImGui::ShowDemoWindow(&show_imgui_demo);
-      }
-      if (ImGui::BeginMenu("DEBUG")) {
-        if (ImGui::MenuItem("call unload()")) unload();
-        ImGui::EndMenu();
-      }
-
-      static bool about_open = false;
-      if (ImGui::BeginMenu("Help")) {
-        if (ImGui::MenuItem("About...")) about_open = true;
-        ImGui::EndMenu();
-      }
-
-      ImGui::EndMainMenuBar();
-
-      about_window(logo, &about_open);
-
       if (asset_loaded) {
         // Draw all windows
-
-        // selected_shader = 0;
-        // shader_to_use = "textured";
-
         // shader_selector_window(shader_names, selected_shader, shader_to_use);
         asset_images_window(textures, &show_asset_image_window);
         model_info_window(model, &show_model_info_window);
@@ -421,15 +492,19 @@ void app::main_loop() {
         camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
         shader_selector_window(shader_names, selected_shader, shader_to_use);
 
-        ImGui::InputInt("Active joint", &active_joint, 1, 1);
-        glm::clamp(active_joint, 0, loaded_meshes[0].nb_joints);
+        static bool joint_select_window_open = true;
+        if (ImGui::Begin("Bone selector", &joint_select_window_open))
+          ImGui::InputInt("Active joint", &active_joint, 1, 1);
+        ImGui::End();
 
-        // Animation player advances time and apply animation interpolation.
-        // It also display the sequencer timeline and controls on screen
-        run_animation_timeline(sequence, looping, selectedEntry, firstFrame,
-                               expanded, currentFrame, currentPlayTime,
-                               last_frame_time, playing_state, animations);
+        active_joint = glm::clamp(active_joint, 0, loaded_meshes[0].nb_joints);
       }
+
+      // Animation player advances time and apply animation interpolation.
+      // It also display the sequencer timeline and controls on screen
+      run_animation_timeline(sequence, looping, selectedEntry, firstFrame,
+                             expanded, currentFrame, currentPlayTime,
+                             last_frame_time, playing_state, animations);
     }
 
     {
@@ -755,9 +830,13 @@ void app::run_animation_timeline(gltf_insight::AnimSequence& sequence,
   }
 
   currentFrame = int(ANIMATION_FPS * currentPlayTime);
+
+  lower_docked_prop_size = 0.25f;
+  lower_docked_max_px_size = 300;
   timeline_window(sequence, playing_state, need_to_update_pose, looping,
                   selectedEntry, firstFrame, expanded, currentFrame,
-                  currentPlayTime, &show_timeline);
+                  currentPlayTime, &show_timeline, lower_docked_prop_size,
+                  lower_docked_max_px_size);
 
   // loop the sequencer now: TODO replace that true with a "is looping"
   // boolean

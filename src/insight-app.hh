@@ -85,6 +85,14 @@ class app {
  public:
   app(int argc, char** argv);
   ~app();
+  void run_file_menu();
+  void run_edit_menu();
+  void run_view_menu();
+  void run_debug_menu();
+  void run_help_menu(bool& about_open);
+  void run_menubar(bool& about_open);
+  void create_transparent_docking_area(ImVec2 pos, ImVec2 size,
+                                       std::string name);
 
   void unload();
   void load();
@@ -93,6 +101,8 @@ class app {
  private:
   ImGuizmo::OPERATION mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
   ImGuizmo::MODE mCurrentGizmoMode = ImGuizmo::WORLD;
+  float lower_docked_prop_size = 0.25;
+  float lower_docked_max_px_size = 300;
 
   enum selection_mode : int { manipulate_mesh = 0, manipulate_joint = 1 };
 

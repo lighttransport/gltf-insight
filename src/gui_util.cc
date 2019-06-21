@@ -27,7 +27,7 @@
 
 void gui_new_frame() {
   glfwPollEvents();
-  ImGui_ImplOpenGL2_NewFrame();
+  ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
   ImGuizmo::BeginFrame();
@@ -47,7 +47,7 @@ void gl_gui_end_frame(GLFWwindow* window) {
   glUseProgram(0);
 
   ImGui::Render();
-  ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
   glfwSwapBuffers(window);
   glFlush();
@@ -494,7 +494,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
                         GL_TRUE);
 #endif
   glEnable(GL_MULTISAMPLE);
-  // glEnable(GL_BLEND);
+  glEnable(GL_BLEND);
   // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   // glFrontFace(GL_CW);
 
@@ -505,7 +505,10 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 void initialize_imgui(GLFWwindow* window) {
   // Setup Dear ImGui context
   ImGui::CreateContext();
-  auto io = ImGui::GetIO();
+  auto& io = ImGui::GetIO();
+
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
   const float default_font_scale = 16.f;
   ImFontConfig roboto_config;
@@ -542,7 +545,7 @@ void initialize_imgui(GLFWwindow* window) {
 
   // Setup Platform/Renderer bindings
   ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL2_Init();
+  ImGui_ImplOpenGL3_Init("#version 140");
 
 #ifndef FORCE_DEFAULT_STYLE
   // Setup Style
@@ -600,9 +603,8 @@ void initialize_imgui(GLFWwindow* window) {
   colors[ImGuiCol_TabUnfocused] = ImVec4(0.098f, 0.098f, 0.098f, 1.000f);
   colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.195f, 0.195f, 0.195f, 1.000f);
   // TODO see docking branch of ImGui
-  // colors[ImGuiCol_DockingPreview]         = ImVec4(1.000f, 0.391f, 0.000f,
-  // 0.781f); colors[ImGuiCol_DockingEmptyBg]         = ImVec4(0.180f, 0.180f,
-  // 0.180f, 1.000f);
+  colors[ImGuiCol_DockingPreview] = ImVec4(1.000f, 0.391f, 0.000f, 0.781f);
+  colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.180f, 0.180f, 0.180f, 0.9f);
   colors[ImGuiCol_PlotLines] = ImVec4(0.469f, 0.469f, 0.469f, 1.000f);
   colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.000f, 0.391f, 0.000f, 1.000f);
   colors[ImGuiCol_PlotHistogram] = ImVec4(0.586f, 0.586f, 0.586f, 1.000f);
@@ -620,7 +622,7 @@ void initialize_imgui(GLFWwindow* window) {
 
 void deinitialize_gui_and_window(GLFWwindow* window) {
   // Cleanup
-  ImGui_ImplOpenGL2_Shutdown();
+  ImGui_ImplOpenGL3_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
 
@@ -696,9 +698,20 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
                      bool& playing_state, bool& need_to_update_pose,
                      bool& looping, int& selectedEntry, int& firstFrame,
                      bool& expanded, int& currentFrame, double& currentPlayTime,
-                     bool* open) {
+                     bool* open, float docked_size_prop,
+                     float docked_size_max_pixel) {
   if (!*open) return;
-  if (ImGui::Begin("Timeline", open)) {
+
+  const auto display_size = ImGui::GetIO().DisplaySize;
+  const auto dockspace_pixel_size =
+      std::min(docked_size_max_pixel, docked_size_prop * display_size.y);
+
+  ImGui::SetNextWindowSize(ImVec2(display_size.x, dockspace_pixel_size));
+  ImGui::SetNextWindowPos(ImVec2(0, display_size.y - dockspace_pixel_size));
+
+  if (ImGui::Begin("Timeline", open,
+                   ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoResize |
+                       ImGuiWindowFlags_NoCollapse)) {
     const auto adjust_time = [&] {
       currentPlayTime = double(currentFrame) / ANIMATION_FPS;
       need_to_update_pose = true;
@@ -856,7 +869,6 @@ void cursor_pos_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
       !ImGuizmo::IsOver() && !ImGuizmo::IsUsing()) {
     param->rot_yaw -= param->rotation_scale * (mouse_x - param->last_mouse_x);
     param->rot_pitch -= param->rotation_scale * (mouse_y - param->last_mouse_y);
-
     param->rot_pitch = glm::clamp(param->rot_pitch, -90.0, +90.0);
   }
 
