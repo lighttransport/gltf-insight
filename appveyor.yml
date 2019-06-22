@@ -38,16 +38,13 @@ before_deploy:
 
 deploy:
 - provider: GitHub
-    tag: continuous-appveyor
-    release: "Windows continuous build"
-    description: "AppVeyor build $(appveyor_repo_commit)"
-    auth_token:
-      secure: 0ewOMT51w2I41galWFJsoJp/SQyOjtljI0RAn/P4Z62JbcOiOHVT06SWxpfWVODc
-    prerelease: true
-    force_update: true
-    on:
-      branch: devel
-
-
-
+  tag: continuous-appveyor
+  release: "Windows continuous build"
+  description: "AppVeyor build $(appveyor_repo_commit)"
+  auth_token:
+    secure: 0ewOMT51w2I41galWFJsoJp/SQyOjtljI0RAn/P4Z62JbcOiOHVT06SWxpfWVODc
+  prerelease: true
+  force_update: true
+  on:
+    branch: devel
 
