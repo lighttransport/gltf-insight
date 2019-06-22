@@ -32,6 +32,8 @@ artifacts:
 before_deploy:
   - git config --global credential.helper store
   - ps: Add-Content "$HOME\.git-credentials" "https://$($env:access_token):x-oauth-basic@github.com`n"
+  - git config --global user.name "Ybalrid, but via a script on AppVeyor"
+  - git config --global user.email "ybalrid+appveyor@ybalrid.info"
   - git tag -fa continuous-appveyor
   - git push origin :refs/tags/continuous-appveyor
   - git push origin devel --tags
