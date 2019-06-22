@@ -112,7 +112,8 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
                      float docked_size_max_pixel = 300.f);
 
 void shader_selector_window(const std::vector<std::string>& shader_names,
-                            int& selected_shader, std::string& shader_to_use);
+                            int& selected_shader, std::string& shader_to_use,
+                            bool* open = nullptr);
 
 void utilities_window(bool& show_imgui_demo);
 

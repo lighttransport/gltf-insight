@@ -108,6 +108,7 @@ class app {
 
   selection_mode current_mode = manipulate_mesh;
 
+  bool show_shader_selector_window = true;
   bool show_asset_image_window = true;
   bool show_model_info_window = true;
   bool show_animation_window = true;

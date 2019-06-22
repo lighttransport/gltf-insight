@@ -86,7 +86,7 @@ bool ImGuiCombo(const char* label, int* current_item,
 }
 
 void asset_images_window(const std::vector<GLuint>& textures, bool* open) {
-  if (!*open) return;
+  if (open && !*open) return;
   if (ImGui::Begin("glTF Images", open, ImGuiWindowFlags_AlwaysAutoResize)) {
     ImGui::Text("Number of textures [%zu]", textures.size());
     ImGui::BeginChild("##ScrollableRegion0", ImVec2(256, 286), false,
@@ -137,7 +137,7 @@ void describe_node_topology_in_imgui_tree(const tinygltf::Model& model,
 }
 
 void model_info_window(const tinygltf::Model& model, bool* open) {
-  if (!*open) return;
+  if (open && !*open) return;
   // TODO also cache info found here
   if (ImGui::Begin("Model information", open)) {
     const auto main_node_index = find_main_mesh_node(model);
@@ -167,7 +167,7 @@ void model_info_window(const tinygltf::Model& model, bool* open) {
 }
 
 void animation_window(const std::vector<animation>& animations, bool* open) {
-  if (!*open) return;
+  if (open && !*open) return;
   ImGui::Begin("Animations", open);
 
   if (animations.size() == 0) {
@@ -348,7 +348,7 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
 // TODO create mesh.hh and extract this definition
 #include "insight-app.hh"
 void mesh_display_window(std::vector<gltf_insight::mesh>& meshes, bool* open) {
-  if (!*open) return;
+  if (open && !*open) return;
   if (ImGui::Begin("Mesh visibility", open)) {
     for (auto& mesh : meshes)
       ImGui::Checkbox(mesh.name.c_str(), &mesh.displayed);
@@ -399,7 +399,7 @@ void skinning_data_window(
 
 void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets,
                          bool* open) {
-  if (!*open) return;
+  if (open && !*open) return;
   if (ImGui::Begin("Morph Target blend weights", open)) {
     for (int w = 0; w < nb_morph_targets; ++w) {
       std::string name;
@@ -635,8 +635,7 @@ void transform_window(float* vecTranslation, float* vecRotation,
                       ImGuizmo::OPERATION& current_gizmo_operation,
                       ImGuizmo::MODE& current_gizmo_mode, int* mode,
                       bool* show_gizmo, bool* open) {
-  if (!*open) return;
-
+  if (open && !*open) return;
   if (ImGui::Begin("Transform manipulator", open)) {
     if (ImGui::RadioButton("Mesh mode", *mode == 0)) *mode = 0;
     ImGui::SameLine();
@@ -700,8 +699,7 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
                      bool& expanded, int& currentFrame, double& currentPlayTime,
                      bool* open, float docked_size_prop,
                      float docked_size_max_pixel) {
-  if (!*open) return;
-
+  if (open && !*open) return;
   const auto display_size = ImGui::GetIO().DisplaySize;
   const auto dockspace_pixel_size =
       std::min(docked_size_max_pixel, docked_size_prop * display_size.y);
@@ -776,8 +774,10 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
 }
 
 void shader_selector_window(const std::vector<std::string>& shader_names,
-                            int& selected_shader, std::string& shader_to_use) {
-  if (ImGui::Begin("Shader mode")) {
+                            int& selected_shader, std::string& shader_to_use,
+                            bool* open) {
+  if (open && !*open) return;
+  if (ImGui::Begin("Shader mode", open)) {
     ImGuiCombo("Choose shader", &selected_shader, shader_names);
     shader_to_use = shader_names[selected_shader];
   }
@@ -785,7 +785,7 @@ void shader_selector_window(const std::vector<std::string>& shader_names,
 }
 
 void camera_parameters_window(float& fovy, float& z_far, bool* open) {
-  if (!*open) return;
+  if (open && !*open) return;
   if (ImGui::Begin("Camera Parameters", open)) {
     ImGui::SliderFloat("FOV", &fovy, 5, 90, "%.1f");
     ImGui::SliderFloat("draw distance", &z_far, 100, 1000, "%.0f");

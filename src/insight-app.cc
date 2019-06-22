@@ -352,9 +352,9 @@ void app::run_view_menu() {
     ImGui::MenuItem("TransformWindow", 0, &show_transform_window);
     ImGui::MenuItem("Bone selector", 0, &show_bone_selector);
     ImGui::MenuItem("Timeline", 0, &show_timeline);
+    ImGui::MenuItem("Shader selector", 0, &show_shader_selector_window);
     ImGui::Separator();
     ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
-
     ImGui::EndMenu();
   }
 }
@@ -493,7 +493,6 @@ void app::main_loop() {
 
       if (asset_loaded) {
         // Draw all windows
-        // shader_selector_window(shader_names, selected_shader, shader_to_use);
         model_info_window(model, &show_model_info_window);
         asset_images_window(textures, &show_asset_image_window);
         animation_window(animations, &show_animation_window);
@@ -502,7 +501,8 @@ void app::main_loop() {
         morph_target_window(gltf_scene_tree,
                             loaded_meshes.front().nb_morph_targets,
                             &show_morph_target_window);
-        shader_selector_window(shader_names, selected_shader, shader_to_use);
+        shader_selector_window(shader_names, selected_shader, shader_to_use,
+                               &show_shader_selector_window);
 
         if (show_bone_selector) {
           if (ImGui::Begin("Bone selector", &show_bone_selector))
