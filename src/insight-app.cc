@@ -452,7 +452,8 @@ void app::main_loop() {
             try {
               load();
             } catch (const std::exception& e) {
-              std::cerr << e.what() << '\n';
+              std::cerr << "error occured during loading of " << input_filename
+                        << ": " << e.what() << '\n';
               unload();
             }
           } else {
@@ -464,14 +465,20 @@ void app::main_loop() {
       if (save_file_dialog) {
         if (!asset_loaded)
           save_file_dialog = false;
-        else if (ImGuiFileDialog::Instance()->FileDialog("Save as...", "")) {
+        else if (ImGuiFileDialog::Instance()->FileDialog("Save as...", 0, true,
+                                                         ".", input_filename)) {
           if (ImGuiFileDialog::Instance()->IsOk) {
             auto save_as_filename =
                 ImGuiFileDialog::Instance()->GetFilepathName();
             try {
               // Check file path extension for gltf or glb. Fix it if
               // necessary.
+
+              // check if file exist, if so PROMPT BEFORE OVERWRITE
+
               // Serialize to file
+
+              throw std::runtime_error("Not implemented yet!");
             } catch (const std::exception& e) {
               std::cerr << e.what() << '\n';
               // display error here

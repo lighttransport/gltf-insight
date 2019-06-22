@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 
 set(BUILD_TARGET "gltf-insight")
+
+set(BUILD_VERSION_MAJOR 0)
+set(BUILD_VERSION_MINOR 1)
+set(BUILD_VERSION_PATCH 0)
+
 project(${BUILD_TARGET})
 
 if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include")
@@ -68,18 +73,20 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/config/
 )
 
-
+set(CI_BUILD -1)
 if(DEFINED ENV{TRAVIS_COMMIT})
  set(IS_CI true)
  message(STATUS "This is a travis build")
  set(CI_NAME "Travis-CI")
  set(GIT_COMMIT "$ENV{TRAVIS_COMMIT}")
+ set(CI_BUILD "$ENV{TRAVIS_BUILD_NUMBER}")
 
 elseif(DEFINED ENV{APPVEYOR_REPO_COMMIT})
  set(IS_CI true)
  message(STATUS "This is an appveyor build")
  set(CI_NAME "AppVeyor")
  set(GIT_COMMIT "$ENV{APPVEYOR_REPO_COMMIT}")
+ set(CI_BUILD "$ENV{APPVEYOR_BUILD_NUMBER}")
 
 else()
 message(STATUS "This is not a CI build")

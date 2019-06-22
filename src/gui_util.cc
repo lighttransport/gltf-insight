@@ -804,11 +804,14 @@ void about_window(GLuint logo, bool* open) {
     ImGui::Image((ImTextureID)(size_t)logo, ImVec2(256, 256));
     ImGui::NextColumn();
     ImGui::Text("glTF-insight\n\n");
+    ImGui::Text("Version %d.%d.%d.%08x", CMAKE_BUILD_MAJOR, CMAKE_BUILD_MINOR,
+                CMAKE_BUILD_PATCH, CMAKE_CI ? CMAKE_CI_BUILD : 0x1337F00D);
+
     ImGui::Text("Built from git commit " CMAKE_GIT_COMMIT_SHORT);
     if (CMAKE_CI) ImGui::Text("Continuous Built from " CMAKE_CI_NAME);
     ImGui::Text("\n");
     ImGui::Text(
-        u8"\u00A9"  // (c) symbol
+        u8"\u00A9"  // (c) symbol unicode +00A9
         " "
         "2018-2019 Light Transport Entertainment, Inc.; "
         "Syoyo Fujita; "
