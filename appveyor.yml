@@ -3,6 +3,11 @@ skip_tags: true
 image: Visual Studio 2017
 configuration: RelWithDebInfo
 platform: x64
+
+environement:
+  access_token:
+    secure: 0ewOMT51w2I41galWFJsoJp/SQyOjtljI0RAn/P4Z62JbcOiOHVT06SWxpfWVODc
+
 before_build:
 - cmd: >-
     echo Building the commit %APPVEYOR_REPO_COMMIT%
@@ -12,21 +17,35 @@ before_build:
     git submodule update --init --recursive
 
     vcsetup.bat
+
+
+
 build:
   project: build\gltf-insight.sln
   parallel: true
   verbosity: minimal
+  
 artifacts:
-- path: build\RelWithDebInfo\gltf-insight.exe
-- path: build\RelWithDebInfo\gltf-insight.pdb
+  - path: build\RelWithDebInfo\gltf-insight.exe
+  - path: build\RelWithDebInfo\gltf-insight.pdb
+
+before_deploy:
+  - git config --global credential.helper store
+  - ps: Add-Content "$HOME\.git-credentials" "https://$($env:access_token):x-oauth-basic@github.com`n"
+  - git tag -fa continuous-appveyor
+  - git push origin :refs/tags/continuous-appveyor
+  - git push origin devel --tags
+
 deploy:
 - provider: GitHub
-  tag: continuous-appveyor
-  release: "Windows continuous build"
-  description: "AppVeyor build $(appveyor_repo_commit)"
-  auth_token:
-    secure: 0ewOMT51w2I41galWFJsoJp/SQyOjtljI0RAn/P4Z62JbcOiOHVT06SWxpfWVODc
-  prerelease: true
-  force_update: true
-  on:
-    branch: devel
+    tag: continuous-appveyor
+    release: "Windows continuous build"
+    description: "AppVeyor build $(appveyor_repo_commit)"
+    auth_token:
+      secure: 0ewOMT51w2I41galWFJsoJp/SQyOjtljI0RAn/P4Z62JbcOiOHVT06SWxpfWVODc
+    prerelease: true
+    force_update: true
+    on:
+      branch: devel
+
+
