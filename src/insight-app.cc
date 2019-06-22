@@ -285,8 +285,8 @@ void app::load() {
       shader_names.push_back(shader_it->first);
 
     for (size_t i = 0; i < shader_names.size(); ++i) {
-      if (shader_names[i] == "textured") {
-        selected_shader = i;
+      if (shader_names[i] == "unlit") {
+        selected_shader = int(i);
         break;
       }
     }

@@ -91,6 +91,13 @@ void shader::set_uniform(const char* name, const glm::vec4& v) const {
   if (location != -1) glUniform4f(location, v.x, v.y, v.z, v.w);
 }
 
+void shader::set_uniform(const char* name, const glm::vec3& v) const {
+  if (!name) return;
+
+  const auto location = glGetUniformLocation(program_, name);
+  if (location != -1) glUniform3f(location, v.x, v.y, v.z);
+}
+
 void shader::set_uniform(const char* name, const glm::mat4& m) const {
   if (!name) return;
   const auto location = glGetUniformLocation(program_, name);

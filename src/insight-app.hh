@@ -2,8 +2,10 @@
 
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
-#include "animation.hh"
 #endif
+
+#include "animation.hh"
+#include "material.hh"
 
 // This includes opengl for us, along side debuging callbacks
 #include "gl_util.hh"

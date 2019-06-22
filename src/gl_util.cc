@@ -414,8 +414,8 @@ void main()
 
 )glsl";
 
-  shaders["textured"] =
-      shader("textured",
+  shaders["unlit"] =
+      shader("unlit",
              nb_joints != 0 ? vertex_shader_source : vertex_shader_no_skinning,
              fragment_shader_source_textured_unlit);
   shaders["debug_color"] = shader("debug_color", vertex_shader_no_skinning,
