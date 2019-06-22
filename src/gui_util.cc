@@ -804,8 +804,15 @@ void about_window(GLuint logo, bool* open) {
     ImGui::Image((ImTextureID)(size_t)logo, ImVec2(256, 256));
     ImGui::NextColumn();
     ImGui::Text("glTF-insight\n\n");
-    ImGui::Text("Version %d.%d.%d.%08x", CMAKE_BUILD_MAJOR, CMAKE_BUILD_MINOR,
-                CMAKE_BUILD_PATCH, CMAKE_CI ? CMAKE_CI_BUILD : 0x1337F00D);
+#if CMAKE_CI
+#define LOCAL_ID "%d"
+#else
+#define LOCAL_ID "%x"
+#endif
+    ImGui::Text("Version %d.%d.%d." LOCAL_ID, CMAKE_BUILD_MAJOR,
+                CMAKE_BUILD_MINOR, CMAKE_BUILD_PATCH,
+                CMAKE_CI ? CMAKE_CI_BUILD : 0x1337F00D);
+#undef LOCAL_ID
 
     ImGui::Text("Built from git commit " CMAKE_GIT_COMMIT_SHORT);
     if (CMAKE_CI) ImGui::Text("Continuous Built from " CMAKE_CI_NAME);
