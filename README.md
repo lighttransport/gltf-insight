@@ -16,6 +16,8 @@ For example, you can display and tweak animation prameters this tool(since glTF 
 
 Work-in-progress.
 
+Latest coninious build are available for [**Linux** (AppImage)](https://github.com/lighttransport/gltf-insight/releases/tag/continuous) and [**Windows** (portable exe)](https://github.com/lighttransport/gltf-insight/releases/tag/continuous-appveyor). Both are 64bit
+
 ## Requirements
 
 * CMake
@@ -30,14 +32,26 @@ Work-in-progress.
 
 ## Features
 
+* Load and display glTF assets
+  * [x] glTF files with external resources
+  * [x] glTF files with embeded resources
+  * [x] glb files (binary glTF with enclosed resources)
+  * [ ] Any of the above with darco mesh compression **TODO**
+  * [x] Partial support for VRM avatars (simply treated as a standard glTF binary)
+
 * glTF animation evaluation
+This program can play the animations defined in a glTF asset by the following mean
   * [x] morph - Software blending between any number of morph targets
-  * [x] skin - Hardware blending with max 4 joint attributes per vertex
+  * [x] skin - Hardware blending with max **4 joints** attributes per vertex
   * [ ] skin - Software blending between an arbitrary number of joints per vertex
+  * [ ] **TODO** animation editing features
+  
 * Data visualization
-  * [x] Skin weight
+  * [x] Skinning weights
 
 ## Setup
+
+Every source dependencies is either enclosed within the source code, or is pulled from submodules. These dependences also uses subomudles. You will need to get them recursively. This command should get you up and running:
 
 ```bash
 git submodule update --init --recursive
@@ -89,6 +103,7 @@ MIT license
 
 ### Third party licenses
 
+gltf-insight is built upon the following open-source projects:
 * TinyGLTF : MIT license
 * json.hpp : MIT license
 * stb_image libraries : Public domain
