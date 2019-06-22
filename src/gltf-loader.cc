@@ -530,6 +530,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
         glEnableVertexAttribArray(2);
       }
 
+      // Tangent is layout 3
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][3]);
       glBufferData(GL_ARRAY_BUFFER, tangents[submesh].size() * sizeof(float),
                    tangents[submesh].data(), GL_DYNAMIC_DRAW);
@@ -571,14 +572,14 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
 
 void load_morph_targets(const tinygltf::Model& model,
                         const tinygltf::Primitive& primitive,
-                        std::vector<morph_target>& morph_targets) {
+                        std::vector<morph_target>& morph_targets,
+                        bool& has_normal, bool& has_tangent) {
   for (size_t i = 0; i < morph_targets.size(); ++i) {
     const auto& target = primitive.targets[i];
 
     const auto position_it = target.find("POSITION");
     const auto normal_it = target.find("NORMAL");
-    // const auto tangent_it = target.find("TANGENT"); //<- only useful for
-    // normal mapping...
+    const auto tangent_it = target.find("TANGENT");
 
     if (position_it != target.end()) {
       const auto& position_accessor = model.accessors[position_it->second];
@@ -642,6 +643,7 @@ void load_morph_targets(const tinygltf::Model& model,
     }
 
     if (normal_it != target.end()) {
+      has_normal = true;
       const auto& normal_accessor = model.accessors[normal_it->second];
       const auto& normal_buffer_view =
           model.bufferViews[normal_accessor.bufferView];
@@ -697,6 +699,68 @@ void load_morph_targets(const tinygltf::Model& model,
         for (size_t sparse_index = 0; sparse_index < indices.size();
              ++sparse_index) {
           memcpy(&morph_targets[i].normal[indices[sparse_index]],
+                 &values[sparse_index * 3], 3 * sizeof(float));
+        }
+      }
+    }
+
+    if (tangent_it != target.end()) {
+      has_tangent = true;
+      const auto& tangent_accessor = model.accessors[tangent_it->second];
+      const auto& tangent_buffer_view =
+          model.bufferViews[tangent_accessor.bufferView];
+      const auto& tangent_buffer = model.buffers[tangent_buffer_view.buffer];
+      const auto tangent_data_start = tangent_buffer.data.data() +
+                                      tangent_buffer_view.byteOffset +
+                                      tangent_accessor.byteOffset;
+      const auto stride = tangent_accessor.ByteStride(tangent_buffer_view);
+
+      assert(tangent_accessor.type == TINYGLTF_TYPE_VEC3);
+      assert(tangent_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT);
+
+      morph_targets[i].tangent.resize(3 * tangent_accessor.count);
+      for (size_t vertex = 0; vertex < tangent_accessor.count; ++vertex) {
+        memcpy(&morph_targets[i].tangent[3 * vertex],
+               tangent_data_start + vertex * stride, sizeof(float) * 3);
+      }
+
+      if (tangent_accessor.sparse.isSparse) {
+        const auto sparse_indices = tangent_accessor.sparse.indices;
+        const auto indices_component_size = tinygltf::GetComponentSizeInBytes(
+            tangent_accessor.sparse.indices.componentType);
+        const auto& indices_buffer_view =
+            model.bufferViews[sparse_indices.bufferView];
+        const auto& indices_buffer = model.buffers[indices_buffer_view.buffer];
+        const auto indices_data = indices_buffer.data.data() +
+                                  indices_buffer_view.byteOffset +
+                                  sparse_indices.byteOffset;
+
+        assert(sizeof(unsigned int) >= indices_component_size);
+
+        const auto sparse_values = tangent_accessor.sparse.values;
+        const auto& values_buffer_view =
+            model.bufferViews[sparse_values.bufferView];
+        const auto& values_buffer = model.buffers[values_buffer_view.buffer];
+        const float* values_data = reinterpret_cast<const float*>(
+            values_buffer.data.data() + values_buffer_view.byteOffset +
+            sparse_values.byteOffset);
+
+        std::vector<unsigned int> indices(tangent_accessor.sparse.count);
+        std::vector<float> values(3 * size_t(tangent_accessor.sparse.count));
+
+        for (size_t sparse_index = 0; sparse_index < indices.size();
+             ++sparse_index) {
+          memcpy(&indices[sparse_index],
+                 indices_data + sparse_index * indices_component_size,
+                 indices_component_size);
+          memcpy(&values[3 * sparse_index], &values_data[3 * sparse_index],
+                 3 * sizeof(float));
+        }
+
+        // Patch the loaded sparse data into the morph target vertex attribute
+        for (size_t sparse_index = 0; sparse_index < indices.size();
+             ++sparse_index) {
+          memcpy(&morph_targets[i].tangent[indices[sparse_index]],
                  &values[sparse_index * 3], 3 * sizeof(float));
         }
       }

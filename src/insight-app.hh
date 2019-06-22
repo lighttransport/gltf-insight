@@ -195,12 +195,15 @@ class app {
       const std::vector<std::vector<morph_target>>& morph_targets,
       const std::vector<std::vector<float>>& vertex_coord,
       const std::vector<std::vector<float>>& normals,
+      const std::vector<std::vector<float>>& tangents,
       std::vector<std::vector<float>>& display_position,
-      std::vector<std::vector<float>>& display_normal, size_t vertex);
+      std::vector<std::vector<float>>& display_normal,
+      std::vector<std::vector<float>>& display_tangent, size_t vertex);
 
   void gpu_update_morphed_submesh(
       size_t submesh_id, std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
+      std::vector<std::vector<float>>& display_tangent,
       std::vector<std::array<GLuint, 7>>& VBOs);
 
   void perform_software_morphing(
@@ -208,8 +211,10 @@ class app {
       const std::vector<std::vector<morph_target>>& morph_targets,
       const std::vector<std::vector<float>>& vertex_coord,
       const std::vector<std::vector<float>>& normals,
+      const std::vector<std::vector<float>>& tangents,
       std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
+      std::vector<std::vector<float>>& display_tangent,
       std::vector<std::array<GLuint, 7>>& VBOs);
 
   void draw_bone_overlay(gltf_node& mesh_skeleton_graph, int active_joint_node,

@@ -32,7 +32,8 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
 
 void load_morph_targets(const tinygltf::Model& model,
                         const tinygltf::Primitive& primitive,
-                        std::vector<morph_target>& morph_targets);
+                        std::vector<morph_target>& morph_targets,
+                        bool& has_normals, bool& has_tangents);
 
 void load_morph_target_names(const tinygltf::Mesh& mesh,
                              std::vector<std::string>& names);
