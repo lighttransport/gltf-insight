@@ -122,15 +122,45 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   file(GLOB SOURCES CONFIGURE_DEPENDS  src/*)
+  file(GLOB SHADER CONFIGURE_DEPENDS shaders/*.vert shaders/*.frag)
 else()
   file(GLOB SOURCES src/*)
+  file(GLOB SHADER shaders/*.vert shaders/*.frag)
+endif()
+
+# Shader source code is #included from shaders directory
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/shaders)
+
+if(WIN32)
+SET(SHADER_PACKER ${CMAKE_CURRENT_SOURCE_DIR}/bin/xxd.exe)
+else()
+SET(SHADER_PACKER xxd) #this should be installed on any descent linux system
+endif()
+
+foreach(INPUT_FILE ${SHADER})
+set(OUTPUT_FILE ${INPUT_FILE}_inc.hh)
+get_filename_component(INPUT_FILENAME ${INPUT_FILE} NAME)
+add_custom_command(
+	OUTPUT ${OUTPUT_FILE}
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/shaders/
+	COMMAND  ${SHADER_PACKER}  -i  ${INPUT_FILENAME} ${OUTPUT_FILE}
+	COMMENT  "packing ${INPUT_FILE} shader into ${OUTPUT_FILE}"
+	DEPENDS ${SHADER}
+	)
+
+	list(APPEND SHADER ${OUTPUT_FILE})
+endforeach()
+
+
+if(CMAKE_VERSION VERSION_GREATER 3.8)
+	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
 endif()
 
 if(WIN32)
   set(ICO_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/icons/icons.rc)
 endif()
 
-add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES}
+add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
 )
 
