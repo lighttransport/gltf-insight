@@ -4,6 +4,27 @@
 
 using namespace gltf_insight;
 
+void gltf_insight::setup_fallback_textures() {
+  static constexpr std::array<uint8_t, 16> pure_white_image_2{
+      255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255,
+  };
+
+  static constexpr std::array<uint8_t, 12> pure_flat_normal_2{
+      128, 128, 255, 128, 128, 255, 128, 128, 255, 128, 128, 255,
+  };
+
+  glGenTextures(1, &pure_white_texture);
+  glBindTexture(GL_TEXTURE_2D, pure_white_texture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               pure_white_image_2.data());
+
+  glGenTextures(1, &pure_flat_normal_map);
+  glBindTexture(GL_TEXTURE_2D, pure_flat_normal_map);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_UNSIGNED_BYTE,
+               pure_white_image_2.data());
+}
+
 void material::fill_material_slots() {
   texture_slots[0] = normal_texture;
   texture_slots[1] = occlusion_texture;
@@ -38,7 +59,7 @@ void material::bind_textures() {
   }
 }
 
-void material::update_uniforms(shader& shading_program) {
+void material::set_shader_uniform(shader& shading_program) {
   shading_program.use();
   shading_program.set_uniform("normal_texture", 0);
   shading_program.set_uniform("occlusion_texture", 1);
@@ -46,4 +67,28 @@ void material::update_uniforms(shader& shading_program) {
   shading_program.set_uniform("emissive_factor", emissive_factor);
   shading_program.set_uniform("alpha_mode", int(alpha_mode));
   shading_program.set_uniform("alpha_cuttoff", alpha_cuttoff);
+
+  switch (intended_shader) {
+    case gltf_insight::shading_type::pbr_metal_rough:
+      shading_program.set_uniform("base_color_texture", 3);
+      shading_program.set_uniform("metallic_roughness_texture", 4);
+      shading_program.set_uniform(
+          "base_color_factor",
+          shader_inputs.pbr_metal_roughness.base_color_factor);
+      shading_program.set_uniform(
+          "metallic_factor", shader_inputs.pbr_metal_roughness.metallic_factor);
+      shading_program.set_uniform(
+          "roughness_factor",
+          shader_inputs.pbr_metal_roughness.roughness_factor);
+      break;
+    case gltf_insight::shading_type::pbr_specular_glossy:
+      // TODO
+      break;
+    case gltf_insight::shading_type::unlit:
+      shading_program.set_uniform("base_color_texture", 3);
+      shading_program.set_uniform("base_color_factor",
+                                  shader_inputs.unlit.base_color_factor);
+
+      break;
+  }
 }

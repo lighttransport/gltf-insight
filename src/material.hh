@@ -12,6 +12,10 @@ class shader;
 
 namespace gltf_insight {
 
+static GLuint pure_white_texture = 0;
+static GLuint pure_flat_normal_map = 0;
+void setup_fallback_textures();
+
 /// Type of shader requested
 enum class shading_type {
   // Standard PBR shader for glTF.
@@ -35,7 +39,6 @@ struct material {
 
   // These are texture attachment in an arbitrary order
   std::array<GLuint, max_texture_slots> texture_slots;
-  std::array<bool, max_texture_slots> slot_used = {false};
   // Number of textures to attach
   size_t textures_used = 0;
 
@@ -59,8 +62,8 @@ struct material {
       // attachement 4
       GLuint metallic_roughness_texture;
 
-      float metallic_factor = 1;
-      float roughness_factor = 1;
+      float metallic_factor = 1.f;
+      float roughness_factor = 1.f;
     } pbr_metal_roughness;
 
     struct {
@@ -71,7 +74,7 @@ struct material {
       GLuint specular_glossiness_texture;
 
       glm::vec3 specular_factor = glm::vec3(1.f, 1.f, 1.f);
-      float glossiness_factor = 1;
+      float glossiness_factor = 1.f;
     } pbr_specular_glossiness;
 
     struct {
@@ -84,7 +87,7 @@ struct material {
 
   void fill_material_slots();
   void bind_textures();
-  void update_uniforms(shader& shading_program);
+  void set_shader_uniform(shader& shading_program);
 };
 
 }  // namespace gltf_insight

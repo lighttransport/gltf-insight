@@ -369,6 +369,8 @@ app::app(int argc, char** argv) {
   }
 
   logo = load_gltf_insight_icon();
+
+  gltf_insight::setup_fallback_textures();
 }
 
 app::~app() {
