@@ -25,7 +25,7 @@ void gltf_insight::setup_fallback_textures() {
                pure_white_image_2.data());
 }
 
-void material::fill_material_slots() {
+void material::fill_material_texture_slots() {
   texture_slots[0] = normal_texture;
   texture_slots[1] = occlusion_texture;
   texture_slots[2] = emissive_texture;
@@ -59,8 +59,11 @@ void material::bind_textures() {
   }
 }
 
-void material::set_shader_uniform(shader& shading_program) {
+void material::set_shader_uniform(const shader& shading_program) const {
+  // Bind program to opengl state machine
   shading_program.use();
+
+  // set generic material uniform values
   shading_program.set_uniform("normal_texture", 0);
   shading_program.set_uniform("occlusion_texture", 1);
   shading_program.set_uniform("emissive_texture", 2);
@@ -68,8 +71,9 @@ void material::set_shader_uniform(shader& shading_program) {
   shading_program.set_uniform("alpha_mode", int(alpha_mode));
   shading_program.set_uniform("alpha_cuttoff", alpha_cuttoff);
 
+  // set shader specific material uniform values
   switch (intended_shader) {
-    case gltf_insight::shading_type::pbr_metal_rough:
+    case shading_type::pbr_metal_rough:
       shading_program.set_uniform("base_color_texture", 3);
       shading_program.set_uniform("metallic_roughness_texture", 4);
       shading_program.set_uniform(
@@ -81,10 +85,22 @@ void material::set_shader_uniform(shader& shading_program) {
           "roughness_factor",
           shader_inputs.pbr_metal_roughness.roughness_factor);
       break;
-    case gltf_insight::shading_type::pbr_specular_glossy:
-      // TODO
+
+    case shading_type::pbr_specular_glossy:
+      shading_program.set_uniform("diffuse_texture", 3);
+      shading_program.set_uniform("specular_glossiness_texture", 4);
+      shading_program.set_uniform(
+          "diffuse_factor",
+          shader_inputs.pbr_specular_glossiness.diffuse_factor);
+      shading_program.set_uniform(
+          "specular_factor",
+          shader_inputs.pbr_specular_glossiness.specular_factor);
+      shading_program.set_uniform(
+          "glossiness_factor",
+          shader_inputs.pbr_specular_glossiness.glossiness_factor);
       break;
-    case gltf_insight::shading_type::unlit:
+
+    case shading_type::unlit:
       shading_program.set_uniform("base_color_texture", 3);
       shading_program.set_uniform("base_color_factor",
                                   shader_inputs.unlit.base_color_factor);

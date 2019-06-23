@@ -85,9 +85,9 @@ struct material {
 
   } shader_inputs;
 
-  void fill_material_slots();
+  void fill_material_texture_slots();
   void bind_textures();
-  void set_shader_uniform(shader& shading_program);
+  void set_shader_uniform(const shader& shading_program) const;
 };
 
 }  // namespace gltf_insight
