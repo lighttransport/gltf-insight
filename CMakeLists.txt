@@ -142,12 +142,11 @@ foreach(INPUT_FILE ${SHADER})
 	#From full path, get only the filename of the shader
 	get_filename_component(INPUT_FILENAME ${INPUT_FILE} NAME)
 	#Compute an output path that lands in build/shaders/shadername.{frag, vert}_inc.hh
-	set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/shaders/${INPUT_FILENAME}_inc.hh)
+	set(OUTPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/config/shaders/${INPUT_FILENAME}_inc.hh)
 	#A a custom build command that will generate the output file as a includable header
 	add_custom_command(
 		OUTPUT ${OUTPUT_FILE}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/shaders/
-		COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}
 		COMMAND  ${SHADER_PACKER}  -i  ${INPUT_FILENAME} ${OUTPUT_FILE}
 		COMMENT  "packing ${INPUT_FILE} shader into ${OUTPUT_FILE}"
 		DEPENDS ${INPUT_FILE}
@@ -156,7 +155,7 @@ foreach(INPUT_FILE ${SHADER})
 	list(APPEND SHADER_GEN ${OUTPUT_FILE})
 endforeach()
 # Shader source code is #included from shaders directory
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/shaders/)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/config/shaders)
 
 if(CMAKE_VERSION VERSION_GREATER 3.8)
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
