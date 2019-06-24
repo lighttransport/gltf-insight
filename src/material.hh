@@ -118,7 +118,7 @@ struct material {
   static void load_brdf_lut();
 
   void fill_material_texture_slots();
-  void bind_textures();
+  void bind_textures() const;
   void set_shader_uniform(const shader& shading_program) const;
 };
 

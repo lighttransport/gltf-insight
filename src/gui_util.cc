@@ -775,11 +775,17 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
 
 void shader_selector_window(const std::vector<std::string>& shader_names,
                             int& selected_shader, std::string& shader_to_use,
-                            bool* open) {
+                            int& display_mode, bool* open) {
   if (open && !*open) return;
   if (ImGui::Begin("Shader mode", open)) {
-    ImGuiCombo("Choose shader", &selected_shader, shader_names);
-    shader_to_use = shader_names[selected_shader];
+    ImGui::Text("Display_mode:");
+    if (ImGui::RadioButton("Normal", display_mode == 0)) display_mode = 0;
+    if (ImGui::RadioButton("Debug", display_mode == 42)) display_mode = 42;
+
+    if (display_mode == 0x2A) {
+      ImGuiCombo("Choose shader", &selected_shader, shader_names);
+      shader_to_use = shader_names[selected_shader];
+    }
   }
   ImGui::End();
 }

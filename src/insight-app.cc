@@ -132,7 +132,7 @@ void app::load() {
           }
         }
 
-        else if (value.first == "rougnessFactor") {
+        else if (value.first == "roughnessFactor") {
           const auto factor = value.second.Factor();
           if (factor >= 0 && factor <= 1) {
             pbr_metal_rough.roughness_factor = factor;
@@ -720,6 +720,7 @@ void app::main_loop() {
                             loaded_meshes.front().nb_morph_targets,
                             &show_morph_target_window);
         shader_selector_window(shader_names, selected_shader, shader_to_use,
+                               reinterpret_cast<int&>(current_display_mode),
                                &show_shader_selector_window);
 
         material_info_window(dummy_material, loaded_material,
@@ -787,12 +788,24 @@ void app::main_loop() {
           glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
           glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
 
-          update_uniforms(*a_mesh.shader_list, active_joint, shader_to_use, mvp,
-                          normal, a_mesh.joint_matrices);
-
           // Draw all of the submeshes of the object
           for (size_t submesh = 0;
                submesh < a_mesh.draw_call_descriptors.size(); ++submesh) {
+            const auto& material_to_use =
+                loaded_material[a_mesh.materials[submesh]];
+
+            if (current_display_mode == display_mode::normal) {
+              switch (material_to_use.intended_shader) {
+                case shading_type::pbr_metal_rough:
+                  shader_to_use = "pbr_metal_rough";
+                  break;
+              }
+            }
+            material_to_use.set_shader_uniform(
+                (*a_mesh.shader_list)[shader_to_use]);
+            material_to_use.bind_textures();
+            update_uniforms(*a_mesh.shader_list, active_joint, shader_to_use,
+                            mvp, normal, a_mesh.joint_matrices);
             const auto& draw_call = a_mesh.draw_call_descriptors[submesh];
             perform_software_morphing(
                 gltf_scene_tree, submesh, a_mesh.morph_targets,

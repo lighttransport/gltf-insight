@@ -60,4 +60,7 @@ void main()
 	}
 	*/
 
+	output_color = base_color;
+	output_color = vec4(1,0,0,1);
+
 }

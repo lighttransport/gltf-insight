@@ -78,7 +78,7 @@ void material::fill_material_texture_slots() {
   }
 }
 
-void material::bind_textures() {
+void material::bind_textures() const {
   for (int i = 0; i < textures_used; ++i) {
     glActiveTexture(GL_TEXTURE0 + i);
     glBindTexture(GL_TEXTURE_2D, texture_slots[i]);

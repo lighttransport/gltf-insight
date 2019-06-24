@@ -86,6 +86,11 @@ struct mesh {
 
 class app {
  public:
+  enum class display_mode : int {
+    normal = 0,
+    debug = 0b101010
+  } current_display_mode = display_mode::normal;
+
   app(int argc, char** argv);
   ~app();
   void run_file_menu();

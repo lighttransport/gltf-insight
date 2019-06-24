@@ -114,7 +114,7 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
 
 void shader_selector_window(const std::vector<std::string>& shader_names,
                             int& selected_shader, std::string& shader_to_use,
-                            bool* open = nullptr);
+                            int& display_mode, bool* open = nullptr);
 
 void utilities_window(bool& show_imgui_demo);
 
