@@ -859,7 +859,7 @@ void material_info_window(
   if (ImGui::Begin("Materials", open)) {
     static int index = -1;
     ImGui::Text("The currently asset contains %d materials",
-                loaded_materials.size());
+                int(loaded_materials.size()));
 
     ImGui::InputInt("Material index", &index);
     index = glm::clamp(index, -1, int(loaded_materials.size()) - 1);
