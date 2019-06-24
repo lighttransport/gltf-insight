@@ -143,10 +143,10 @@ add_custom_command(
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/shaders/
 	COMMAND  ${SHADER_PACKER}  -i  ${INPUT_FILENAME} ${OUTPUT_FILE}
 	COMMENT  "packing ${INPUT_FILE} shader into ${OUTPUT_FILE}"
-	DEPENDS ${SHADER}
+	DEPENDS ${INPUT_FILE}
 	)
 
-	list(APPEND SHADER ${OUTPUT_FILE})
+	list(APPEND SHADER_GEN ${OUTPUT_FILE})
 endforeach()
 # Shader source code is #included from shaders directory
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/shaders/)
@@ -159,7 +159,7 @@ if(WIN32)
   set(ICO_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/icons/icons.rc)
 endif()
 
-add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER}
+add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER} ${SHADER_GEN}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
 )
 
