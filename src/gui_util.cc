@@ -851,6 +851,98 @@ void about_window(GLuint logo, bool* open) {
   ImGui::End();
 }
 
+void material_info_window(
+    const gltf_insight::material& dummy,
+    const std::vector<gltf_insight::material>& loaded_materials, bool* open) {
+  static constexpr int tsize = 128;
+  if (open && !*open) return;
+  if (ImGui::Begin("Materials", open)) {
+    static int index = -1;
+    ImGui::Text("The currently asset contains %d materials",
+                loaded_materials.size());
+
+    ImGui::InputInt("Material index", &index);
+    index = glm::clamp(index, -1, int(loaded_materials.size()) - 1);
+
+    const auto& selected = index != -1 && index < loaded_materials.size()
+                               ? loaded_materials[index]
+                               : dummy;
+
+    ImGui::Text("Name: %s", selected.name.c_str());
+    ImGui::Text("Type: %s",
+                gltf_insight::to_string(selected.intended_shader).c_str());
+
+    ImGui::ColorEdit3(
+        "Emissive factor", (float*)glm::value_ptr(selected.emissive_factor),
+        ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker);
+    ImGui::Text("Alpha Mode [%s]", to_string(selected.alpha_mode).c_str());
+    ImGui::Text("Alpha cutoff [%.3f]", selected.alpha_cutoff);
+    ImGui::Text(selected.double_sided ? ICON_II_IOS_CHECKMARK
+                                      : ICON_II_IOS_CHECKMARK_EMPTY
+                    " Double sided");
+
+    ImGui::Separator();
+    ImGui::TextColored(ImGui::GetStyle().Colors[ImGuiCol_DockingPreview],
+                       "Texture maps:");
+    ImGui::Columns(3);
+    ImGui::Text(ICON_II_ARROW_RIGHT_B " Normal");
+    ImGui::NextColumn();
+    ImGui::Text(ICON_II_ARROW_RIGHT_B " Occlusion");
+    ImGui::NextColumn();
+    ImGui::Text(ICON_II_ARROW_RIGHT_B " Emissive");
+    ImGui::NextColumn();
+    ImGui::Image((ImTextureID)(size_t)(selected.normal_texture),
+                 ImVec2(tsize, tsize));
+    ImGui::NextColumn();
+    ImGui::Image((ImTextureID)(size_t)(selected.occlusion_texture),
+                 ImVec2(tsize, tsize));
+    ImGui::NextColumn();
+    ImGui::Image((ImTextureID)(size_t)(selected.emissive_texture),
+                 ImVec2(tsize, tsize));
+    ImGui::NextColumn();
+    ImGui::Columns();
+    ImGui::Separator();
+    ImGui::TextColored(ImGui::GetStyle().Colors[ImGuiCol_DockingPreview],
+                       "Shader specific data:");
+    switch (selected.intended_shader) {
+      case gltf_insight::shading_type::pbr_metal_rough: {
+        const auto& pbr_metal_rough =
+            selected.shader_inputs.pbr_metal_roughness;
+        ImGui::Columns(2);
+        ImGui::ColorEdit4(
+            "Base Color Factor",
+            (float*)glm::value_ptr(pbr_metal_rough.base_color_factor),
+            ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker);
+        ImGui::NextColumn();
+        ImGui::Text("Roughness [%.3f]\nMetallic_factor [%.3f]",
+                    pbr_metal_rough.roughness_factor,
+                    pbr_metal_rough.metallic_factor);
+        ImGui::NextColumn();
+        ImGui::Text(ICON_II_ARROW_RIGHT_B " Albedo (BaseColor) Map:");
+        ImGui::NextColumn();
+        ImGui::Text(ICON_II_ARROW_RIGHT_B " Metal Roughness map:");
+        ImGui::NextColumn();
+        ImGui::Image((ImTextureID)(size_t)(pbr_metal_rough.base_color_texture),
+                     ImVec2(tsize, tsize));
+
+        ImGui::NextColumn();
+        ImGui::Image(
+            (ImTextureID)(size_t)(pbr_metal_rough.metallic_roughness_texture),
+            ImVec2(tsize, tsize));
+        ImGui::NextColumn();
+        ImGui::Columns();
+      } break;
+
+      case gltf_insight::shading_type::pbr_specular_glossy: {
+      } break;
+
+      case gltf_insight::shading_type::unlit: {
+      } break;
+    }
+  }
+  ImGui::End();
+}
+
 void mouse_button_callback(GLFWwindow* window, int button, int action,
                            int mods) {
   auto* param = reinterpret_cast<application_parameters*>(

@@ -26,6 +26,7 @@
 
 #include "animation-sequencer.inc.h"
 #include "animation.hh"
+#include "material.hh"
 
 struct application_parameters {
   glm::vec3& camera_position;
@@ -121,3 +122,8 @@ void camera_parameters_window(float& fovy, float& z_far, bool* open = nullptr);
 
 GLuint load_gltf_insight_icon();
 void about_window(GLuint logo, bool* open = nullptr);
+
+void material_info_window(
+    const gltf_insight::material& dummy,
+    const std::vector<gltf_insight::material>& loaded_materials,
+    bool* open = nullptr);

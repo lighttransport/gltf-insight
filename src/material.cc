@@ -4,25 +4,50 @@
 
 using namespace gltf_insight;
 
+GLuint gltf_insight::fallback_textures::pure_white_texture = 0;
+GLuint gltf_insight::fallback_textures::pure_black_texture = 0;
+GLuint gltf_insight::fallback_textures::pure_flat_normal_map = 0;
+
 void gltf_insight::setup_fallback_textures() {
   static constexpr std::array<uint8_t, 16> pure_white_image_2{
       255, 255, 255, 255, 255, 255, 255, 255,
       255, 255, 255, 255, 255, 255, 255, 255,
   };
 
-  static constexpr std::array<uint8_t, 12> pure_flat_normal_2{
-      128, 128, 255, 128, 128, 255, 128, 128, 255, 128, 128, 255,
+  static constexpr std::array<uint8_t, 16> pure_black_image_2{
+      0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255,
   };
 
-  glGenTextures(1, &pure_white_texture);
-  glBindTexture(GL_TEXTURE_2D, pure_white_texture);
+  static constexpr std::array<uint8_t, 16> pure_flat_normal_2{
+      128, 128, 255, 255, 128, 128, 255, 255,
+      128, 128, 255, 255, 128, 128, 255, 255};
+
+  glGenTextures(1, &fallback_textures::pure_white_texture);
+  glBindTexture(GL_TEXTURE_2D, fallback_textures::pure_white_texture);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                pure_white_image_2.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-  glGenTextures(1, &pure_flat_normal_map);
-  glBindTexture(GL_TEXTURE_2D, pure_flat_normal_map);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 2, 2, 0, GL_RGB, GL_UNSIGNED_BYTE,
-               pure_white_image_2.data());
+  glGenTextures(1, &fallback_textures::pure_black_texture);
+  glBindTexture(GL_TEXTURE_2D, fallback_textures::pure_black_texture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               pure_black_image_2.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+  glGenTextures(1, &fallback_textures::pure_flat_normal_map);
+  glBindTexture(GL_TEXTURE_2D, fallback_textures::pure_flat_normal_map);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+               pure_flat_normal_2.data());
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
 void material::fill_material_texture_slots() {
@@ -69,7 +94,7 @@ void material::set_shader_uniform(const shader& shading_program) const {
   shading_program.set_uniform("emissive_texture", 2);
   shading_program.set_uniform("emissive_factor", emissive_factor);
   shading_program.set_uniform("alpha_mode", int(alpha_mode));
-  shading_program.set_uniform("alpha_cuttoff", alpha_cuttoff);
+  shading_program.set_uniform("alpha_cuttoff", alpha_cutoff);
 
   // set shader specific material uniform values
   switch (intended_shader) {

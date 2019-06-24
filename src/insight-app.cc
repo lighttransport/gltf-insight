@@ -34,6 +34,7 @@ void app::unload() {
   // mesh data
   empty_gltf_graph(gltf_scene_tree);
   loaded_meshes.clear();
+  loaded_material.clear();
 
   // library resources
   model = tinygltf::Model();
@@ -51,8 +52,121 @@ void app::load() {
   textures.resize(nb_textures);
   load_all_textures(model, nb_textures, textures);
 
-  const auto scene_index = find_main_scene(model);
+  loaded_material.resize(model.materials.size());
 
+  for (size_t i = 0; i < model.materials.size(); ++i) {
+    auto& currently_loading = loaded_material[i];
+    const auto gltf_material = model.materials[i];
+
+    // start by settings viable defaults!
+    currently_loading.normal_texture = fallback_textures::pure_flat_normal_map;
+    currently_loading.occlusion_texture = fallback_textures::pure_white_texture;
+    currently_loading.emissive_texture = fallback_textures::pure_black_texture;
+
+    currently_loading.name = gltf_material.name;
+
+    for (auto& value : gltf_material.additionalValues) {
+      if (value.first == "normalTexture") {
+        const auto index = value.second.TextureIndex();
+        if (index < textures.size())
+          currently_loading.normal_texture = textures[index];
+      }
+
+      else if (value.first == "occlusionTexture") {
+        const auto index = value.second.TextureIndex();
+        if (index < textures.size())
+          currently_loading.occlusion_texture = textures[index];
+      }
+
+      else if (value.first == "emissiveTexture") {
+        const auto index = value.second.TextureIndex();
+        if (index < textures.size())
+          currently_loading.emissive_texture = textures[index];
+      }
+
+      else if (value.first == "emissiveFactor") {
+        const auto color_value = value.second.ColorFactor();
+        currently_loading.emissive_factor.r = (float)color_value[0];
+        currently_loading.emissive_factor.g = (float)color_value[1];
+        currently_loading.emissive_factor.b = (float)color_value[2];
+      }
+
+      else if (value.first == "alphaCutoff") {
+        const auto factor = value.second.Factor();
+        if (factor >= 0.f && factor <= 1.f) {
+          currently_loading.alpha_cutoff = (float)factor;
+        }
+      }
+
+      else {
+        std::cerr << "Warn: The value " << value.first
+                  << " is defined in material " << i
+                  << " in additionalValues but is ignored by loader\n";
+        if (value.first == "name") {
+          std::cerr << "It seems there's a \"name\" field in the "
+                       "additionalValues of that model. It's value is :"
+                    << value.second.string_value << "\n";
+        }
+      }
+    }
+
+    if (gltf_material.extensions.size() == 0) {
+      // No extension = PBR MetalRough
+      currently_loading.intended_shader = shading_type::pbr_metal_rough;
+      auto& pbr_metal_rough =
+          currently_loading.shader_inputs.pbr_metal_roughness;
+      // tinygltf consider that "values" contains the standard pbr shader values
+      for (auto& value : gltf_material.values) {
+        if (value.first == "baseColorFactor") {
+          const auto base_color = value.second.ColorFactor();
+          pbr_metal_rough.base_color_factor.r = (float)base_color[0];
+          pbr_metal_rough.base_color_factor.g = (float)base_color[1];
+          pbr_metal_rough.base_color_factor.b = (float)base_color[2];
+          pbr_metal_rough.base_color_factor.a = (float)base_color[3];
+        }
+
+        else if (value.first == "metallicFactor") {
+          const auto factor = value.second.Factor();
+          if (factor >= 0 && factor <= 1) {
+            pbr_metal_rough.metallic_factor = (float)factor;
+          }
+        }
+
+        else if (value.first == "rougnessFactor") {
+          const auto factor = value.second.Factor();
+          if (factor >= 0 && factor <= 1) {
+            pbr_metal_rough.roughness_factor = factor;
+          }
+        }
+
+        else if (value.first == "baseColorTexture") {
+          const auto index = value.second.TextureIndex();
+          if (index < textures.size()) {
+            pbr_metal_rough.base_color_texture = textures[index];
+          }
+        }
+
+        else if (value.first == "metallicRoughnessTexture") {
+          const auto index = value.second.TextureIndex();
+          if (index < textures.size()) {
+            pbr_metal_rough.metallic_roughness_texture = textures[index];
+          }
+        }
+
+        else {
+          std::cerr << "Warn: The value " << value.first
+                    << " is defined in material " << i
+                    << " in values but is ignored by loader\n";
+        }
+      }
+    }
+
+    else {
+      std::cerr << "Warn: we aren't currently looking at material extensions\n";
+    }
+  }
+
+  const auto scene_index = find_main_scene(model);
   const auto& scene = model.scenes[scene_index];
 
   gltf_scene_tree.gltf_node_index = -1;
@@ -71,6 +185,7 @@ void app::load() {
   for (size_t i = 0; i < meshes_indices.size(); ++i) {
     loaded_meshes[i].instance = meshes_indices[i];
     auto& current_mesh = loaded_meshes[i];
+
     const auto skin_index = model.nodes[current_mesh.instance.node].skin;
     if (skin_index >= 0) {
       current_mesh.skinned = true;
@@ -134,7 +249,10 @@ void app::load() {
         new std::map<std::string, shader>);
 
     current_mesh.morph_targets.resize(nb_submeshes);
+    current_mesh.materials.resize(nb_submeshes);
     for (int s = 0; s < nb_submeshes; ++s) {
+      current_mesh.materials[i] = gltf_mesh.primitives[i].material;
+
       current_mesh.morph_targets[s].resize(
           gltf_mesh.primitives[s].targets.size());
 
@@ -370,7 +488,17 @@ app::app(int argc, char** argv) {
 
   logo = load_gltf_insight_icon();
 
-  gltf_insight::setup_fallback_textures();
+  // load fallback material
+  setup_fallback_textures();
+  dummy_material.name = "dummy_fallback_material";
+  dummy_material.normal_texture = fallback_textures::pure_flat_normal_map;
+  dummy_material.occlusion_texture = fallback_textures::pure_white_texture;
+  dummy_material.emissive_texture = fallback_textures::pure_black_texture;
+  dummy_material.shader_inputs.pbr_metal_roughness.metallic_roughness_texture =
+      fallback_textures::pure_white_texture;
+  dummy_material.shader_inputs.pbr_metal_roughness.base_color_texture =
+      fallback_textures::pure_white_texture;
+  dummy_material.fill_material_texture_slots();
 }
 
 app::~app() {
@@ -442,6 +570,7 @@ void app::run_view_menu() {
     ImGui::MenuItem("Bone selector", 0, &show_bone_selector);
     ImGui::MenuItem("Timeline", 0, &show_timeline);
     ImGui::MenuItem("Shader selector", 0, &show_shader_selector_window);
+    ImGui::MenuItem("Material info", 0, &show_material_window);
     ImGui::Separator();
     ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
     ImGui::EndMenu();
@@ -593,6 +722,9 @@ void app::main_loop() {
         shader_selector_window(shader_names, selected_shader, shader_to_use,
                                &show_shader_selector_window);
 
+        material_info_window(dummy_material, loaded_material,
+                             &show_material_window);
+
         if (show_bone_selector) {
           if (ImGui::Begin("Bone selector", &show_bone_selector))
             ImGui::InputInt("Active joint", &active_joint, 1, 1);
@@ -654,6 +786,7 @@ void app::main_loop() {
 
           glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
           glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
+
           update_uniforms(*a_mesh.shader_list, active_joint, shader_to_use, mvp,
                           normal, a_mesh.joint_matrices);
 

@@ -61,6 +61,7 @@ struct mesh {
   std::vector<std::vector<float>> display_position;
   std::vector<std::vector<float>> display_normals;
   std::vector<std::vector<float>> display_tangents;
+  std::vector<int> materials;
 
   // Rendering
   std::vector<GLuint> VAOs;
@@ -121,8 +122,11 @@ class app {
   bool show_timeline = true;
   bool show_gizmo = true;
   bool show_bone_selector = true;
+  bool show_material_window = true;
 
   std::vector<mesh> loaded_meshes;
+  std::vector<material> loaded_material;
+  material dummy_material;
 
   // Application state
   bool asset_loaded = false;

@@ -12,8 +12,12 @@ class shader;
 
 namespace gltf_insight {
 
-static GLuint pure_white_texture = 0;
-static GLuint pure_flat_normal_map = 0;
+struct fallback_textures {
+  static GLuint pure_white_texture;
+  static GLuint pure_flat_normal_map;
+  static GLuint pure_black_texture;
+};
+
 void setup_fallback_textures();
 
 /// Type of shader requested
@@ -24,18 +28,42 @@ enum class shading_type {
   pbr_specular_glossy,
   // No lighting. This is from an extension
   unlit,
+
+  // TODO add shader mode defined by extensions here
 };
 
 /// Type of alpha blending requested
 enum class alpha_coverage { opaque, mask, blend };
 
+static inline std::string to_string(alpha_coverage c) {
+  switch (c) {
+    case alpha_coverage::blend:
+      return "blend";
+    case alpha_coverage::opaque:
+      return "opaque";
+    case alpha_coverage::mask:
+      return "mask";
+  }
+}
+
+static inline std::string to_string(shading_type s) {
+  switch (s) {
+    case shading_type::pbr_metal_rough:
+      return "PBR metallic/roughness";
+    case shading_type::pbr_specular_glossy:
+      return "PBR specular/glossiness";
+    case shading_type::unlit:
+      return "Unlit";
+  }
+}
+
 /// The maximum number of texture attachement our shader system can have
 static constexpr size_t max_texture_slots = 5;
 
 struct material {
-  std::string name;
+  std::string name = "not_set";
   // Hint about shader to use
-  shading_type intended_shader;
+  shading_type intended_shader = shading_type::pbr_metal_rough;
 
   // These are texture attachment in an arbitrary order
   std::array<GLuint, max_texture_slots> texture_slots;
@@ -51,10 +79,11 @@ struct material {
 
   glm::vec3 emissive_factor = glm::vec3(0.f, 0.f, 0.f);
   alpha_coverage alpha_mode = alpha_coverage::opaque;
-  float alpha_cuttoff = 0.5;
+  float alpha_cutoff = 0.5;
   bool double_sided = false;
 
-  union {
+  union shader_input_ {
+    shader_input_() : pbr_metal_roughness() {}
     struct {
       glm::vec4 base_color_factor = glm::vec4(1.f, 1.f, 1.f, 1.f);
       // attachement 3
