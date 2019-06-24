@@ -156,6 +156,7 @@ foreach(INPUT_FILE ${SHADER})
 endforeach()
 # Shader source code is #included from shaders directory
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/config/shaders)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/shaders/)
 
 if(CMAKE_VERSION VERSION_GREATER 3.8)
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})

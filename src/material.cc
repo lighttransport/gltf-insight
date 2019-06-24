@@ -60,7 +60,8 @@ void material::fill_material_texture_slots() {
       texture_slots[3] = shader_inputs.pbr_metal_roughness.base_color_texture;
       texture_slots[4] =
           shader_inputs.pbr_metal_roughness.metallic_roughness_texture;
-      textures_used = 5;
+      texture_slots[5] = brdf_lut;
+      textures_used = 6;
       break;
 
     case shading_type::pbr_specular_glossy:
@@ -80,7 +81,7 @@ void material::fill_material_texture_slots() {
 void material::bind_textures() {
   for (int i = 0; i < textures_used; ++i) {
     glActiveTexture(GL_TEXTURE0 + i);
-    glBindTexture(GL_TEXTURE_2D, texture_slots[0]);
+    glBindTexture(GL_TEXTURE_2D, texture_slots[i]);
   }
 }
 
@@ -132,4 +133,22 @@ void material::set_shader_uniform(const shader& shading_program) const {
 
       break;
   }
+}
+
+GLuint material::brdf_lut = 0;
+#include "brdflut.png_inc.hh"
+#include "stb_image.h"
+void material::load_brdf_lut() {
+  int x, y, c;
+  stbi_uc* brdf_lut_data =
+      stbi_load_from_memory(brdflut_png, brdflut_png_len, &x, &y, &c, 4);
+  glGenTextures(1, &brdf_lut);
+  glBindTexture(GL_TEXTURE_2D, brdf_lut);
+  glTexImage2D(GL_TEXTURE_2D, 0, c == 4 ? GL_RGBA : GL_RGB, x, y, 0,
+               c == 4 ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE, brdf_lut_data);
+  stbi_image_free(brdf_lut_data);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }

@@ -147,6 +147,7 @@ void load_shaders(const size_t nb_joints,
 #include "draw_debug_color.frag_inc.hh"
 #include "no_skinning.vert_inc.hh"
 #include "normals.frag_inc.hh"
+#include "pbr_metallic_roughness.frag_inc.hh"
 #include "skinning_template.vert_inc.hh"
 #include "tangents.frag_inc.hh"
 #include "unlit.frag_inc.hh"
@@ -186,11 +187,12 @@ void load_shaders(const size_t nb_joints,
       bin_to_str(normals_frag, normals_frag_len);
   std::string fragment_shader_source_tangents =
       bin_to_str(tangents_frag, tangents_frag_len);
-
   std::string fragment_shader_source_bitangent =
       bin_to_str(bitangent_frag, bitangent_frag_len);
   std::string fragment_shader_weights =
       bin_to_str(bitangent_frag, bitangent_frag_len);
+  std::string fragment_shader_pbr_metal_rough =
+      bin_to_str(pbr_metallic_roughness_frag, pbr_metallic_roughness_frag_len);
 
   shaders["unlit"] =
       shader("unlit",
@@ -226,6 +228,12 @@ void load_shaders(const size_t nb_joints,
   shaders["no_skinning_tex"] =
       shader("no_skinning_tex", vertex_shader_no_skinning.c_str(),
              fragment_shader_source_textured_unlit.c_str());
+
+  shaders["pbr_metal_rough"] =
+      shader("pbr_metal_rough",
+             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
+                            : vertex_shader_no_skinning.c_str(),
+             fragment_shader_pbr_metal_rough.c_str());
 
   if (nb_joints > 0)
     shaders["weights"] =

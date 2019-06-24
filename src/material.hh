@@ -33,7 +33,7 @@ enum class shading_type {
 };
 
 /// Type of alpha blending requested
-enum class alpha_coverage { opaque, mask, blend };
+enum class alpha_coverage : int { opaque = 0, mask = 1, blend = 2 };
 
 static inline std::string to_string(alpha_coverage c) {
   switch (c) {
@@ -49,16 +49,16 @@ static inline std::string to_string(alpha_coverage c) {
 static inline std::string to_string(shading_type s) {
   switch (s) {
     case shading_type::pbr_metal_rough:
-      return "PBR metallic/roughness";
+      return "PBR metallic roughness";
     case shading_type::pbr_specular_glossy:
-      return "PBR specular/glossiness";
+      return "PBR specular glossiness";
     case shading_type::unlit:
       return "Unlit";
   }
 }
 
 /// The maximum number of texture attachement our shader system can have
-static constexpr size_t max_texture_slots = 5;
+static constexpr size_t max_texture_slots = 6;
 
 struct material {
   std::string name = "not_set";
@@ -113,6 +113,9 @@ struct material {
     } unlit;
 
   } shader_inputs;
+
+  static GLuint brdf_lut;
+  static void load_brdf_lut();
 
   void fill_material_texture_slots();
   void bind_textures();

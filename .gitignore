@@ -1,4 +1,4 @@
 build/
 imgui.ini
 config/cmake_config.hh
-shaders/*.hh
+config/shaders/*.hh
