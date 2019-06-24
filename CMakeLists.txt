@@ -128,8 +128,6 @@ else()
   file(GLOB SHADER shaders/*.vert shaders/*.frag)
 endif()
 
-# Shader source code is #included from shaders directory
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/shaders)
 
 if(WIN32)
 SET(SHADER_PACKER ${CMAKE_CURRENT_SOURCE_DIR}/bin/xxd.exe)
@@ -138,8 +136,8 @@ SET(SHADER_PACKER xxd) #this should be installed on any descent linux system
 endif()
 
 foreach(INPUT_FILE ${SHADER})
-set(OUTPUT_FILE ${INPUT_FILE}_inc.hh)
 get_filename_component(INPUT_FILENAME ${INPUT_FILE} NAME)
+set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/shaders/${INPUT_FILENAME}_inc.hh)
 add_custom_command(
 	OUTPUT ${OUTPUT_FILE}
 	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/shaders/
@@ -150,7 +148,8 @@ add_custom_command(
 
 	list(APPEND SHADER ${OUTPUT_FILE})
 endforeach()
-
+# Shader source code is #included from shaders directory
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/shaders/)
 
 if(CMAKE_VERSION VERSION_GREATER 3.8)
 	source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
