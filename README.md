@@ -28,6 +28,8 @@ Latest coninious build are available for [**Linux** (AppImage)](https://github.c
 
 * [x] Windows
 * [x] Linux
+  * [x] Ubuntu 16.04
+  * [x] CentOS7
 * [x] macOS
 
 ## Features
@@ -81,10 +83,20 @@ cmake ..
 make
 ```
 
-On Ubuntu, you may need to install a few dependencies : 
+#### On Ubuntu
+
+You may need to install a few dependencies : 
 
 ```bash
 sudo apt install git cmake mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-xinerama0 libxinerama-dev libxcursor-dev libxi-dev
+```
+
+#### On CentOS7
+
+You can use cmake3 package and You may need to install a few dependencies : 
+
+```bash
+sudo yum install git cmake3 libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel
 ```
 
 ## TODO
@@ -93,8 +105,9 @@ sudo apt install git cmake mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-
 * [ ] Animation curve display : https://github.com/ocornut/imgui/issues/786
 * [ ] Edit animation parameters in GUI
 * [ ] Better GUI for animations.
-* [ ] CPU skinning.
+* [x] CPU skinning.
 * [ ] Draco compressed mesh support. https://github.com/google/draco
+  * NOTE that Draco fails to compile with gcc4.8(CentOS7 default)
 * [ ] basis_universal texture compression support. https://github.com/binomialLLC/basis_universal
 
 ## License
