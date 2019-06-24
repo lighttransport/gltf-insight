@@ -244,20 +244,27 @@ void load_shaders(const size_t nb_joints,
 }
 
 void update_uniforms(std::map<std::string, shader>& shaders,
-                     const int active_joint, const std::string& shader_to_use,
+                     const glm::vec3& camera_position,
+                     const glm::vec3& light_color,
+                     const glm::vec3& light_direction, const int active_joint,
+                     const std::string& shader_to_use, const glm::mat4& model,
                      const glm::mat4& mvp, const glm::mat3& normal,
                      const std::vector<glm::mat4>& joint_matrices) {
   shaders[shader_to_use].use();
+  shaders[shader_to_use].set_uniform("camera_position", camera_position);
+  shaders[shader_to_use].set_uniform("light_direction", light_direction);
+  shaders[shader_to_use].set_uniform("light_color", light_color);
   shaders[shader_to_use].set_uniform("active_joint", active_joint);
   shaders[shader_to_use].set_uniform("joint_matrix", joint_matrices);
   shaders[shader_to_use].set_uniform("mvp", mvp);
+  shaders[shader_to_use].set_uniform("model", model);
   shaders[shader_to_use].set_uniform("normal", normal);
   shaders[shader_to_use].set_uniform("debug_color",
                                      glm::vec4(0.5f, 0.5f, 0.f, 1.f));
 }
 
 void perform_draw_call(const draw_call_submesh& draw_call_to_perform) {
-  glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
+  // glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
   glBindVertexArray(draw_call_to_perform.VAO);
   glDrawElements(draw_call_to_perform.draw_mode,
                  GLsizei(draw_call_to_perform.count), GL_UNSIGNED_INT, 0);

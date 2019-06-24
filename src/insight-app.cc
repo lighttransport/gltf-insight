@@ -164,6 +164,8 @@ void app::load() {
     else {
       std::cerr << "Warn: we aren't currently looking at material extensions\n";
     }
+
+    currently_loading.fill_material_texture_slots();
   }
 
   const auto scene_index = find_main_scene(model);
@@ -467,6 +469,31 @@ mesh::mesh(mesh&& other) throw() { *this = std::move(other); }
 
 mesh::mesh() : instance() {}
 
+glm::vec3 directional_light::get_direction_vector() const {
+  return glm::normalize(non_normalized_direction);
+}
+
+void directional_light::show_control() {
+  if (control_open) {
+    if (ImGui::Begin("Editor light control", &control_open)) {
+      ImGui::ColorEdit3("Light color", glm::value_ptr(color));
+      ImGui::SliderFloat3("Light Direction Euler",
+                          glm::value_ptr(non_normalized_direction), -1, 1);
+
+      // Since what wer are already doing is not ideal to set a light direction
+      // vector from an UI... Safeguard against null vector normalization
+      // causing NANtastic things
+      if (glm::length(non_normalized_direction) == 0.f)
+        non_normalized_direction.y -= .001f;
+
+      const auto dir = get_direction_vector();
+      ImGui::Text("Actual direction is vec3(%.3f, %.3f, %.3f)", dir.x, dir.y,
+                  dir.z);
+    }
+    ImGui::End();
+  }
+}
+
 app::app(int argc, char** argv) {
   parse_command_line(argc, argv, debug_output, input_filename);
 
@@ -573,6 +600,7 @@ void app::run_view_menu() {
     ImGui::MenuItem("Material info", 0, &show_material_window);
     ImGui::Separator();
     ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
+    ImGui::MenuItem("Editor light controls", 0, &editor_light.control_open);
     ImGui::EndMenu();
   }
 }
@@ -726,6 +754,8 @@ void app::main_loop() {
         material_info_window(dummy_material, loaded_material,
                              &show_material_window);
 
+        editor_light.show_control();
+
         if (show_bone_selector) {
           if (ImGui::Begin("Bone selector", &show_bone_selector))
             ImGui::InputInt("Active joint", &active_joint, 1, 1);
@@ -763,10 +793,10 @@ void app::main_loop() {
       const glm::quat camera_rotation(
           glm::vec3(glm::radians(gui_parameters.rot_pitch),
                     glm::radians(gui_parameters.rot_yaw), 0.f));
+      const auto world_camera_position = camera_rotation * camera_position;
 
-      view_matrix =
-          glm::lookAt(camera_rotation * camera_position, glm::vec3(0.f),
-                      camera_rotation * glm::vec3(0, 1.f, 0));
+      view_matrix = glm::lookAt(world_camera_position, glm::vec3(0.f),
+                                camera_rotation * glm::vec3(0, 1.f, 0));
 
       if (asset_loaded) {
         int active_bone_gltf_node = -1;
@@ -786,7 +816,7 @@ void app::main_loop() {
               a_mesh.flat_joint_list, a_mesh.inverse_bind_matrices);
 
           glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
-          glm::mat3 normal = glm::transpose(glm::inverse(model_matrix));
+          glm::mat3 normal_matrix = glm::transpose(glm::inverse(model_matrix));
 
           // Draw all of the submeshes of the object
           for (size_t submesh = 0;
@@ -799,21 +829,39 @@ void app::main_loop() {
                 case shading_type::pbr_metal_rough:
                   shader_to_use = "pbr_metal_rough";
                   break;
+                default:
+                  shader_to_use = "unlit";
+                  std::cout << "Warn: unimplemented material shader mode.\n";
+                  break;
               }
             }
+
+            material_to_use.bind_textures();
             material_to_use.set_shader_uniform(
                 (*a_mesh.shader_list)[shader_to_use]);
-            material_to_use.bind_textures();
-            update_uniforms(*a_mesh.shader_list, active_joint, shader_to_use,
-                            mvp, normal, a_mesh.joint_matrices);
+
+            update_uniforms(*a_mesh.shader_list, world_camera_position,
+                            editor_light.color,
+                            editor_light.get_direction_vector(), active_joint,
+                            shader_to_use, model_matrix, mvp, normal_matrix,
+                            a_mesh.joint_matrices);
+
             const auto& draw_call = a_mesh.draw_call_descriptors[submesh];
+
             perform_software_morphing(
                 gltf_scene_tree, submesh, a_mesh.morph_targets,
                 a_mesh.positions, a_mesh.normals, a_mesh.tangents,
                 a_mesh.display_position, a_mesh.display_normals,
                 a_mesh.display_tangents, a_mesh.VBOs);
+
             glEnable(GL_DEPTH_TEST);
-            glFrontFace(GL_CCW);
+            if (!material_to_use.double_sided) {
+              glEnable(GL_CULL_FACE);
+              glFrontFace(GL_CCW);
+            } else {
+              glDisable(GL_CULL_FACE);
+            }
+
             perform_draw_call(draw_call);
           }
           // Then draw 2D bones and joints on top of that
@@ -826,6 +874,7 @@ void app::main_loop() {
     gl_gui_end_frame(window);
   }
 }
+
 // Private methods here :
 
 std::string app::GetFilePathExtension(const std::string& FileName) {

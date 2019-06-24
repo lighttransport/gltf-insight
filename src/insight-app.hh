@@ -67,9 +67,11 @@ struct mesh {
   std::vector<GLuint> VAOs;
   std::vector<std::array<GLuint, 7>> VBOs;
   std::vector<draw_call_submesh> draw_call_descriptors;
-  // The "material" is just defined as the shader used to render the object...
-  // string = a standardized display mode
-  // shader = shader object to use
+
+  // Each mesh comes with a set of shader objects to be used. They need to be
+  // created after we known some info about the mesh Because gl_util's
+  // load_shader function take templated shader code and substitues values. This
+  // is required for the GPU skinning implementation.
   std::unique_ptr<std::map<std::string, shader>> shader_list;
 
   // is this mesh displayed on screen
@@ -82,6 +84,18 @@ struct mesh {
   mesh(mesh&& other) throw();
   mesh();
   ~mesh();
+};
+
+struct directional_light {
+  glm::vec3 color = glm::vec3(1.f, 1.f, 1.f);
+
+  glm::vec3 non_normalized_direction = glm::vec3(1.f, 1.f, 1.f);
+
+  glm::vec3 get_direction_vector() const;
+
+  bool control_open = true;
+
+  void show_control();
 };
 
 class app {
@@ -107,6 +121,8 @@ class app {
   void main_loop();
 
  private:
+  directional_light editor_light;
+
   ImGuizmo::OPERATION mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
   ImGuizmo::MODE mCurrentGizmoMode = ImGuizmo::WORLD;
   float lower_docked_prop_size = 0.25;

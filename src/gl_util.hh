@@ -27,7 +27,10 @@ void load_shaders(const size_t nb_joints,
 
 /// Update all shader's uniforms
 void update_uniforms(std::map<std::string, shader>& shaders,
-                     const int active_joint, const std::string& shader_to_use,
+                     const glm::vec3& camera_position,
+                     const glm::vec3& light_color,
+                     const glm::vec3& light_direction, const int active_joint,
+                     const std::string& shader_to_use, const glm::mat4& model,
                      const glm::mat4& mvp, const glm::mat3& normal,
                      const std::vector<glm::mat4>& joint_matrices);
 

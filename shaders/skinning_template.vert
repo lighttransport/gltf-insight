@@ -9,6 +9,7 @@ layout (location = 3) in vec3 input_tangent;
 layout (location = 4) in vec4 input_joints;
 layout (location = 5) in vec4 input_weights;
 
+uniform mat4 model;
 uniform mat4 mvp;
 uniform mat3 normal;
 uniform int active_joint;
@@ -20,6 +21,8 @@ uniform mat4 joint_matrix[$nb_joints];
 out vec3 interpolated_normal;
 out vec3 interpolated_tangent;
 out vec3 interpolated_bitangent;
+out vec3 fragment_world_position;
+out mat3 tbn;
 
 out vec2 interpolated_uv;
 out vec4 interpolated_weights;
@@ -126,7 +129,9 @@ void main()
   interpolated_normal = normal * vec3(normal_skin_matrix * vec4(input_normal, 1.0));
   interpolated_tangent = normal *  vec3(normal_skin_matrix * vec4(input_tangent, 1.0));
   interpolated_bitangent = cross(interpolated_normal, interpolated_tangent);
-  
+  tbn = mat3(interpolated_normal, interpolated_bitangent, interpolated_tangent);
+  fragment_world_position = vec3(model * vec4(input_position, 1.0));
+
   interpolated_uv = input_uv;
   interpolated_weights = weight_color();
 }

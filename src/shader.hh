@@ -24,6 +24,7 @@ class shader {
   GLuint get_program() const;
   const char* get_name() const;
 
+  void set_uniform(const char* name, const float value) const;
   void set_uniform(const char* name, const int value) const;
   void set_uniform(const char* name, const glm::vec4& v) const;
   void set_uniform(const char* name, const glm::vec3& v) const;
