@@ -120,6 +120,8 @@ endif()
 # [tinygltf]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf)
 
+
+#Discover the source code
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   file(GLOB SOURCES CONFIGURE_DEPENDS  src/*)
   file(GLOB SHADER CONFIGURE_DEPENDS shaders/*.vert shaders/*.frag)
@@ -128,22 +130,26 @@ else()
   file(GLOB SHADER shaders/*.vert shaders/*.frag)
 endif()
 
-
+#find xxd's executable
 if(WIN32)
-SET(SHADER_PACKER ${CMAKE_CURRENT_SOURCE_DIR}/bin/xxd.exe)
+  set(SHADER_PACKER ${CMAKE_CURRENT_SOURCE_DIR}/bin/xxd.exe)
 else()
-SET(SHADER_PACKER xxd) #this should be installed on any descent linux system
+  set(SHADER_PACKER xxd) #this should be installed on any decent
 endif()
 
+#Iterate over every shader file
 foreach(INPUT_FILE ${SHADER})
-get_filename_component(INPUT_FILENAME ${INPUT_FILE} NAME)
-set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/shaders/${INPUT_FILENAME}_inc.hh)
-add_custom_command(
-	OUTPUT ${OUTPUT_FILE}
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/shaders/
-	COMMAND  ${SHADER_PACKER}  -i  ${INPUT_FILENAME} ${OUTPUT_FILE}
-	COMMENT  "packing ${INPUT_FILE} shader into ${OUTPUT_FILE}"
-	DEPENDS ${INPUT_FILE}
+	#From full path, get only the filename of the shader
+	get_filename_component(INPUT_FILENAME ${INPUT_FILE} NAME)
+	#Compute an output path that lands in build/shaders/shadername.{frag, vert}_inc.hh
+	set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/shaders/${INPUT_FILENAME}_inc.hh)
+	#A a custom build command that will generate the output file as a includable header
+	add_custom_command(
+		OUTPUT ${OUTPUT_FILE}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/shaders/
+		COMMAND  ${SHADER_PACKER}  -i  ${INPUT_FILENAME} ${OUTPUT_FILE}
+		COMMENT  "packing ${INPUT_FILE} shader into ${OUTPUT_FILE}"
+		DEPENDS ${INPUT_FILE}
 	)
 
 	list(APPEND SHADER_GEN ${OUTPUT_FILE})
