@@ -10,7 +10,7 @@ in vec2 interpolated_uv;
 in vec3 interpolated_normal;
 in vec3 interpolated_tangent;
 in vec3 interpolated_bitangent;
-in vec3 frag_world_position;
+in vec3 fragment_world_position;
 in mat3 tbn;
 
 //texture maps
@@ -54,16 +54,40 @@ struct pbr_info
 const float PI =  3.141592653589793;
 const float min_roughness = 0.04;
 
-
-vec3 calculate_normal_vector()
+mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
 {
-  vec3 sampled_normal = normalize((texture(normal_texture, interpolated_uv).rgb * 2.0f) - 1.0f);
-  return (normalize(tbn * sampled_normal));
+
+ vec3 dp1 = dFdx( p );
+ vec3 dp2 = dFdy( p );
+ vec2 duv1 = dFdx( uv );
+ vec2 duv2 = dFdy( uv );
+
+ vec3 dp2perp = cross( dp2, N );
+ vec3 dp1perp = cross( N, dp1 );
+
+
+ vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+ vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+
+ float invmax = inversesqrt(max(dot(T,T), dot(B,B)));
+ return mat3( T * invmax, B * invmax, N );
+
 }
 
+// Perturb normal, see http://www.thetenthplanet.de/archives/1180
+vec3 perturb_normal(vec3 N, vec3 V)
+{
+	vec3 sampled_normal_map = texture(normal_texture, interpolated_uv).xyz * 255.f/127.f - 128.f/127.f;
+
+	mat3 TBN = cotangent_frame(N, -V, interpolated_uv);
+	return normalize(TBN * sampled_normal_map);
+}
+
+//TODO divide or don't divide by pi?
 vec3 diffuse(pbr_info pbr_inputs)
 {
-	return pbr_inputs.diffuse_color /*/ PI*/;
+	//return pbr_inputs.diffuse_color.rgb / PI;
+	return pbr_inputs.diffuse_color.rgb;
 }
 
 vec3 specular_reflection(pbr_info pbr_inputs)
@@ -112,7 +136,6 @@ void main()
 	perceptual_roughness = clamp(roughness_factor * physics_sample.g, min_roughness, 1.0);
 	float alpha_roughness = perceptual_roughness * perceptual_roughness;
 
-
 	vec3 f0 = vec3(0.04); //frenel factor
 	vec3 diffuse_color = base_color.rgb * (vec3(1.0) - f0); 
 	diffuse_color *= 1.0 - metallic;
@@ -125,9 +148,9 @@ void main()
 	vec3 specular_env_r0 = specular_color.rgb;
 	vec3 specular_env_r90 =  vec3(1.0f, 1.0f, 1.0f) * reflectance90;
 
-	//vec3 n = calculate_normal_vector(); //TODO fix my tangent space for normal mapping!
-	vec3 n = normalize(interpolated_normal);
-	vec3 v = normalize(camera_position - frag_world_position);
+	//vec3 n = normalize(interpolated_normal);
+	vec3 v = normalize(camera_position - fragment_world_position);
+	vec3 n = perturb_normal(normalize(interpolated_normal), v); //TODO fix my tangent space for normal mapping!
 	vec3 l = normalize(-light_direction);
 	vec3 h = normalize(l+v);
 	vec3 reflection = -normalize(reflect(v, n));

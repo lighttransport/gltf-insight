@@ -52,8 +52,8 @@ void app::load() {
   textures.resize(nb_textures);
   load_all_textures(model, nb_textures, textures);
 
+  // TODO extract "load_materials" function
   loaded_material.resize(model.materials.size());
-
   for (size_t i = 0; i < model.materials.size(); ++i) {
     auto& currently_loading = loaded_material[i];
     const auto gltf_material = model.materials[i];
@@ -218,7 +218,6 @@ void app::load() {
     current_mesh.positions.resize(nb_submeshes);
     current_mesh.uvs.resize(nb_submeshes);
     current_mesh.normals.resize(nb_submeshes);
-    current_mesh.tangents.resize(nb_submeshes);
     current_mesh.weights.resize(nb_submeshes);
     current_mesh.joints.resize(nb_submeshes);
     current_mesh.VAOs.resize(nb_submeshes);
@@ -236,12 +235,11 @@ void app::load() {
                   current_mesh.draw_call_descriptors, current_mesh.VAOs,
                   current_mesh.VBOs, current_mesh.indices,
                   current_mesh.positions, current_mesh.uvs,
-                  current_mesh.normals, current_mesh.tangents,
-                  current_mesh.weights, current_mesh.joints);
+                  current_mesh.normals, current_mesh.weights,
+                  current_mesh.joints);
 
     current_mesh.display_position = current_mesh.positions;
     current_mesh.display_normals = current_mesh.normals;
-    current_mesh.display_tangents = current_mesh.tangents;
 
     // cleanup opengl state
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -317,33 +315,6 @@ void app::load() {
             morph_target.normal[i2 + 0] = n.x;
             morph_target.normal[i2 + 1] = n.y;
             morph_target.normal[i2 + 2] = n.z;
-          }
-        }
-      }
-
-      if (!has_tangents) {
-        for (auto& morph_target : current_mesh.morph_targets[s]) {
-          morph_target.tangent.resize(morph_target.normal.size());
-          const auto dir = glm::vec3(0.f, 1.f, 1.f);
-          for (size_t vert = 0; vert < morph_target.normal.size() / 3; ++vert) {
-            const glm::vec3 normal(current_mesh.normals[s][3 * vert + 0] +
-                                       morph_target.normal[3 * vert + 0],
-                                   current_mesh.normals[s][3 * vert + 1] +
-                                       morph_target.normal[3 * vert + 1],
-                                   current_mesh.normals[s][3 * vert + 2] +
-                                       morph_target.normal[3 * vert + 2]);
-
-            const glm::vec3 morphed_tangent = glm::cross(normal, dir);
-            const glm::vec3 unmorphed_tangent =
-                glm::vec3(current_mesh.tangents[s][3 * vert + 0],
-                          current_mesh.tangents[s][3 * vert + 1],
-                          current_mesh.tangents[s][3 * vert + 2]);
-
-            const glm::vec3 tangent = morphed_tangent - unmorphed_tangent;
-
-            morph_target.tangent[3 * vert + 0] = tangent.x;
-            morph_target.tangent[3 * vert + 1] = tangent.y;
-            morph_target.tangent[3 * vert + 2] = tangent.z;
           }
         }
       }
@@ -455,10 +426,8 @@ mesh& mesh::operator=(mesh&& o) throw() {
   uvs = std::move(o.uvs);
   normals = std::move(o.normals);
   weights = std::move(o.weights);
-  tangents = std::move(o.tangents);
   display_position = std::move(o.display_position);
   display_normals = std::move(o.display_normals);
-  display_tangents = std::move(o.display_tangents);
   o.joints = std::move(o.joints);
 
   shader_list = std::move(o.shader_list);
@@ -848,11 +817,10 @@ void app::main_loop() {
 
             const auto& draw_call = a_mesh.draw_call_descriptors[submesh];
 
-            perform_software_morphing(
-                gltf_scene_tree, submesh, a_mesh.morph_targets,
-                a_mesh.positions, a_mesh.normals, a_mesh.tangents,
-                a_mesh.display_position, a_mesh.display_normals,
-                a_mesh.display_tangents, a_mesh.VBOs);
+            perform_software_morphing(gltf_scene_tree, submesh,
+                                      a_mesh.morph_targets, a_mesh.positions,
+                                      a_mesh.normals, a_mesh.display_position,
+                                      a_mesh.display_normals, a_mesh.VBOs);
 
             glEnable(GL_DEPTH_TEST);
             if (!material_to_use.double_sided) {
@@ -970,14 +938,13 @@ void app::cpu_compute_morphed_display_mesh(
     const std::vector<std::vector<morph_target>>& morph_targets,
     const std::vector<std::vector<float>>& vertex_coord,
     const std::vector<std::vector<float>>& normals,
-    const std::vector<std::vector<float>>& tangents,
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<std::vector<float>>& display_tangent, size_t vertex) {
+
+    size_t vertex) {
   // Get the base vector
   display_position[submesh_id][vertex] = vertex_coord[submesh_id][vertex];
   display_normal[submesh_id][vertex] = normals[submesh_id][vertex];
-  display_tangent[submesh_id][vertex] = tangents[submesh_id][vertex];
 
   // Accumulate the delta, v = v0 + w0 * m0 + w1 * m1 + w2 * m2 ...
   for (size_t w = 0; w < mesh_skeleton_graph.pose.blend_weights.size(); ++w) {
@@ -986,15 +953,12 @@ void app::cpu_compute_morphed_display_mesh(
         weight * morph_targets[submesh_id][w].position[vertex];
     display_normal[submesh_id][vertex] +=
         weight * morph_targets[submesh_id][w].normal[vertex];
-    display_tangent[submesh_id][vertex] +=
-        weight * morph_targets[submesh_id][w].normal[vertex];
   }
 }
 
 void app::gpu_update_morphed_submesh(
     size_t submesh_id, std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<std::vector<float>>& display_tangent,
     std::vector<std::array<GLuint, 7>>& VBOs) {
   // upload to GPU
   glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][0]);
@@ -1007,11 +971,12 @@ void app::gpu_update_morphed_submesh(
                display_normal[submesh_id].size() * sizeof(float),
                display_normal[submesh_id].data(), GL_DYNAMIC_DRAW);
 
-  // TODO create #defines for these layout numbers, they are arbitrary
-  glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][3]);
-  glBufferData(GL_ARRAY_BUFFER,
-               display_tangent[submesh_id].size() * sizeof(float),
-               display_tangent[submesh_id].data(), GL_DYNAMIC_DRAW);
+  //// TODO create #defines for these layout numbers, they are arbitrary
+  // glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][3]);
+  // glBufferData(GL_ARRAY_BUFFER,
+  //             display_tangent[submesh_id].size() * sizeof(float),
+  //             display_tangent[submesh_id].data(), GL_DYNAMIC_DRAW);
+
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -1020,10 +985,8 @@ void app::perform_software_morphing(
     const std::vector<std::vector<morph_target>>& morph_targets,
     const std::vector<std::vector<float>>& vertex_coord,
     const std::vector<std::vector<float>>& normals,
-    const std::vector<std::vector<float>>& tangents,
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<std::vector<float>>& display_tangent,
     std::vector<std::array<GLuint, 7>>& VBOs) {
   // evaluation cache:
   static std::vector<bool> clean;
@@ -1075,13 +1038,12 @@ void app::perform_software_morphing(
            ++vertex) {
         cpu_compute_morphed_display_mesh(
             mesh_skeleton_graph, submesh_id, morph_targets, vertex_coord,
-            normals, tangents, display_position, display_normal,
-            display_tangent, vertex);
+            normals, display_position, display_normal, vertex);
       }
 
       // Upload the new mesh data to the GPU
       gpu_update_morphed_submesh(submesh_id, display_position, display_normal,
-                                 display_tangent, VBOs);
+                                 VBOs);
     }
   }
 }

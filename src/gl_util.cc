@@ -181,8 +181,7 @@ void load_shaders(const size_t nb_joints,
 
   std::string fragment_shader_source_draw_debug_color =
       bin_to_str(draw_debug_color_frag, draw_debug_color_frag_len);
-  std::string fragment_shader_source_uv =
-      bin_to_str(draw_debug_color_frag, draw_debug_color_frag_len);
+  std::string fragment_shader_source_uv = bin_to_str(uv_frag, uv_frag_len);
   std::string fragment_shader_source_normals =
       bin_to_str(normals_frag, normals_frag_len);
   std::string fragment_shader_source_tangents =
