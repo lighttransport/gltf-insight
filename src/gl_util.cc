@@ -143,13 +143,17 @@ void load_shaders(const size_t nb_joints,
     // TODO put the GLSL code ouside of here, load them from files
     // Main vertex shader, that perform GPU skinning
 
-#include "bitangent.frag_inc.hh"
+#include "base_color_map.frag_inc.hh"
 #include "draw_debug_color.frag_inc.hh"
+#include "emissive_map.frag_inc.hh"
+#include "metallic_roughness_map.frag_inc.hh"
 #include "no_skinning.vert_inc.hh"
+#include "normal_map.frag_inc.hh"
 #include "normals.frag_inc.hh"
+#include "occlusion_map.frag_inc.hh"
 #include "pbr_metallic_roughness.frag_inc.hh"
+#include "perturbed_normal.frag_inc.hh"
 #include "skinning_template.vert_inc.hh"
-#include "tangents.frag_inc.hh"
 #include "unlit.frag_inc.hh"
 #include "uv.frag_inc.hh"
 #include "weights.frag_inc.hh"
@@ -178,20 +182,27 @@ void load_shaders(const size_t nb_joints,
 
   std::string fragment_shader_source_textured_unlit =
       bin_to_str(unlit_frag, unlit_frag_len);
-
   std::string fragment_shader_source_draw_debug_color =
       bin_to_str(draw_debug_color_frag, draw_debug_color_frag_len);
   std::string fragment_shader_source_uv = bin_to_str(uv_frag, uv_frag_len);
   std::string fragment_shader_source_normals =
       bin_to_str(normals_frag, normals_frag_len);
-  std::string fragment_shader_source_tangents =
-      bin_to_str(tangents_frag, tangents_frag_len);
-  std::string fragment_shader_source_bitangent =
-      bin_to_str(bitangent_frag, bitangent_frag_len);
   std::string fragment_shader_weights =
-      bin_to_str(bitangent_frag, bitangent_frag_len);
+      bin_to_str(weights_frag, weights_frag_len);
   std::string fragment_shader_pbr_metal_rough =
       bin_to_str(pbr_metallic_roughness_frag, pbr_metallic_roughness_frag_len);
+  std::string fragment_shader_normal_map =
+      bin_to_str(normal_map_frag, normal_map_frag_len);
+  std::string fragment_shader_perturbed_normal =
+      bin_to_str(perturbed_normal_frag, perturbed_normal_frag_len);
+  std::string fragment_shader_occlusion_map =
+      bin_to_str(occlusion_map_frag, occlusion_map_frag_len);
+  std::string fragment_shader_emissive_map =
+      bin_to_str(emissive_map_frag, emissive_map_frag_len);
+  std::string fragment_shader_base_color_map =
+      bin_to_str(base_color_map_frag, base_color_map_frag_len);
+  std::string fragment_shader_metallic_roughness_map =
+      bin_to_str(metallic_roughness_map_frag, metallic_roughness_map_frag_len);
 
   shaders["unlit"] =
       shader("unlit",
@@ -211,21 +222,40 @@ void load_shaders(const size_t nb_joints,
              nb_joints != 0 ? vertex_shader_source_skinning.c_str()
                             : vertex_shader_no_skinning.c_str(),
              fragment_shader_source_normals.c_str());
-
-  shaders["debug_tangent"] =
-      shader("debug_tangent",
+  shaders["debug_normal_map"] =
+      shader("debug_normal_map",
              nb_joints != 0 ? vertex_shader_source_skinning.c_str()
                             : vertex_shader_no_skinning.c_str(),
-             fragment_shader_source_tangents.c_str());
+             fragment_shader_normal_map.c_str());
 
-  shaders["debug_bitangent"] =
-      shader("debug_bitangent",
+  shaders["debug_metallic_roughness_map"] =
+      shader("debug_metallic_roughness_map",
              nb_joints != 0 ? vertex_shader_source_skinning.c_str()
                             : vertex_shader_no_skinning.c_str(),
-             fragment_shader_source_bitangent.c_str());
+             fragment_shader_metallic_roughness_map.c_str());
 
-  shaders["no_skinning_tex"] =
-      shader("no_skinning_tex", vertex_shader_no_skinning.c_str(),
+  shaders["debug_occlusion_map"] =
+      shader("debug_occlusion_map",
+             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
+                            : vertex_shader_no_skinning.c_str(),
+             fragment_shader_occlusion_map.c_str());
+  shaders["debug_emissive_map"] =
+      shader("debug_emissive_map",
+             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
+                            : vertex_shader_no_skinning.c_str(),
+             fragment_shader_emissive_map.c_str());
+  shaders["debug_base_color_map"] =
+      shader("debug_base_color_map",
+             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
+                            : vertex_shader_no_skinning.c_str(),
+             fragment_shader_base_color_map.c_str());
+  shaders["debug_applied_normal_mapping"] =
+      shader("debug_applied_normal_mapping",
+             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
+                            : vertex_shader_no_skinning.c_str(),
+             fragment_shader_perturbed_normal.c_str());
+  shaders["no_skinning_unlit"] =
+      shader("no_skinning_unlit", vertex_shader_no_skinning.c_str(),
              fragment_shader_source_textured_unlit.c_str());
 
   shaders["pbr_metal_rough"] =
