@@ -438,11 +438,11 @@ mesh::mesh(mesh&& other) throw() { *this = std::move(other); }
 
 mesh::mesh() : instance() {}
 
-glm::vec3 directional_light::get_direction_vector() const {
+glm::vec3 editor_light::get_directional_light_direction() const {
   return glm::normalize(non_normalized_direction);
 }
 
-void directional_light::show_control() {
+void editor_light::show_control() {
   if (control_open) {
     if (ImGui::Begin("Editor light control", &control_open)) {
       ImGui::ColorEdit3("Light color", glm::value_ptr(color));
@@ -455,7 +455,7 @@ void directional_light::show_control() {
       if (glm::length(non_normalized_direction) == 0.f)
         non_normalized_direction.y -= .001f;
 
-      const auto dir = get_direction_vector();
+      const auto dir = get_directional_light_direction();
       ImGui::Text("Actual direction is vec3(%.3f, %.3f, %.3f)", dir.x, dir.y,
                   dir.z);
     }
@@ -809,11 +809,11 @@ void app::main_loop() {
             material_to_use.set_shader_uniform(
                 (*a_mesh.shader_list)[shader_to_use]);
 
-            update_uniforms(*a_mesh.shader_list, world_camera_position,
-                            editor_light.color,
-                            editor_light.get_direction_vector(), active_joint,
-                            shader_to_use, model_matrix, mvp, normal_matrix,
-                            a_mesh.joint_matrices);
+            update_uniforms(*a_mesh.shader_list, editor_light.use_ibl,
+                            world_camera_position, editor_light.color,
+                            editor_light.get_directional_light_direction(),
+                            active_joint, shader_to_use, model_matrix, mvp,
+                            normal_matrix, a_mesh.joint_matrices);
 
             const auto& draw_call = a_mesh.draw_call_descriptors[submesh];
 

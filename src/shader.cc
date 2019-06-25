@@ -24,7 +24,8 @@ shader::shader() {}
 shader::shader(const char* shader_name, const char* vertex_shader_source_code,
                const char* fragment_shader_source_code)
     : shader_name_(shader_name) {
-  std::cout << "Creating " << shader_name << "\n";
+  // std::cout << "Creating " << shader_name << "\n";
+
   const GLint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
   const GLint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
   program_ = glCreateProgram();
@@ -48,14 +49,18 @@ shader::shader(const char* shader_name, const char* vertex_shader_source_code,
   glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
   if (!success) {
     glGetShaderInfoLog(vertex_shader, sizeof info_log, nullptr, info_log);
-    std::cout << info_log << '\n';
-    throw std::runtime_error("Cannot buld vertex shader : " +
-                             std::string(info_log));
+    std::cout << shader_name_ << " vertex shader build error: " << info_log
+              << '\n';
+    throw std::runtime_error("Cannot build vertex shader for " + shader_name_ +
+                             " : " + std::string(info_log));
   }
   glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success);
   if (!success) {
     glGetShaderInfoLog(fragment_shader, sizeof info_log, nullptr, info_log);
-    std::cout << info_log << '\n';
+    std::cout << shader_name_ << " fragment shader build error: " << info_log
+              << '\n';
+    throw std::runtime_error("Cannot build fragment shader for " +
+                             shader_name_ + " : " + std::string(info_log));
   }
 
   // Link shader

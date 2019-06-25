@@ -33,6 +33,7 @@ uniform float alpha_cutoff;
 uniform vec3 camera_position;
 uniform vec3 light_direction;
 uniform vec3 light_color;
+uniform bool use_ibl;
 
 //To hold the data during computation
 struct pbr_info

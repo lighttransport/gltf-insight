@@ -497,11 +497,6 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                    indices[submesh].data(), GL_STATIC_DRAW);
       glBindVertexArray(0);
     }
-
-    const auto& material = model.materials[primitive.material];
-    if (textures.size() > 0)
-      draw_call_descriptor[submesh].main_texture =
-          textures[material.values.at("baseColorTexture").TextureIndex()];
   }
 }
 

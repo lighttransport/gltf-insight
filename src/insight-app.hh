@@ -84,16 +84,16 @@ struct mesh {
   ~mesh();
 };
 
-struct directional_light {
+struct editor_lighting {
   glm::vec3 color = glm::vec3(1.f, 1.f, 1.f);
-
+  float multiplier = 1.f;
   glm::vec3 non_normalized_direction = glm::vec3(1.f, 1.f, 1.f);
-
-  glm::vec3 get_direction_vector() const;
+  glm::vec3 get_directional_light_direction() const;
 
   bool control_open = true;
-
   void show_control();
+
+  bool use_ibl = false;
 };
 
 class app {
@@ -119,7 +119,7 @@ class app {
   void main_loop();
 
  private:
-  directional_light editor_light;
+  editor_lighting editor_light;
 
   ImGuizmo::OPERATION mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
   ImGuizmo::MODE mCurrentGizmoMode = ImGuizmo::WORLD;

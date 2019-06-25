@@ -1,9 +1,10 @@
 #pragma once
 
+#include <glad/glad.h>
+
 #include <string>
 #include <vector>
 
-#include "glad/include/glad/glad.h"
 #include "glm/glm.hpp"
 
 class shader {
@@ -11,7 +12,14 @@ class shader {
   std::string shader_name_;
 
  public:
+  // default ctor
   shader();
+  // delegate ctor
+  shader(const char* shader_name, const std::string& vertex_shader_source_code,
+         const std::string& fragment_shader_source_code)
+      : shader(shader_name, vertex_shader_source_code.c_str(),
+               fragment_shader_source_code.c_str()) {}
+  // actual ctor
   shader(const char* shader_name, const char* vertex_shader_source_code,
          const char* fragment_shader_source_code);
   ~shader();

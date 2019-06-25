@@ -123,26 +123,9 @@ void draw_space_base(GLuint shader, const float line_width,
   glEnd();
 }
 
-std::string bin_to_str(unsigned char data[], unsigned int len) {
-  std::string output;
-  output.resize(len);
-  memcpy((char*)output.c_str(), (char*)data, len);
-  return output;
-}
-
 void load_shaders(const size_t nb_joints,
                   std::map<std::string, shader>& shaders) {
-  std::cerr << "Generating GLSL code for shader with " << nb_joints
-            << " joints.\n";
-
-  if (nb_joints > 180)
-    std::cerr << "Warning: This is a lot of joints, model may be unsuited for "
-                 "GPU based skinning.\n//TODO investigate dual quaternion "
-                 "based skinning\n";
-
-    // TODO put the GLSL code ouside of here, load them from files
-    // Main vertex shader, that perform GPU skinning
-
+  //"paste in" the bundled shader code
 #include "base_color_map.frag_inc.hh"
 #include "draw_debug_color.frag_inc.hh"
 #include "emissive_map.frag_inc.hh"
@@ -158,15 +141,24 @@ void load_shaders(const size_t nb_joints,
 #include "uv.frag_inc.hh"
 #include "weights.frag_inc.hh"
 
-  std::string vertex_shader_no_skinning(
-      bin_to_str(no_skinning_vert, no_skinning_vert_len));
+  // print some warnings
+  if (nb_joints > 180)
+    std::cerr << "Warning: This is a lot of joints, model may be unsuited for "
+                 "GPU based skinning.\n//TODO investigate dual quaternion "
+                 "based skinning\n";
 
-  // TODO a real shader template system may be useful
-  // Write in shader source code the value of `nb_joints`
-  std::string vertex_shader_source_skinning_template(
-      bin_to_str(skinning_template_vert, skinning_template_vert_len));
-  std::string vertex_shader_source_skinning = [&] {
-    size_t index = vertex_shader_source_skinning_template.find("$nb_joints");
+  // TODO put the GLSL code ouside of here, load them from files
+  // Main vertex shader, that perform GPU skinning
+
+  const std::string no_skinning_vert_src((char*)no_skinning_vert,
+                                         no_skinning_vert_len);
+
+  const std::string skinning_vert_src = [&] {
+    // TODO a real shader template system may be useful
+    // Write in shader source code the value of `nb_joints`
+    std::string skinning_template_vert_src((char*)skinning_template_vert,
+                                           skinning_template_vert_len);
+    size_t index = skinning_template_vert_src.find("$nb_joints");
     if (index == std::string::npos) {
       std::cerr
           << "The skinned mesh vertex shader doesn't have the $nb_joints "
@@ -175,104 +167,62 @@ void load_shaders(const size_t nb_joints,
       exit(EXIT_FAILURE);
     }
 
-    vertex_shader_source_skinning_template.replace(index, strlen("$nb_joints"),
-                                                   std::to_string(nb_joints));
-    return vertex_shader_source_skinning_template;
+    skinning_template_vert_src.replace(index, strlen("$nb_joints"),
+                                       std::to_string(nb_joints));
+    return skinning_template_vert_src;
   }();
 
-  std::string fragment_shader_source_textured_unlit =
-      bin_to_str(unlit_frag, unlit_frag_len);
-  std::string fragment_shader_source_draw_debug_color =
-      bin_to_str(draw_debug_color_frag, draw_debug_color_frag_len);
-  std::string fragment_shader_source_uv = bin_to_str(uv_frag, uv_frag_len);
-  std::string fragment_shader_source_normals =
-      bin_to_str(normals_frag, normals_frag_len);
-  std::string fragment_shader_weights =
-      bin_to_str(weights_frag, weights_frag_len);
-  std::string fragment_shader_pbr_metal_rough =
-      bin_to_str(pbr_metallic_roughness_frag, pbr_metallic_roughness_frag_len);
-  std::string fragment_shader_normal_map =
-      bin_to_str(normal_map_frag, normal_map_frag_len);
-  std::string fragment_shader_perturbed_normal =
-      bin_to_str(perturbed_normal_frag, perturbed_normal_frag_len);
-  std::string fragment_shader_occlusion_map =
-      bin_to_str(occlusion_map_frag, occlusion_map_frag_len);
-  std::string fragment_shader_emissive_map =
-      bin_to_str(emissive_map_frag, emissive_map_frag_len);
-  std::string fragment_shader_base_color_map =
-      bin_to_str(base_color_map_frag, base_color_map_frag_len);
-  std::string fragment_shader_metallic_roughness_map =
-      bin_to_str(metallic_roughness_map_frag, metallic_roughness_map_frag_len);
+  const std::string unlit_frag_src((char*)unlit_frag, unlit_frag_len);
+  const std::string draw_debug_color_src((char*)draw_debug_color_frag,
+                                         draw_debug_color_frag_len);
+  const std::string uv_frag_src((char*)uv_frag, uv_frag_len);
+  const std::string normals_frag_src((char*)normals_frag, normals_frag_len);
+  const std::string weights_frag_src((char*)weights_frag, weights_frag_len);
+  const std::string pbr_metallic_roughness_frag_src(
+      (char*)pbr_metallic_roughness_frag, pbr_metallic_roughness_frag_len);
+  const std::string normal_map_frag_src((char*)normal_map_frag,
+                                        normal_map_frag_len);
+  const std::string perturbed_normal_frag_src((char*)perturbed_normal_frag,
+                                              perturbed_normal_frag_len);
+  const std::string occlusion_map_frag_src((char*)occlusion_map_frag,
+                                           occlusion_map_frag_len);
+  const std::string emissive_map_frag_src((char*)emissive_map_frag,
+                                          emissive_map_frag_len);
+  const std::string base_color_map_frag_src((char*)base_color_map_frag,
+                                            base_color_map_frag_len);
+  const std::string metallic_roughness_map_frag_src(
+      (char*)metallic_roughness_map_frag, metallic_roughness_map_frag_len);
+  const std::string& vert_src =
+      nb_joints != 0 ? skinning_vert_src : no_skinning_vert_src;
 
-  shaders["unlit"] =
-      shader("unlit",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_source_textured_unlit.c_str());
+  shaders["unlit"] = shader("unlit", vert_src, unlit_frag_src);
   shaders["debug_color"] =
-      shader("debug_color", vertex_shader_no_skinning.c_str(),
-             fragment_shader_source_draw_debug_color.c_str());
-  shaders["debug_uv"] =
-      shader("debug_uv",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_source_uv.c_str());
+      shader("debug_color", no_skinning_vert_src, draw_debug_color_src);
+  shaders["debug_uv"] = shader(
+      "debug_uv", nb_joints != 0 ? skinning_vert_src : no_skinning_vert_src,
+      uv_frag_src);
   shaders["debug_normals"] =
-      shader("debug_normals",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_source_normals.c_str());
+      shader("debug_normals", vert_src, normals_frag_src);
   shaders["debug_normal_map"] =
-      shader("debug_normal_map",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_normal_map.c_str());
-
+      shader("debug_normal_map", vert_src, normal_map_frag_src);
   shaders["debug_metallic_roughness_map"] =
-      shader("debug_metallic_roughness_map",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_metallic_roughness_map.c_str());
-
+      shader("debug_metallic_roughness_map", vert_src,
+             metallic_roughness_map_frag_src);
   shaders["debug_occlusion_map"] =
-      shader("debug_occlusion_map",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_occlusion_map.c_str());
+      shader("debug_occlusion_map", vert_src, occlusion_map_frag_src);
   shaders["debug_emissive_map"] =
-      shader("debug_emissive_map",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_emissive_map.c_str());
+      shader("debug_emissive_map", vert_src, emissive_map_frag_src);
   shaders["debug_base_color_map"] =
-      shader("debug_base_color_map",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_base_color_map.c_str());
-  shaders["debug_applied_normal_mapping"] =
-      shader("debug_applied_normal_mapping",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_perturbed_normal.c_str());
-  shaders["no_skinning_unlit"] =
-      shader("no_skinning_unlit", vertex_shader_no_skinning.c_str(),
-             fragment_shader_source_textured_unlit.c_str());
-
+      shader("debug_base_color_map", vert_src, base_color_map_frag_src);
+  shaders["debug_applied_normal_mapping"] = shader(
+      "debug_applied_normal_mapping", vert_src, perturbed_normal_frag_src);
   shaders["pbr_metal_rough"] =
-      shader("pbr_metal_rough",
-             nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                            : vertex_shader_no_skinning.c_str(),
-             fragment_shader_pbr_metal_rough.c_str());
-
+      shader("pbr_metal_rough", vert_src, pbr_metallic_roughness_frag_src);
   if (nb_joints > 0)
-    shaders["weights"] =
-        shader("weights",
-               nb_joints != 0 ? vertex_shader_source_skinning.c_str()
-                              : vertex_shader_no_skinning.c_str(),
-               fragment_shader_weights.c_str());
+    shaders["weights"] = shader("weights", vert_src, weights_frag_src);
 }
 
-void update_uniforms(std::map<std::string, shader>& shaders,
+void update_uniforms(std::map<std::string, shader>& shaders, bool use_ibl,
                      const glm::vec3& camera_position,
                      const glm::vec3& light_color,
                      const glm::vec3& light_direction, const int active_joint,
@@ -290,10 +240,11 @@ void update_uniforms(std::map<std::string, shader>& shaders,
   shaders[shader_to_use].set_uniform("normal", normal);
   shaders[shader_to_use].set_uniform("debug_color",
                                      glm::vec4(0.5f, 0.5f, 0.f, 1.f));
+  shaders[shader_to_use].set_uniform("use_ibl",
+                                     int(use_ibl ? GL_TRUE : GL_FALSE));
 }
 
 void perform_draw_call(const draw_call_submesh& draw_call_to_perform) {
-  // glBindTexture(GL_TEXTURE_2D, draw_call_to_perform.main_texture);
   glBindVertexArray(draw_call_to_perform.VAO);
   glDrawElements(draw_call_to_perform.draw_mode,
                  GLsizei(draw_call_to_perform.count), GL_UNSIGNED_INT, 0);

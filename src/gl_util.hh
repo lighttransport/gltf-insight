@@ -26,7 +26,7 @@ void load_shaders(const size_t nb_joints,
                   std::map<std::string, shader>& shaders);
 
 /// Update all shader's uniforms
-void update_uniforms(std::map<std::string, shader>& shaders,
+void update_uniforms(std::map<std::string, shader>& shaders, bool use_ibl,
                      const glm::vec3& camera_position,
                      const glm::vec3& light_color,
                      const glm::vec3& light_direction, const int active_joint,
@@ -38,7 +38,7 @@ void update_uniforms(std::map<std::string, shader>& shaders,
 struct draw_call_submesh {
   GLenum draw_mode;
   size_t count;
-  GLuint VAO, main_texture;
+  GLuint VAO;
 };
 
 /// Perform the specified drawcall
