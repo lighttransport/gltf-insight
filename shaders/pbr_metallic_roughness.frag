@@ -33,7 +33,7 @@ uniform float alpha_cutoff;
 uniform vec3 camera_position;
 uniform vec3 light_direction;
 uniform vec3 light_color;
-uniform bool use_ibl;
+
 
 //To hold the data during computation
 struct pbr_info
@@ -117,6 +117,66 @@ float microfaced_distribution(pbr_info pbr_inputs)
 	return r_sq / (PI * f * f);
 }
 
+
+//IBL / ENV LIGHTING 
+uniform bool use_ibl;
+uniform float gamma;
+uniform float exposure;
+
+vec4 SRGB_to_LINEAR(vec4 srgb)
+{
+	return vec4(pow(srgb.rgb, vec3(gamma)), srgb.a);
+}
+
+vec3 uncharted2_tonemap(vec3 color)
+{
+	float A = 0.15;
+	float B = 0.50;
+	float C = 0.10;
+	float D = 0.20;
+	float E = 0.02;
+	float F = 0.30;
+	float W = 11.2;
+	return ((color*(A*color+C*B)+D*E)/(color*(A*color+B)+D*F))-E/F;
+}
+
+vec4 tonemap(vec4 color)
+{
+	vec3 outcol = uncharted2_tonemap(color.rgb * exposure);
+	outcol = outcol * (1.0f / uncharted2_tonemap(vec3(11.2f)));	
+	return vec4(pow(outcol, vec3(1.0f /gamma)), color.a);
+}
+
+
+uniform samplerCube env_irradiance;
+uniform samplerCube env_prefiltered_specular;
+uniform float prefiltered_cube_mip_levels;
+
+// Calculation of the lighting contribution from an optional Image Based Light source.
+// Precomputed Environment Maps are required uniform inputs and are computed as outlined in [1].
+// See our README.md on Environment Maps [3] for additional discussion.
+vec3 get_IBL_contribution(pbr_info pbr_inputs, vec3 n, vec3 reflection)
+{
+	float lod = (pbr_inputs.preceptual_roughness * prefiltered_cube_mip_levels);
+	// retrieve a scale and bias to F0. See [1], Figure 3
+	vec3 brdf = (texture(brdf_lut, vec2(pbr_inputs.n_dot_v, 1.0 - pbr_inputs.preceptual_roughness))).rgb;
+	
+	
+	vec3 diffuseLight = SRGB_to_LINEAR(tonemap(texture(env_irradiance, n))).rgb;
+	vec3 specularLight = SRGB_to_LINEAR(tonemap(textureLod(env_prefiltered_specular, reflection, lod))).rgb;
+
+	vec3 diffuse = diffuseLight * pbr_inputs.diffuse_color;
+	vec3 specular = specularLight * (pbr_inputs.specular_color * brdf.x + brdf.y);
+
+	// For presentation, this allows us to disable IBL terms
+	// For presentation, this allows us to disable IBL terms
+	
+	//diffuse *= uboParams.scaleIBLAmbient;
+	//specular *= uboParams.scaleIBLAmbient;
+
+	return diffuse + specular;
+}
+
 void main()
 {
 	//sample the base_color texture. //TODO SRGB color space.
@@ -186,6 +246,11 @@ void main()
 	vec3 diffuse_contribution = (1.0 - F) * diffuse(pbr_inputs);
 	vec3 sepcular_contribution = F * G * D / (4.0f * n_dot_l * n_dot_v);
 	vec3 color = n_dot_l * light_color * (diffuse_contribution + sepcular_contribution);
+
+	if(use_ibl)
+	{
+		color += get_IBL_contribution(pbr_inputs, n, reflection);
+	}
 
 	//TODO make these tweakable?
 	//Occlusion remove light is small features of the geometry

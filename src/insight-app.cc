@@ -438,11 +438,11 @@ mesh::mesh(mesh&& other) throw() { *this = std::move(other); }
 
 mesh::mesh() : instance() {}
 
-glm::vec3 editor_light::get_directional_light_direction() const {
+glm::vec3 editor_lighting::get_directional_light_direction() const {
   return glm::normalize(non_normalized_direction);
 }
 
-void editor_light::show_control() {
+void editor_lighting::show_control() {
   if (control_open) {
     if (ImGui::Begin("Editor light control", &control_open)) {
       ImGui::ColorEdit3("Light color", glm::value_ptr(color));
