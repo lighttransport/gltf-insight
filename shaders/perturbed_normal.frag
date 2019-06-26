@@ -31,6 +31,7 @@ mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
 vec3 perturb_normal(vec3 N, vec3 V)
 {
 	vec3 sampled_normal_map = texture(normal_texture, interpolated_uv).xyz * 255.f/127.f - 128.f/127.f;
+	sampled_normal_map.y = - sampled_normal_map.y;
 	mat3 TBN = cotangent_frame(N, -V, interpolated_uv);
 	return normalize(TBN * sampled_normal_map);
 }
