@@ -18,13 +18,17 @@ Work-in-progress.
 
 ### glTF extension support:
 
+general:
+ - [ ] `KHR_draco_mesh_compression` Note: This is supported directly inside tinygltf
+
 material:
- - [x] `KHR_material_unlit`
- - [ ] `KHR_material_pbrSpecularGlossiness`
+ - [x] `KHR_materials_unlit`
+ - [ ] `KHR_materials_pbrSpecularGlossiness`
+ - [ ] `KHR_texture_transform` 
 
 
 lighting:
- - 
+ - [ ] `EXT_lights_image_based`
 
 
 Latest coninious build are available for [**Linux** (AppImage)](https://github.com/lighttransport/gltf-insight/releases/tag/continuous) and [**Windows** (portable exe)](https://github.com/lighttransport/gltf-insight/releases/tag/continuous-appveyor). Both are 64bit
