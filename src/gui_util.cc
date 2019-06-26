@@ -495,7 +495,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 #endif
   glEnable(GL_MULTISAMPLE);
   glEnable(GL_BLEND);
-  // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   // glFrontFace(GL_CW);
 
   // load a window icon
@@ -942,6 +942,14 @@ void material_info_window(
       } break;
 
       case gltf_insight::shading_type::unlit: {
+        const auto& unlit = selected.shader_inputs.unlit;
+        ImGui::ColorEdit4(
+            "Base Color Factor",
+            (float*)glm::value_ptr(unlit.base_color_factor),
+            ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker);
+        ImGui::Image((ImTextureID)(size_t)(unlit.base_color_texture),
+                     ImVec2(2 * tsize, 2 * tsize));
+
       } break;
     }
   }

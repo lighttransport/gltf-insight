@@ -16,6 +16,17 @@ For example, you can display and tweak animation prameters this tool(since glTF 
 
 Work-in-progress.
 
+### glTF extension support:
+
+material:
+ - [x] `KHR_material_unlit`
+ - [ ] `KHR_material_pbrSpecularGlossiness`
+
+
+lighting:
+ - 
+
+
 Latest coninious build are available for [**Linux** (AppImage)](https://github.com/lighttransport/gltf-insight/releases/tag/continuous) and [**Windows** (portable exe)](https://github.com/lighttransport/gltf-insight/releases/tag/continuous-appveyor). Both are 64bit
 
 ## Requirements

@@ -183,7 +183,7 @@ void main()
 	//sample the base_color texture. //TODO SRGB color space.
 	vec4 base_color = base_color_factor * texture(base_color_texture, interpolated_uv);
 
-	if(alpha_mode == 1)
+	if(alpha_mode == 1 || alpha_mode == 2)
 	{
 		if(base_color.a < alpha_cutoff)
 			discard;

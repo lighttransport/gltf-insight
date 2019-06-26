@@ -174,7 +174,44 @@ void app::load() {
     }
 
     else {
-      std::cerr << "Warn: we aren't currently looking at material extensions\n";
+      const auto unlit_ext_it =
+          gltf_material.extensions.find("KHR_materials_unlit");
+      const auto specular_glossiness =
+          gltf_material.extensions.find("KHR_materials_pbrSpecularGlossiness");
+
+      if (unlit_ext_it != gltf_material.extensions.end()) {
+        currently_loading.intended_shader = shading_type::unlit;
+        auto& unlit = currently_loading.shader_inputs.unlit;
+
+        for (auto& value : gltf_material.values) {
+          // Ignore pbrMetalRoughness fallback parameters
+          if (value.first == "metallicFactor" ||
+              value.first == "roughnessFactor" ||
+              value.first == "metallicRoughnessTexture")
+            continue;
+
+          // Load the color
+          if (value.first == "baseColorFactor") {
+            const auto base_color = value.second.ColorFactor();
+            unlit.base_color_factor.r = (float)base_color[0];
+            unlit.base_color_factor.g = (float)base_color[1];
+            unlit.base_color_factor.b = (float)base_color[2];
+            unlit.base_color_factor.a = (float)base_color[3];
+          }
+
+          // Load the texture
+          else if (value.first == "baseColorTexture") {
+            const auto index = value.second.TextureIndex();
+            if (index < textures.size()) {
+              unlit.base_color_texture = textures[index];
+            }
+          }
+        }
+      } else {
+        std::cerr
+            << "Warn: we aren't currently looking at the material extension(s) "
+               "used in this file. Sorry... :-/\n";
+      }
     }
 
     currently_loading.fill_material_texture_slots();
@@ -860,6 +897,14 @@ void app::main_loop() {
               glFrontFace(GL_CCW);
             } else {
               glDisable(GL_CULL_FACE);
+            }
+
+            if (material_to_use.alpha_mode == alpha_coverage::blend) {
+              // just make sure alpha blending is enabled. We don't really need
+              // to worry too much about it
+              glEnable(GL_BLEND);
+              glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+              glBlendEquation(GL_FUNC_ADD);
             }
 
             perform_draw_call(draw_call);
