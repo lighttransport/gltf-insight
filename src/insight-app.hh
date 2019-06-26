@@ -118,6 +118,8 @@ class app {
   void load();
   void main_loop();
 
+  static void open_url(std::string url);
+
  private:
   editor_lighting editor_light;
 
@@ -142,6 +144,7 @@ class app {
   bool show_gizmo = true;
   bool show_bone_selector = true;
   bool show_material_window = true;
+  bool show_bone_display_window = true;
 
   std::vector<mesh> loaded_meshes;
   std::vector<material> loaded_material;

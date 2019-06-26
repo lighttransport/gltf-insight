@@ -593,6 +593,7 @@ void app::run_view_menu() {
     ImGui::MenuItem("Timeline", 0, &show_timeline);
     ImGui::MenuItem("Shader selector", 0, &show_shader_selector_window);
     ImGui::MenuItem("Material info", 0, &show_material_window);
+    ImGui::MenuItem("Bone display window", 0, &show_bone_display_window);
     ImGui::Separator();
     ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
     ImGui::MenuItem("Editor light controls", 0, &editor_light.control_open);
@@ -610,6 +611,8 @@ void app::run_debug_menu() {
 void app::run_help_menu(bool& about_open) {
   if (ImGui::BeginMenu("Help")) {
     if (ImGui::MenuItem("About...")) about_open = true;
+    if (ImGui::MenuItem("See on GitHub"))
+      open_url("https://github.com/lighttransport/gltf-insight/");
     ImGui::EndMenu();
   }
 }
@@ -1084,7 +1087,7 @@ void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
   glBindVertexArray(0);
   glDisable(GL_DEPTH_TEST);
 
-  bone_display_window();
+  bone_display_window(&show_bone_display_window);
   shaders["debug_color"].use();
   draw_bones(mesh_skeleton_graph, active_joint_node,
              shaders["debug_color"].get_program(), view_matrix,
@@ -1257,4 +1260,27 @@ void app::fill_sequencer(gltf_insight::AnimSequence& sequence,
     }
     sequence.mFrameMax = max_time;
   }
+}
+
+#include <cstdio>
+#ifdef WIN32
+#include <shellapi.h>
+#else
+#endif
+void app::open_url(std::string url) {
+  bool ran = false;
+#ifdef WIN32
+  (void)ShellExecuteA(0, 0, url.c_str(), 0, 0, SW_SHOW);
+  ran = true;
+#endif
+#ifdef __linux__
+  std::string command = "xdg-open " + url;
+  (void)std::system(command.c_str());
+  ran = true;
+#endif
+
+  if (!ran)
+    std::cerr
+        << "Warn: Cannot open URLs on this platform. We should have displayed "
+        << url << "\n";
 }
