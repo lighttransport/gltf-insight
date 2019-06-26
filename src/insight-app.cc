@@ -849,8 +849,11 @@ void app::main_loop() {
                                       a_mesh.display_normals, a_mesh.VBOs);
 
             glEnable(GL_DEPTH_TEST);
+            glEnable(GL_CULL_FACE);
+            glFrontFace(GL_CCW);
             if (!material_to_use.double_sided) {
               glEnable(GL_CULL_FACE);
+              glCullFace(GL_BACK);
               glFrontFace(GL_CCW);
             } else {
               glDisable(GL_CULL_FACE);

@@ -883,9 +883,8 @@ void material_info_window(
         ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker);
     ImGui::Text("Alpha Mode [%s]", to_string(selected.alpha_mode).c_str());
     ImGui::Text("Alpha cutoff [%.3f]", selected.alpha_cutoff);
-    ImGui::Text(selected.double_sided ? ICON_II_IOS_CHECKMARK
-                                      : ICON_II_IOS_CHECKMARK_EMPTY
-                    " Double sided");
+    auto read_only_bool = selected.double_sided;
+    ImGui::Checkbox("Double Sided", &read_only_bool);
 
     ImGui::Separator();
     ImGui::TextColored(ImGui::GetStyle().Colors[ImGuiCol_DockingPreview],
