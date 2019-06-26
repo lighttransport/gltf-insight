@@ -24,7 +24,7 @@ shader::shader() {}
 shader::shader(const char* shader_name, const char* vertex_shader_source_code,
                const char* fragment_shader_source_code)
     : shader_name_(shader_name) {
-  // std::cout << "Creating " << shader_name << "\n";
+  std::cout << "Creating " << shader_name << "\n";
 
   const GLint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
   const GLint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);

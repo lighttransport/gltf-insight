@@ -10,7 +10,7 @@ uniform sampler2D emissive_texture;
 uniform vec3 emissive_factor;
 uniform vec4 base_color_factor;
 uniform int alpha_mode;
-uniform float alpha_cuttoff;
+uniform float alpha_cutoff;
 
 #define ALPHA_OPAQUE 0
 #define ALPHA_MASK 1
@@ -23,7 +23,7 @@ void main()
 
   if(alpha_mode == ALPHA_MASK)
   {
-	if(color.a < alpha_cuttoff)
+	if(color.a < alpha_cutoff)
 	{
 		discard;
 	}

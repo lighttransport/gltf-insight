@@ -98,6 +98,23 @@ void app::load() {
         }
       }
 
+      else if (value.first == "alphaMode") {
+        if (value.second.string_value == "OPAQUE") {
+          currently_loading.alpha_mode = alpha_coverage::opaque;
+        } else if (value.second.string_value == "MASK") {
+          currently_loading.alpha_mode = alpha_coverage::mask;
+        } else if (value.second.string_value == "BLEND") {
+          currently_loading.alpha_mode = alpha_coverage::blend;
+        } else {
+          std::cerr << "Warn: couldn't understand the alphaMode from the "
+                       "material...\n";
+        }
+      }
+
+      else if (value.first == "doubleSided") {
+        currently_loading.double_sided = value.second.bool_value;
+      }
+
       else {
         std::cerr << "Warn: The value " << value.first
                   << " is defined in material " << i
@@ -184,7 +201,10 @@ void app::load() {
   auto meshes_indices = get_list_of_mesh_instances(gltf_scene_tree);
 
   loaded_meshes.resize(meshes_indices.size());
+  std::cerr << "Loading " << meshes_indices.size() << " meshes from glTF\n";
   for (size_t i = 0; i < meshes_indices.size(); ++i) {
+    std::cerr << "mesh " << i << "\n";
+
     loaded_meshes[i].instance = meshes_indices[i];
     auto& current_mesh = loaded_meshes[i];
 
@@ -201,6 +221,8 @@ void app::load() {
       genrate_joint_inverse_bind_matrix_map(
           gltf_skin, current_mesh.nb_joints,
           current_mesh.joint_inverse_bind_matrix_map);
+      std::cerr << " This is a skinned mesh with " << current_mesh.nb_joints
+                << "joints \n";
     }
 
     const auto& gltf_mesh = model.meshes[current_mesh.instance.mesh];
@@ -210,8 +232,13 @@ void app::load() {
     else
       current_mesh.name = std::string("mesh_") + std::to_string(i);
 
+    std::cerr << "Mesh name: " << current_mesh.name << "\n";
+
     const auto& gltf_mesh_primitives = gltf_mesh.primitives;
     const auto nb_submeshes = gltf_mesh_primitives.size();
+
+    std::cerr << "Mesh contains " << nb_submeshes
+              << "submeshes (glTF primitive)\n";
 
     current_mesh.draw_call_descriptors.resize(nb_submeshes);
     current_mesh.indices.resize(nb_submeshes);
@@ -250,8 +277,12 @@ void app::load() {
 
     current_mesh.morph_targets.resize(nb_submeshes);
     current_mesh.materials.resize(nb_submeshes);
+    std::cerr << "loading primitive data:\n";
     for (int s = 0; s < nb_submeshes; ++s) {
-      current_mesh.materials[i] = gltf_mesh.primitives[i].material;
+      std::cerr << "Submesh " << s << "\n";
+
+      current_mesh.materials[s] = gltf_mesh.primitives[s].material;
+      std::cerr << "using material index " << current_mesh.materials[s] << "\n";
 
       current_mesh.morph_targets[s].resize(
           gltf_mesh.primitives[s].targets.size());

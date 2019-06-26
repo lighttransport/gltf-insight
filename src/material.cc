@@ -95,7 +95,7 @@ void material::set_shader_uniform(const shader& shading_program) const {
   shading_program.set_uniform("emissive_texture", 2);
   shading_program.set_uniform("emissive_factor", emissive_factor);
   shading_program.set_uniform("alpha_mode", int(alpha_mode));
-  shading_program.set_uniform("alpha_cuttoff", alpha_cutoff);
+  shading_program.set_uniform("alpha_cutoff", alpha_cutoff);
 
   // set shader specific material uniform values
   switch (intended_shader) {
