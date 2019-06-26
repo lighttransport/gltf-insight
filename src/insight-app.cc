@@ -119,11 +119,6 @@ void app::load() {
         std::cerr << "Warn: The value " << value.first
                   << " is defined in material " << i
                   << " in additionalValues but is ignored by loader\n";
-        if (value.first == "name") {
-          std::cerr << "It seems there's a \"name\" field in the "
-                       "additionalValues of that model. It's value is :"
-                    << value.second.string_value << "\n";
-        }
       }
     }
 
