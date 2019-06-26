@@ -8,6 +8,8 @@ set(BUILD_VERSION_PATCH 0)
 
 project(${BUILD_TARGET})
 
+option(GLTF_INSIGHT_USE_CCACHE "Compile with ccache(if available. Linux only)" OFF)
+
 if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include")
   message(FATAL_ERROR "The glfw submodule directory is missing! "
     "You probably did not clone submodules. It is possible to recover "
@@ -32,6 +34,33 @@ endif(MSVC)
 find_package(OpenGL REQUIRED)
 # OpenGL
 include_directories(${OPENGL_INCLUDE_DIR})
+
+# [ccache]
+if (GLTF_INSIGHT_USE_CCACHE)
+  if (MSVC)
+    # No ccache support
+  else()
+    find_program(CCACHE_EXE ccache)
+    if (CCACHE_EXE)
+
+      message(STATUS "Use ccache : " ${CCACHE_EXE})
+      # CMAKE_C_COMPILER_LAUNCHER = available from cmake 3.4+)
+      if (CMAKE_C_COMPILER_LAUNCHER)
+        set(CMAKE_C_COMPILER_LAUNCHER "${CMAKE_C_COMPILER_LAUNCHER}" "${CCACHE_EXE}")
+      else()
+        set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_EXE}")
+      endif()
+
+      if (CMAKE_CXX_COMPILER_LAUNCHER)
+        set(CMAKE_CXX_COMPILER_LAUNCHER "${CMAKE_CXX_COMPILER_LAUNCHER}" "${CCACHE_EXE}")
+      else()
+        set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_EXE}")
+      endif()
+
+    endif (CCACHE_EXE)
+  endif()
+endif()
+
 
 # local glad
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/deps")
