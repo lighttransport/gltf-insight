@@ -6,6 +6,8 @@
 
 #include "gltf-graph.hh"
 
+#include "exprtk.hpp"
+
 void animation::set_playing_state(bool state) { playing = state; }
 
 void animation::add_time(float delta) {

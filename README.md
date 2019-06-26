@@ -47,7 +47,7 @@ This program can play the animations defined in a glTF asset by the following me
   * [x] skin - Hardware blending with max **4 joints** attributes per vertex
   * [ ] skin - Software blending between an arbitrary number of joints per vertex
   * [ ] **TODO** animation editing features
-  
+
 * Data visualization
   * [x] Skinning weights
 
@@ -85,7 +85,7 @@ make
 
 #### On Ubuntu
 
-You may need to install a few dependencies : 
+You may need to install a few dependencies :
 
 ```bash
 sudo apt install git cmake mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-xinerama0 libxinerama-dev libxcursor-dev libxi-dev
@@ -93,7 +93,7 @@ sudo apt install git cmake mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-
 
 #### On CentOS7
 
-You can use cmake3 package and You may need to install a few dependencies : 
+You can use cmake3 package and You may need to install a few dependencies :
 
 ```bash
 sudo yum install git cmake3 libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel
@@ -130,5 +130,6 @@ gltf-insight is built upon the following open-source projects:
 * ionicons icon helper header : zlib licence
 * ionic framework icon font : MIT
 * Roboto icons : Apache 2
+* exprtk : MIT license.
 
 *“glTF and the glTF logo are trademarks of the Khronos Group Inc.”*
