@@ -115,4 +115,4 @@ void create_flat_bone_list(const tinygltf::Skin& skin,
 int find_skeleton_root(const tinygltf::Model& model,
                        const std::vector<int>& joints, int start_node = 0);
 
-void bone_display_window();
+void bone_display_window(bool* open = nullptr);

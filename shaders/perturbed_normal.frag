@@ -8,7 +8,6 @@ in vec3 fragment_world_position;
 uniform sampler2D normal_texture;
 out vec4 output_color;
 
-
 mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
 {
 

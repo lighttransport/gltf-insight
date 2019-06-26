@@ -91,22 +91,12 @@ void update_mesh_skeleton_graph_transforms(gltf_node& node,
     update_mesh_skeleton_graph_transforms(*child, node.world_xform);
 }
 
-// skeleton_index is the first node that will be added as a child of
-// "graph_root" e.g: a gltf node has a mesh. That mesh has a skin, and that
-// skin as a node index as "skeleton". You need to pass that "skeleton"
-// integer to this function as skeleton_index. This returns a flat array of
-// the bones to be used by the skinning code
-void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
-                         int gltf_index)
+glm::mat4 load_node_local_xform(const tinygltf::Node& root_node) {
+  if (!root_node.name.empty()) std::cout << "name: " << root_node.name << "\n";
 
-{
-  // get the gltf node object
-  const auto& root_node = model.nodes[gltf_index];
-
-  // Holder for the data.
-  glm::mat4 xform(1.f);
+  auto xform = glm::mat4(1.f);
   glm::vec3 translation(0.f), scale(1.f, 1.f, 1.f);
-  glm::quat rotation(1.f, 0.f, 0.f, 0.f);
+  glm::quat rotation(glm::normalize(glm::quat(glm::mat4(1.f))));
 
   // A node can store both a transform matrix and separate translation, rotation
   // and scale. We need to load them if they are present. tiny_gltf signal this
@@ -114,6 +104,8 @@ void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
   const auto& node_matrix = root_node.matrix;
   if (node_matrix.size() == 16)  // 4x4 matrix
   {
+    std::cout << "this node has an xform matrix\n";
+
     double tmp[16];
     float tmpf[16];
     memcpy(tmp, root_node.matrix.data(), 16 * sizeof(double));
@@ -125,45 +117,90 @@ void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
 
     // Both glm matrices and this float array have the same data layout. We can
     // pass the pointer to glm::make_mat4
-    xform = glm::make_mat4(tmpf);
+    auto loaded_xform = glm::make_mat4(tmpf);
+
+    glm::vec3 load_scale, load_translation;
+    glm::quat load_orient;
+    glm::vec3 skew;
+    glm::vec4 persp;
+    glm::decompose(loaded_xform, load_scale, load_orient, load_translation,
+                   skew, persp);
+
+    for (int line = 0; line < 4; ++line) {
+      for (int col = 0; col < 4; ++col) {
+        std::cout << loaded_xform[col][line] << " ";
+      }
+      std::cout << "\b\n";
+    }
   }
 
   // Do the same for translation rotation and scale.
   const auto& node_translation = root_node.translation;
   if (node_translation.size() == 3)  // 3D vector
   {
+    glm::vec3 loaded_translate;
     for (glm::vec3::length_type i = 0; i < 3; ++i)
-      translation[i] = float(node_translation[i]);
+      loaded_translate[i] = float(node_translation[i]);
+
+    translation += loaded_translate;
+
+    std::cout << "loaded translation: " << translation.x << " " << translation.y
+              << " " << translation.z << "\n";
   }
 
   const auto& node_scale = root_node.scale;
   if (node_scale.size() == 3)  // 3D vector
   {
+    glm::vec3 loaded_scale;
     for (glm::vec3::length_type i = 0; i < 3; ++i)
-      scale[i] = float(node_scale[i]);
+      loaded_scale[i] = float(node_scale[i]);
+    scale *= loaded_scale;
+    std::cout << "loaded scale  " << scale.x << " " << scale.y << " " << scale.z
+              << "\n";
   }
 
   const auto& node_rotation = root_node.rotation;
   if (node_rotation.size() == 4)  // Quaternion
   {
-    rotation.w = float(node_rotation[3]);
-    rotation.x = float(node_rotation[0]);
-    rotation.y = float(node_rotation[1]);
-    rotation.z = float(node_rotation[2]);
-    glm::normalize(rotation);  // Be prudent
+    glm::quat loaded_rot;
+    loaded_rot.w = float(node_rotation[3]);
+    loaded_rot.x = float(node_rotation[0]);
+    loaded_rot.y = float(node_rotation[1]);
+    loaded_rot.z = float(node_rotation[2]);
+    glm::normalize(loaded_rot);  // Be prudent
+
+    rotation = loaded_rot * rotation;
+
+    std::cout << "loaded rotation: " << rotation.w << "" << rotation.x << " "
+              << rotation.y << " " << rotation.z << "\n";
   }
 
   const glm::mat4 rotation_matrix = glm::toMat4(rotation);
   const glm::mat4 translation_matrix =
       glm::translate(glm::mat4(1.f), translation);
   const glm::mat4 scale_matrix = glm::scale(glm::mat4(1.f), scale);
-  const glm::mat4 reconstructed_matrix =
-      translation_matrix * rotation_matrix * scale_matrix;
+  xform = translation_matrix * rotation_matrix * scale_matrix;
 
   // In the case that the node has both the matrix and the individual vectors,
   // both transform has to be applied.
-  xform = xform * reconstructed_matrix;
 
+  std::cout << "final xform is:\n";
+  for (int line = 0; line < 4; ++line) {
+    for (int col = 0; col < 4; ++col) {
+      std::cout << xform[col][line] << " ";
+    }
+    std::cout << "\b\n";
+  }
+
+  return xform;
+}
+
+void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
+                         int gltf_index) {
+  std::cout << "loading node " << gltf_index << "\n";
+  // get the gltf node object
+  const auto& root_node = model.nodes[gltf_index];
+  glm::mat4 xform = load_node_local_xform(root_node);
   // set data inside root
   graph_root.local_xform = xform;
   graph_root.gltf_node_index = gltf_index;
@@ -348,8 +385,9 @@ int find_skeleton_root(const tinygltf::Model& model,
 }
 
 #include <imgui.h>
-void bone_display_window() {
-  if (ImGui::Begin("Skeleton drawing options")) {
+void bone_display_window(bool* open) {
+  if (open && !*open) return;
+  if (ImGui::Begin("Skeleton drawing options", open)) {
     ImGui::Checkbox("Draw joint points", &draw_joint_point);
     ImGui::Checkbox("Draw Bone as segments", &draw_bone_segment);
     ImGui::Checkbox("Draw childless joint extnesion",
