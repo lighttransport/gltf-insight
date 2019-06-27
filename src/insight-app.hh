@@ -127,6 +127,7 @@ class app {
     debug = 0b101010
   } current_display_mode = display_mode::normal;
 
+  void load_sensible_default_material(material& material);
   app(int argc, char** argv);
   ~app();
   void run_file_menu();

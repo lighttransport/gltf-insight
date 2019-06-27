@@ -79,6 +79,7 @@ void app::load() {
   loaded_material.resize(model.materials.size());
   for (size_t i = 0; i < model.materials.size(); ++i) {
     auto& currently_loading = loaded_material[i];
+    load_sensible_default_material(currently_loading);
     const auto gltf_material = model.materials[i];
 
     // start by settings viable defaults!
@@ -557,6 +558,18 @@ void editor_lighting::show_control() {
   }
 }
 
+void app::load_sensible_default_material(material& material) {
+  material.name = "dummy_fallback_material";
+  material.normal_texture = fallback_textures::pure_flat_normal_map;
+  material.occlusion_texture = fallback_textures::pure_white_texture;
+  material.emissive_texture = fallback_textures::pure_black_texture;
+  material.shader_inputs.pbr_metal_roughness.metallic_roughness_texture =
+      fallback_textures::pure_white_texture;
+  material.shader_inputs.pbr_metal_roughness.base_color_texture =
+      fallback_textures::pure_white_texture;
+  material.fill_material_texture_slots();
+}
+
 app::app(int argc, char** argv) {
   parse_command_line(argc, argv, debug_output, input_filename);
 
@@ -580,15 +593,8 @@ app::app(int argc, char** argv) {
 
   // load fallback material
   setup_fallback_textures();
-  dummy_material.name = "dummy_fallback_material";
-  dummy_material.normal_texture = fallback_textures::pure_flat_normal_map;
-  dummy_material.occlusion_texture = fallback_textures::pure_white_texture;
-  dummy_material.emissive_texture = fallback_textures::pure_black_texture;
-  dummy_material.shader_inputs.pbr_metal_roughness.metallic_roughness_texture =
-      fallback_textures::pure_white_texture;
-  dummy_material.shader_inputs.pbr_metal_roughness.base_color_texture =
-      fallback_textures::pure_white_texture;
-  dummy_material.fill_material_texture_slots();
+
+  load_sensible_default_material(dummy_material);
 }
 
 app::~app() {
