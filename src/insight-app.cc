@@ -304,6 +304,7 @@ void app::load() {
     current_mesh.indices.resize(nb_submeshes);
     current_mesh.positions.resize(nb_submeshes);
     current_mesh.uvs.resize(nb_submeshes);
+    current_mesh.colors.resize(nb_submeshes);
     current_mesh.normals.resize(nb_submeshes);
     current_mesh.weights.resize(nb_submeshes);
     current_mesh.joints.resize(nb_submeshes);
@@ -321,7 +322,7 @@ void app::load() {
     load_geometry(model, textures, gltf_mesh_primitives,
                   current_mesh.draw_call_descriptors, current_mesh.VAOs,
                   current_mesh.VBOs, current_mesh.indices,
-                  current_mesh.positions, current_mesh.uvs,
+                  current_mesh.positions, current_mesh.uvs, current_mesh.colors,
                   current_mesh.normals, current_mesh.weights,
                   current_mesh.joints);
 
@@ -496,6 +497,7 @@ mesh::~mesh() {
   flat_joint_list.clear();
   joint_inverse_bind_matrix_map.clear();
   joint_matrices.clear();
+  colors.clear();
   instance.mesh = -1;
   instance.node = -1;
   draw_call_descriptors.clear();
@@ -519,7 +521,8 @@ mesh& mesh::operator=(mesh&& o) throw() {
   weights = std::move(o.weights);
   display_position = std::move(o.display_position);
   display_normals = std::move(o.display_normals);
-  o.joints = std::move(o.joints);
+  joints = std::move(o.joints);
+  colors = std::move(o.colors);
 
   shader_list = std::move(o.shader_list);
   return *this;

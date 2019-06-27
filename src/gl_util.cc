@@ -162,6 +162,7 @@ void load_shaders(const size_t nb_joints,
 #include "skinning_template.vert_inc.hh"
 #include "unlit.frag_inc.hh"
 #include "uv.frag_inc.hh"
+#include "vertex_color.frag_inc.hh"
 #include "weights.frag_inc.hh"
 
   // print some warnings
@@ -215,6 +216,8 @@ void load_shaders(const size_t nb_joints,
                                             base_color_map_frag_len);
   const std::string metallic_roughness_map_frag_src(
       (char*)metallic_roughness_map_frag, metallic_roughness_map_frag_len);
+  const std::string vertex_color_frag_src((char*)vertex_color_frag,
+                                          vertex_color_frag_len);
   const std::string& vert_src =
       nb_joints != 0 ? skinning_vert_src : no_skinning_vert_src;
 
@@ -239,6 +242,8 @@ void load_shaders(const size_t nb_joints,
       shader("debug_base_color_map", vert_src, base_color_map_frag_src);
   shaders["debug_applied_normal_mapping"] = shader(
       "debug_applied_normal_mapping", vert_src, perturbed_normal_frag_src);
+  shaders["debug_vertex_color"] =
+      shader("debug_vertex_color", vert_src, vertex_color_frag_src);
   shaders["pbr_metal_rough"] =
       shader("pbr_metal_rough", vert_src, pbr_metallic_roughness_frag_src);
   if (nb_joints > 0)

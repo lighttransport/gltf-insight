@@ -6,6 +6,7 @@
 
 out vec4 output_color;
 
+in vec4 interpolated_colors;
 in vec2 interpolated_uv;
 in vec3 interpolated_normal;
 in vec3 interpolated_tangent;
@@ -181,7 +182,7 @@ vec3 get_IBL_contribution(pbr_info pbr_inputs, vec3 n, vec3 reflection)
 void main()
 {
 	//sample the base_color texture. //TODO SRGB color space.
-	vec4 base_color = base_color_factor * texture(base_color_texture, interpolated_uv);
+	vec4 base_color = interpolated_colors * base_color_factor * texture(base_color_texture, interpolated_uv);
 
 	if(alpha_mode == 1 || alpha_mode == 2)
 	{

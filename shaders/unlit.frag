@@ -2,6 +2,7 @@
 
 in vec2 interpolated_uv;
 in vec3 interpolated_normal;
+in vec4 interpolated_colors;
 out vec4 output_color;
 
 uniform sampler2D base_color_texture;
@@ -19,7 +20,7 @@ uniform float alpha_cutoff;
 
 void main()
 {
-  vec4 color = base_color_factor * texture(base_color_texture, interpolated_uv);
+  vec4 color = interpolated_colors * base_color_factor * texture(base_color_texture, interpolated_uv);
 
   if(alpha_mode == ALPHA_MASK || alpha_mode == ALPHA_BLEND)
   {

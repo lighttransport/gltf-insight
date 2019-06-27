@@ -5,6 +5,7 @@
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
 layout (location = 2) in vec2 input_uv;
+layout (location = 3) in vec4 input_colors;
 layout (location = 3) in vec3 input_tangent;
 layout (location = 4) in vec4 input_joints;
 layout (location = 5) in vec4 input_weights;
@@ -23,6 +24,7 @@ out vec3 fragment_world_position;
 
 out vec2 interpolated_uv;
 out vec4 interpolated_weights;
+out vec4 interpolated_colors;
 
 vec3 float_to_rgb(float value)
 {
@@ -128,5 +130,6 @@ void main()
 
   interpolated_uv = input_uv;
   interpolated_weights = weight_color();
+  interpolated_colors = input_colors;
 }
 

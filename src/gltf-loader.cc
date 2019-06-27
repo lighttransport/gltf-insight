@@ -209,6 +209,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                    std::vector<std::vector<unsigned>>& indices,
                    std::vector<std::vector<float>>& vertex_coord,
                    std::vector<std::vector<float>>& texture_coord,
+                   std::vector<std::vector<float>>& colors,
                    std::vector<std::vector<float>>& normals,
                    std::vector<std::vector<float>>& weights,
                    std::vector<std::vector<unsigned short>>& joints) {
@@ -425,6 +426,59 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       }
     }
 
+    // VERTEX COLORS
+    if (primitive.attributes.find("COLOR_0") !=
+        std::end(primitive.attributes)) {
+      const auto color = primitive.attributes.at("COLOR_0");
+      const auto& colors_accessor = model.accessors[color];
+      const auto& colors_buffer_view =
+          model.bufferViews[colors_accessor.bufferView];
+      const auto& colors_buffer = model.buffers[colors_buffer_view.buffer];
+      const auto colors_stride = colors_accessor.ByteStride(colors_buffer_view);
+      const auto colors_start_pointer = colors_buffer.data.data() +
+                                        colors_buffer_view.byteOffset +
+                                        colors_accessor.byteOffset;
+      const size_t byte_size_of_component =
+          tinygltf::GetComponentSizeInBytes(colors_accessor.componentType);
+
+      // Detect if we have an RGB or RGBA color. In case of RGB, we will convert
+      // to RGBA by inserting A=1.f to the array
+      bool insert_alpha = false;
+      if (colors_accessor.type == TINYGLTF_TYPE_VEC3) insert_alpha = true;
+
+      assert(sizeof(float) >= byte_size_of_component);
+
+      colors[submesh].resize(4 * colors_accessor.count);
+
+      for (size_t i = 0; i < colors_accessor.count; ++i) {
+        if (colors_accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+          memcpy(&colors[submesh][i * 4],
+                 colors_start_pointer + i * colors_stride,
+                 byte_size_of_component * (!insert_alpha ? 4 : 3));
+        } else {
+          // Must convert normalized unsigned value to floating point
+          unsigned short temp = 0;
+          for (int j = 0; j < 4; j++) {
+            memcpy(&temp,
+                   colors_start_pointer + i * colors_stride +
+                       j * byte_size_of_component,
+                   byte_size_of_component);
+            colors[submesh][i * 4 + j] =
+                float(temp) /
+                (byte_size_of_component == 2 ? float(0xFFFF) : float(0xFF));
+          }
+        }
+
+        if (insert_alpha) {
+          colors[submesh][4 * i + 3] = 1.f;
+        }
+      }
+    } else {
+      colors[submesh].resize((vertex_coord[submesh].size() / 3) * 4);
+      std::generate(colors[submesh].begin(), colors[submesh].end(),
+                    [] { return 1.f; });
+    }
+
     if (generate_normals) {
       std::cerr << "Warn: Needed to generate flat normals for this model\n";
       // size of array should match
@@ -488,13 +542,13 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
         glEnableVertexAttribArray(2);
       }
 
-      //// Tangent is layout 3
-      // glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][3]);
-      // glBufferData(GL_ARRAY_BUFFER, tangents[submesh].size() * sizeof(float),
-      //             tangents[submesh].data(), GL_DYNAMIC_DRAW);
-      // glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
-      //                      nullptr);
-      // glEnableVertexAttribArray(3);
+      // colors is layout 3
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][3]);
+      glBufferData(GL_ARRAY_BUFFER, colors[submesh].size() * sizeof(float),
+                   colors[submesh].data(), GL_DYNAMIC_DRAW);
+      glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                            nullptr);
+      glEnableVertexAttribArray(3);
 
       // Layout "3" joints assignment vector
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][4]);

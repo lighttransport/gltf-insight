@@ -49,6 +49,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                    std::vector<std::vector<unsigned>>& indices,
                    std::vector<std::vector<float>>& vertex_coord,
                    std::vector<std::vector<float>>& texture_coord,
+                   std::vector<std::vector<float>>& colors,
                    std::vector<std::vector<float>>& normals,
                    std::vector<std::vector<float>>& weights,
                    std::vector<std::vector<unsigned short>>& joints);
