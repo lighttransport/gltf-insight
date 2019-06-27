@@ -121,10 +121,10 @@ class app {
   static void open_url(std::string url);
 
  private:
-  void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
-                      glm::mat3 normal_matrix, glm::mat4 model_matrix);
+  void draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
+                 glm::mat3 normal_matrix, glm::mat4 model_matrix);
 
-  void app::draw_scene(const glm::vec3& world_camera_position);
+  void draw_scene(const glm::vec3& world_camera_position);
   void draw_scene_recur(const glm::vec3& world_camera_position,
                         const gltf_node& node);
 
