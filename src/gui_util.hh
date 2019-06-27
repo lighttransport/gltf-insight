@@ -127,3 +127,5 @@ void material_info_window(
     const gltf_insight::material& dummy,
     const std::vector<gltf_insight::material>& loaded_materials,
     bool* open = nullptr);
+
+void scene_outline_window(gltf_node& sene);

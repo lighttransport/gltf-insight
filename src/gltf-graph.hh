@@ -116,3 +116,4 @@ int find_skeleton_root(const tinygltf::Model& model,
                        const std::vector<int>& joints, int start_node = 0);
 
 void bone_display_window(bool* open = nullptr);
+glm::mat4 load_node_local_xform(const tinygltf::Node& node);

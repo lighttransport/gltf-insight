@@ -121,6 +121,13 @@ class app {
   static void open_url(std::string url);
 
  private:
+  void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
+                      glm::mat3 normal_matrix, glm::mat4 model_matrix);
+
+  void app::draw_scene(const glm::vec3& world_camera_position);
+  void draw_scene_recur(const glm::vec3& world_camera_position,
+                        const gltf_node& node);
+
   editor_lighting editor_light;
 
   ImGuizmo::OPERATION mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
@@ -166,7 +173,7 @@ class app {
   int selected_shader = 0;
   std::string shader_to_use;
   glm::mat4 view_matrix{1.f}, projection_matrix{1.f};
-  glm::mat4& model_matrix = gltf_scene_tree.local_xform;
+  glm::mat4& root_node_model_matrix = gltf_scene_tree.local_xform;
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 7.f};
   float fovy = 45.f;

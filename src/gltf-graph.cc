@@ -91,108 +91,45 @@ void update_mesh_skeleton_graph_transforms(gltf_node& node,
     update_mesh_skeleton_graph_transforms(*child, node.world_xform);
 }
 
-glm::mat4 load_node_local_xform(const tinygltf::Node& root_node) {
-  if (!root_node.name.empty()) std::cout << "name: " << root_node.name << "\n";
+glm::mat4 load_node_local_xform(const tinygltf::Node& node) {
+  if (!node.name.empty()) std::cout << "name: " << node.name << "\n";
 
-  auto xform = glm::mat4(1.f);
-  glm::vec3 translation(0.f), scale(1.f, 1.f, 1.f);
-  glm::quat rotation(glm::normalize(glm::quat(glm::mat4(1.f))));
+  glm::mat4 matrix(1.f);
+  glm::vec3 position(0.f);
+  glm::vec3 scale(1.f);
+  glm::quat rotation(1.f, 0.f, 0.f, 0.f);
 
-  // A node can store both a transform matrix and separate translation, rotation
-  // and scale. We need to load them if they are present. tiny_gltf signal this
-  // by either having empty vectors, or vectors of the expected size.
-  const auto& node_matrix = root_node.matrix;
-  if (node_matrix.size() == 16)  // 4x4 matrix
-  {
-    std::cout << "this node has an xform matrix\n";
-
+  if (node.matrix.size() == 16) {
     double tmp[16];
     float tmpf[16];
-    memcpy(tmp, root_node.matrix.data(), 16 * sizeof(double));
+    memcpy(tmp, node.matrix.data(), 16 * sizeof(double));
 
     // Convert a double array to a float array
     for (int i = 0; i < 16; ++i) {
       tmpf[i] = float(tmp[i]);
     }
 
-    // Both glm matrices and this float array have the same data layout. We can
-    // pass the pointer to glm::make_mat4
-    auto loaded_xform = glm::make_mat4(tmpf);
-
-    glm::vec3 load_scale, load_translation;
-    glm::quat load_orient;
-    glm::vec3 skew;
-    glm::vec4 persp;
-    glm::decompose(loaded_xform, load_scale, load_orient, load_translation,
-                   skew, persp);
-
-    for (int line = 0; line < 4; ++line) {
-      for (int col = 0; col < 4; ++col) {
-        std::cout << loaded_xform[col][line] << " ";
-      }
-      std::cout << "\b\n";
-    }
+    matrix = glm::make_mat4(tmpf);
+  }
+  if (node.translation.size() == 3) {
+    position.x = float(node.translation[0]);
+    position.y = float(node.translation[1]);
+    position.z = float(node.translation[2]);
+  }
+  if (node.scale.size() == 3) {
+    scale.x = float(node.scale[0]);
+    scale.y = float(node.scale[1]);
+    scale.z = float(node.scale[2]);
+  }
+  if (node.rotation.size() == 4) {
+    rotation.w = float(node.rotation[3]);
+    rotation.x = float(node.rotation[0]);
+    rotation.y = float(node.rotation[1]);
+    rotation.z = float(node.rotation[2]);
   }
 
-  // Do the same for translation rotation and scale.
-  const auto& node_translation = root_node.translation;
-  if (node_translation.size() == 3)  // 3D vector
-  {
-    glm::vec3 loaded_translate;
-    for (glm::vec3::length_type i = 0; i < 3; ++i)
-      loaded_translate[i] = float(node_translation[i]);
-
-    translation += loaded_translate;
-
-    std::cout << "loaded translation: " << translation.x << " " << translation.y
-              << " " << translation.z << "\n";
-  }
-
-  const auto& node_scale = root_node.scale;
-  if (node_scale.size() == 3)  // 3D vector
-  {
-    glm::vec3 loaded_scale;
-    for (glm::vec3::length_type i = 0; i < 3; ++i)
-      loaded_scale[i] = float(node_scale[i]);
-    scale *= loaded_scale;
-    std::cout << "loaded scale  " << scale.x << " " << scale.y << " " << scale.z
-              << "\n";
-  }
-
-  const auto& node_rotation = root_node.rotation;
-  if (node_rotation.size() == 4)  // Quaternion
-  {
-    glm::quat loaded_rot;
-    loaded_rot.w = float(node_rotation[3]);
-    loaded_rot.x = float(node_rotation[0]);
-    loaded_rot.y = float(node_rotation[1]);
-    loaded_rot.z = float(node_rotation[2]);
-    glm::normalize(loaded_rot);  // Be prudent
-
-    rotation = loaded_rot * rotation;
-
-    std::cout << "loaded rotation: " << rotation.w << "" << rotation.x << " "
-              << rotation.y << " " << rotation.z << "\n";
-  }
-
-  const glm::mat4 rotation_matrix = glm::toMat4(rotation);
-  const glm::mat4 translation_matrix =
-      glm::translate(glm::mat4(1.f), translation);
-  const glm::mat4 scale_matrix = glm::scale(glm::mat4(1.f), scale);
-  xform = translation_matrix * rotation_matrix * scale_matrix;
-
-  // In the case that the node has both the matrix and the individual vectors,
-  // both transform has to be applied.
-
-  std::cout << "final xform is:\n";
-  for (int line = 0; line < 4; ++line) {
-    for (int col = 0; col < 4; ++col) {
-      std::cout << xform[col][line] << " ";
-    }
-    std::cout << "\b\n";
-  }
-
-  return xform;
+  return glm::translate(glm::mat4(1.f), position) * glm::mat4(rotation) *
+         glm::scale(glm::mat4(1.f), scale) * matrix;
 }
 
 void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,

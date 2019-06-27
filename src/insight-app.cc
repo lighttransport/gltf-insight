@@ -222,11 +222,16 @@ void app::load() {
 
   gltf_scene_tree.gltf_node_index = -1;
 
+  if (scene.nodes.size() > 1)
+    std::cerr << "Warn: The currently loading scene has multiple root node. We "
+                 "create a virtual root node that parent all of them\n";
+
   // dummy "all parent" node
   for (size_t i = 0; i < scene.nodes.size(); ++i) {
     const auto root_index = scene.nodes[i];
     gltf_scene_tree.add_child();
-    populate_gltf_graph(model, *gltf_scene_tree.children.back(), root_index);
+    auto& root = *gltf_scene_tree.children.back();
+    populate_gltf_graph(model, root, root_index);
   }
 
   set_mesh_attachement(model, gltf_scene_tree);
@@ -698,6 +703,79 @@ void app::create_transparent_docking_area(const ImVec2 pos, const ImVec2 size,
   End();
 }
 
+void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
+                    glm::mat3 normal_matrix, glm::mat4 model_matrix)
+
+{
+  for (size_t submesh = 0; submesh < mesh.draw_call_descriptors.size();
+       ++submesh) {
+    const auto& material_to_use = loaded_material[mesh.materials[submesh]];
+
+    if (current_display_mode == display_mode::normal) {
+      switch (material_to_use.intended_shader) {
+        case shading_type::pbr_metal_rough:
+          shader_to_use = "pbr_metal_rough";
+          break;
+        default:
+          shader_to_use = "unlit";
+          std::cout << "Warn: unimplemented material shader mode.\n";
+          break;
+      }
+    }
+
+    material_to_use.bind_textures();
+    material_to_use.set_shader_uniform((*mesh.shader_list)[shader_to_use]);
+
+    update_uniforms(*mesh.shader_list, editor_light.use_ibl,
+                    world_camera_position, editor_light.color,
+                    editor_light.get_directional_light_direction(),
+                    active_joint, shader_to_use,
+                    projection_matrix * view_matrix * model_matrix,
+                    projection_matrix * view_matrix * model_matrix,
+                    normal_matrix, mesh.joint_matrices);
+
+    const auto& draw_call = mesh.draw_call_descriptors[submesh];
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glFrontFace(GL_CCW);
+    if (!material_to_use.double_sided) {
+      glEnable(GL_CULL_FACE);
+      glCullFace(GL_BACK);
+      glFrontFace(GL_CCW);
+    } else {
+      glDisable(GL_CULL_FACE);
+    }
+
+    if (material_to_use.alpha_mode == alpha_coverage::blend) {
+      // just make sure alpha blending is enabled. We don't really need
+      // to worry too much about it
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      glBlendEquation(GL_FUNC_ADD);
+    }
+
+    perform_draw_call(draw_call);
+  }
+}
+
+void app::draw_scene_recur(const glm::vec3& world_camera_position,
+                           const gltf_node& node) {
+  if (node.type == gltf_node::node_type::mesh) {
+    auto& mesh = loaded_meshes[node.gltf_mesh_id];
+
+    const auto normal_matrix = glm::transpose(glm::inverse(node.world_xform));
+
+    draw_mesh(world_camera_position, mesh, normal_matrix, node.world_xform);
+  }
+
+  for (auto child : node.children)
+    draw_scene_recur(world_camera_position, *child);
+}
+
+void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
+  draw_scene_recur(world_camera_position, gltf_scene_tree);
+}
+
 void app::main_loop() {
   while (!glfwWindowShouldClose(window)) {
     {
@@ -774,6 +852,7 @@ void app::main_loop() {
 
       if (asset_loaded) {
         // Draw all windows
+        scene_outline_window(gltf_scene_tree);
         model_info_window(model, &show_model_info_window);
         asset_images_window(textures, &show_asset_image_window);
         animation_window(animations, &show_animation_window);
@@ -816,7 +895,7 @@ void app::main_loop() {
             z_far);
 
       run_3D_gizmo(
-          view_matrix, projection_matrix, model_matrix,
+          view_matrix, projection_matrix, root_node_model_matrix,
           asset_loaded && active_joint >= 0 &&
                   active_joint < loaded_meshes[0].flat_joint_list.size()
               ? loaded_meshes[0].flat_joint_list[active_joint]
@@ -847,70 +926,30 @@ void app::main_loop() {
           // the screen space, the normal matrix, and the joint matrix array
           // that is used to deform the skin with the bones
           precompute_hardware_skinning_data(
-              gltf_scene_tree, model_matrix, a_mesh.joint_matrices,
+              gltf_scene_tree, root_node_model_matrix, a_mesh.joint_matrices,
               a_mesh.flat_joint_list, a_mesh.inverse_bind_matrices);
 
-          glm::mat4 mvp = projection_matrix * view_matrix * model_matrix;
-          glm::mat3 normal_matrix = glm::transpose(glm::inverse(model_matrix));
+          glm::mat4 mvp =
+              projection_matrix * view_matrix * root_node_model_matrix;
+          glm::mat3 normal_matrix =
+              glm::transpose(glm::inverse(root_node_model_matrix));
+
+          glm::mat4 draw_model_matrix = root_node_model_matrix;
 
           // Draw all of the submeshes of the object
           for (size_t submesh = 0;
                submesh < a_mesh.draw_call_descriptors.size(); ++submesh) {
-            const auto& material_to_use =
-                loaded_material[a_mesh.materials[submesh]];
-
-            if (current_display_mode == display_mode::normal) {
-              switch (material_to_use.intended_shader) {
-                case shading_type::pbr_metal_rough:
-                  shader_to_use = "pbr_metal_rough";
-                  break;
-                default:
-                  shader_to_use = "unlit";
-                  std::cout << "Warn: unimplemented material shader mode.\n";
-                  break;
-              }
-            }
-
-            material_to_use.bind_textures();
-            material_to_use.set_shader_uniform(
-                (*a_mesh.shader_list)[shader_to_use]);
-
-            update_uniforms(*a_mesh.shader_list, editor_light.use_ibl,
-                            world_camera_position, editor_light.color,
-                            editor_light.get_directional_light_direction(),
-                            active_joint, shader_to_use, model_matrix, mvp,
-                            normal_matrix, a_mesh.joint_matrices);
-
-            const auto& draw_call = a_mesh.draw_call_descriptors[submesh];
-
             perform_software_morphing(gltf_scene_tree, submesh,
                                       a_mesh.morph_targets, a_mesh.positions,
                                       a_mesh.normals, a_mesh.display_position,
                                       a_mesh.display_normals, a_mesh.VBOs);
-
-            glEnable(GL_DEPTH_TEST);
-            glEnable(GL_CULL_FACE);
-            glFrontFace(GL_CCW);
-            if (!material_to_use.double_sided) {
-              glEnable(GL_CULL_FACE);
-              glCullFace(GL_BACK);
-              glFrontFace(GL_CCW);
-            } else {
-              glDisable(GL_CULL_FACE);
-            }
-
-            if (material_to_use.alpha_mode == alpha_coverage::blend) {
-              // just make sure alpha blending is enabled. We don't really need
-              // to worry too much about it
-              glEnable(GL_BLEND);
-              glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-              glBlendEquation(GL_FUNC_ADD);
-            }
-
-            perform_draw_call(draw_call);
           }
+
           // Then draw 2D bones and joints on top of that
         }
+
+        draw_scene(world_camera_position);
+
         draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
                           projection_matrix, *loaded_meshes[0].shader_list);
       }

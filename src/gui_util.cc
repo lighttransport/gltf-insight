@@ -956,6 +956,40 @@ void material_info_window(
   ImGui::End();
 }
 
+void scene_outline_window_recur(gltf_node& node) {
+  std::string node_name;
+
+  if (node.type == gltf_node::node_type::mesh) node_name += "mesh ";
+  if (node.type == gltf_node::node_type::bone) node_name += "joint ";
+
+  node_name += "node " + std::to_string(node.gltf_node_index);
+  if (ImGui::TreeNode(node_name.c_str())) {
+    if (node.type == gltf_node::node_type::mesh)
+      ImGui::Text("Mesh %d", node.gltf_mesh_id);
+    ImGui::Text("local_xform");
+    ImGui::Columns(4);
+    for (int line = 0; line < 4; line++)
+      for (int col = 0; col < 4; col++) {
+        // ImGui::InputFloat("###",
+        // (float*)&glm::value_ptr(node.local_xform)[i]);
+        ImGui::Text("%.3f", node.local_xform[col][line]);
+        ImGui::NextColumn();
+      }
+    ImGui::Columns();
+
+    for (auto child : node.children) {
+      scene_outline_window_recur(*child);
+    }
+
+    ImGui::TreePop();
+  }
+}
+void scene_outline_window(gltf_node& scene) {
+  ImGui::Begin("Scene outline");
+  scene_outline_window_recur(scene);
+  ImGui::End();
+}
+
 void mouse_button_callback(GLFWwindow* window, int button, int action,
                            int mods) {
   auto* param = reinterpret_cast<application_parameters*>(
