@@ -208,7 +208,7 @@ add_sanitizers(${BUILD_TARGET})
 
 
 if(APPLE)
-    list(APPEND ${ EXT_LIBRARIES " -framework Cocoa  -framework CoreFoundation -framework ApplicationServices ")
+    list(APPEND EXT_LIBRARIES " -framework Cocoa  -framework CoreFoundation -framework ApplicationServices ")
 endif()
 
 target_link_libraries(
