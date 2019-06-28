@@ -43,10 +43,11 @@ matrix:
 #    compiler: clang
 #    env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
 
+  allow_failures:
   - os: osx
   - osx_image: xcode10.2
   compiler: clang
-  env: 
+
   
 
 before_install:
