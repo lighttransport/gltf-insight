@@ -199,6 +199,10 @@ add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
 )
 
+if(APPLE)
+    target_link_libraries(${BUILD_TARGET} PRIVATE "-framework Cocoa  -framework CoreFoundation -framework ApplicationServices")
+endif()
+
 add_definitions( -DIMGUI_IMPL_OPENGL_LOADER_GLAD)
 target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
 add_sanitizers(${BUILD_TARGET})

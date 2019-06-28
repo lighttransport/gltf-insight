@@ -68,6 +68,56 @@ void app::unload() {
   expanded = true;
 }
 
+void app::load_as_metal_roughness(size_t i, material& currently_loading,
+                                  const tinygltf::Material gltf_material) {
+  currently_loading.intended_shader = shading_type::pbr_metal_rough;
+  auto& pbr_metal_rough = currently_loading.shader_inputs.pbr_metal_roughness;
+  // tinygltf consider that "values" contains the standard pbr shader values
+  for (auto& value : gltf_material.values) {
+    if (value.first == "baseColorFactor") {
+      const auto base_color = value.second.ColorFactor();
+      pbr_metal_rough.base_color_factor.r = (float)base_color[0];
+      pbr_metal_rough.base_color_factor.g = (float)base_color[1];
+      pbr_metal_rough.base_color_factor.b = (float)base_color[2];
+      pbr_metal_rough.base_color_factor.a = (float)base_color[3];
+    }
+
+    else if (value.first == "metallicFactor") {
+      const auto factor = value.second.Factor();
+      if (factor >= 0 && factor <= 1) {
+        pbr_metal_rough.metallic_factor = (float)factor;
+      }
+    }
+
+    else if (value.first == "roughnessFactor") {
+      const auto factor = value.second.Factor();
+      if (factor >= 0 && factor <= 1) {
+        pbr_metal_rough.roughness_factor = (float)factor;
+      }
+    }
+
+    else if (value.first == "baseColorTexture") {
+      const auto index = value.second.TextureIndex();
+      if (index < textures.size()) {
+        pbr_metal_rough.base_color_texture = textures[index];
+      }
+    }
+
+    else if (value.first == "metallicRoughnessTexture") {
+      const auto index = value.second.TextureIndex();
+      if (index < textures.size()) {
+        pbr_metal_rough.metallic_roughness_texture = textures[index];
+      }
+    }
+
+    else {
+      std::cerr << "Warn: The value " << value.first
+                << " is defined in material " << i
+                << " in values but is ignored by loader\n";
+    }
+  }
+}
+
 void app::load() {
   load_glTF_asset(gltf_ctx, input_filename, model);
 
@@ -148,53 +198,7 @@ void app::load() {
 
     if (gltf_material.extensions.size() == 0) {
       // No extension = PBR MetalRough
-      currently_loading.intended_shader = shading_type::pbr_metal_rough;
-      auto& pbr_metal_rough =
-          currently_loading.shader_inputs.pbr_metal_roughness;
-      // tinygltf consider that "values" contains the standard pbr shader values
-      for (auto& value : gltf_material.values) {
-        if (value.first == "baseColorFactor") {
-          const auto base_color = value.second.ColorFactor();
-          pbr_metal_rough.base_color_factor.r = (float)base_color[0];
-          pbr_metal_rough.base_color_factor.g = (float)base_color[1];
-          pbr_metal_rough.base_color_factor.b = (float)base_color[2];
-          pbr_metal_rough.base_color_factor.a = (float)base_color[3];
-        }
-
-        else if (value.first == "metallicFactor") {
-          const auto factor = value.second.Factor();
-          if (factor >= 0 && factor <= 1) {
-            pbr_metal_rough.metallic_factor = (float)factor;
-          }
-        }
-
-        else if (value.first == "roughnessFactor") {
-          const auto factor = value.second.Factor();
-          if (factor >= 0 && factor <= 1) {
-            pbr_metal_rough.roughness_factor = factor;
-          }
-        }
-
-        else if (value.first == "baseColorTexture") {
-          const auto index = value.second.TextureIndex();
-          if (index < textures.size()) {
-            pbr_metal_rough.base_color_texture = textures[index];
-          }
-        }
-
-        else if (value.first == "metallicRoughnessTexture") {
-          const auto index = value.second.TextureIndex();
-          if (index < textures.size()) {
-            pbr_metal_rough.metallic_roughness_texture = textures[index];
-          }
-        }
-
-        else {
-          std::cerr << "Warn: The value " << value.first
-                    << " is defined in material " << i
-                    << " in values but is ignored by loader\n";
-        }
-      }
+      load_as_metal_roughness(i, currently_loading, gltf_material);
     }
 
     else {
@@ -231,10 +235,24 @@ void app::load() {
             }
           }
         }
+      } else if (specular_glossiness != gltf_material.extensions.end()) {
+        std::cerr << "Warn: Specular glossiness hasn't been implemented yet\n";
+
+        // probe for metallic roughness material values
+        if (gltf_material.values.find("metallicRoughnessTexture") !=
+                gltf_material.values.end() ||
+            gltf_material.values.find("roughnessFactor") !=
+                gltf_material.values.end() ||
+            gltf_material.values.find("metallicFactor") !=
+                gltf_material.values.end()) {
+          // We can use metallic roughness as a fallback, as per glTF extension
+          // spec §KHR_materials_pbrSpecularGlossiness.best-practices
+          load_as_metal_roughness(i, currently_loading, gltf_material);
+        }
+
       } else {
-        std::cerr
-            << "Warn: we aren't currently looking at the material extension(s) "
-               "used in this file. Sorry... :-/\n";
+        std::cerr << "Warn: we aren't currently looking at the material "
+                     "extension(s) used in this file. Sorry... :-/\n";
       }
     }
 
@@ -668,6 +686,7 @@ void app::run_view_menu() {
     ImGui::MenuItem("Shader selector", 0, &show_shader_selector_window);
     ImGui::MenuItem("Material info", 0, &show_material_window);
     ImGui::MenuItem("Bone display window", 0, &show_bone_display_window);
+    ImGui::MenuItem("Scene outline", 0, &show_scene_outline_window);
     ImGui::Separator();
     ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
     ImGui::MenuItem("Editor light controls", 0, &editor_light.control_open);
@@ -792,6 +811,9 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
 
 void app::draw_scene_recur(const glm::vec3& world_camera_position,
                            const gltf_node& node) {
+  for (auto child : node.children)
+    draw_scene_recur(world_camera_position, *child);
+
   if (node.type == gltf_node::node_type::mesh) {
     auto& mesh = loaded_meshes[node.gltf_mesh_id];
 
@@ -799,9 +821,6 @@ void app::draw_scene_recur(const glm::vec3& world_camera_position,
 
     draw_mesh(world_camera_position, mesh, normal_matrix, node.world_xform);
   }
-
-  for (auto child : node.children)
-    draw_scene_recur(world_camera_position, *child);
 }
 
 void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
@@ -884,7 +903,7 @@ void app::main_loop() {
 
       if (asset_loaded) {
         // Draw all windows
-        scene_outline_window(gltf_scene_tree);
+        scene_outline_window(gltf_scene_tree, &show_scene_outline_window);
         model_info_window(model, &show_model_info_window);
         asset_images_window(textures, &show_asset_image_window);
         animation_window(animations, &show_animation_window);
@@ -976,14 +995,14 @@ void app::main_loop() {
                                       a_mesh.normals, a_mesh.display_position,
                                       a_mesh.display_normals, a_mesh.VBOs);
           }
-
-          // Then draw 2D bones and joints on top of that
         }
 
         draw_scene(world_camera_position);
 
-        draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
-                          projection_matrix, *loaded_meshes[0].shader_list);
+        for (auto& mesh : loaded_meshes)
+          draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
+                            projection_matrix, *loaded_meshes[0].shader_list,
+                            mesh);
       }
     }
     // Render all ImGui, then swap buffers
@@ -1120,7 +1139,7 @@ void app::gpu_update_morphed_submesh(
                display_normal[submesh_id].data(), GL_DYNAMIC_DRAW);
 
   //// TODO create #defines for these layout numbers, they are arbitrary
-  // glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][3]);
+  // glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][TANGENT_BUFFER]);
   // glBufferData(GL_ARRAY_BUFFER,
   //             display_tangent[submesh_id].size() * sizeof(float),
   //             display_tangent[submesh_id].data(), GL_DYNAMIC_DRAW);
@@ -1199,15 +1218,18 @@ void app::perform_software_morphing(
 void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
                             int active_joint_node, const glm::mat4& view_matrix,
                             const glm::mat4& projection_matrix,
-                            std::map<std::string, shader>& shaders) {
+                            std::map<std::string, shader>& shaders,
+                            const mesh& a_mesh) {
+  if (!a_mesh.skinned) return;
+
   glBindVertexArray(0);
   glDisable(GL_DEPTH_TEST);
 
-  bone_display_window(&show_bone_display_window);
+  // bone_display_window(&show_bone_display_window);
   shaders["debug_color"].use();
   draw_bones(mesh_skeleton_graph, active_joint_node,
              shaders["debug_color"].get_program(), view_matrix,
-             projection_matrix);
+             projection_matrix, a_mesh);
 }
 
 void app::precompute_hardware_skinning_data(
@@ -1382,8 +1404,23 @@ void app::fill_sequencer(gltf_insight::AnimSequence& sequence,
 #ifdef WIN32
 #include <Windows.h>
 #include <shellapi.h>
-#else
 #endif
+#ifdef __APPLE__
+#include <ApplicationServices/ApplicationServices.h>
+#include <CoreFoundation/CFBundle.h>
+
+void apple_cocoa_open_url_wrap(const std::string& url_str) {
+  CFURLRef url = CFURLCreateWithBytes(NULL,                     // allocator
+                                      (UInt8*)url_str.c_str(),  // URLBytes
+                                      url_str.length(),         // length
+                                      kCFStringEncodingASCII,   // encoding
+                                      NULL                      // baseURL
+  );
+  LSOpenCFURLRef(url, 0);
+  CFRelease(url);
+}
+#endif
+
 void app::open_url(std::string url) {
   bool ran = false;
 #ifdef WIN32
@@ -1393,6 +1430,10 @@ void app::open_url(std::string url) {
 #ifdef __linux__
   std::string command = "xdg-open " + url;
   (void)std::system(command.c_str());
+  ran = true;
+#endif
+#ifdef __APPLE__
+  apple_cocoa_open_url_wrap(url);
   ran = true;
 #endif
 

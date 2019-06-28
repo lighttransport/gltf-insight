@@ -140,6 +140,8 @@ class app {
                                        std::string name);
 
   void unload();
+  void load_as_metal_roughness(size_t i, material& currently_loading,
+                               tinygltf::Material gltf_material);
   void load();
   void main_loop();
 
@@ -177,6 +179,7 @@ class app {
   bool show_bone_selector = true;
   bool show_material_window = true;
   bool show_bone_display_window = true;
+  bool show_scene_outline_window = true;
 
   std::vector<mesh> loaded_meshes;
   std::vector<material> loaded_material;
@@ -275,7 +278,8 @@ class app {
   void draw_bone_overlay(gltf_node& mesh_skeleton_graph, int active_joint_node,
                          const glm::mat4& view_matrix,
                          const glm::mat4& projection_matrix,
-                         std::map<std::string, shader>& shaders);
+                         std::map<std::string, shader>& shaders,
+                         const mesh& a_mesh);
 
   void precompute_hardware_skinning_data(
       gltf_node& mesh_skeleton_graph, glm::mat4& model_matrix,

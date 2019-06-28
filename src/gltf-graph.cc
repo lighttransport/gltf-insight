@@ -109,6 +109,8 @@ void update_mesh_skeleton_graph_transforms(gltf_node& node,
                           ? glm::inverse(node.local_xform) * pose_matrix
                           : glm::mat4(1.f));
 
+  // node.world_xform = parent_matrix * node.local_xform;
+
   // recursively call itself until you reach a node with no children
   for (auto& child : node.children)
     update_mesh_skeleton_graph_transforms(*child, node.world_xform);
@@ -151,7 +153,7 @@ glm::mat4 load_node_local_xform(const tinygltf::Node& node) {
     rotation.z = float(node.rotation[2]);
   }
 
-  return glm::translate(glm::mat4(1.f), position) * glm::mat4(rotation) *
+  return glm::translate(glm::mat4(1.f), position) * glm::toMat4(rotation) *
          glm::scale(glm::mat4(1.f), scale) * matrix;
 }
 
@@ -225,12 +227,15 @@ void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end,
   glEnd();
 }
 
+#include "insight-app.hh"
+
 void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
-                glm::mat4 view_matrix, glm::mat4 projection_matrix) {
+                glm::mat4 view_matrix, glm::mat4 projection_matrix,
+                const gltf_insight::mesh& a_mesh) {
   // recurse down the scene tree
   for (auto& child : root.children)
     draw_bones(*child, active_joint_node_index, shader, view_matrix,
-               projection_matrix);
+               projection_matrix, a_mesh);
 
   // on current node, set debug_shader model view projection to draw our local
   // space

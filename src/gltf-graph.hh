@@ -117,8 +117,13 @@ inline void empty_gltf_graph(gltf_node& graph_root) {
 // [-0.5,0.5] if(length(coord) > 0.5)                  //outside of circle
 // radius?
 //    discard;
+
+namespace gltf_insight {
+struct mesh;
+}
 void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
-                glm::mat4 view_matrix, glm::mat4 projection_matrix);
+                glm::mat4 view_matrix, glm::mat4 projection_matrix,
+                const gltf_insight::mesh& a_mesh);
 
 void create_flat_bone_array(gltf_node& root,
                             std::vector<gltf_node*>& flat_array,

@@ -164,6 +164,7 @@ void load_shaders(const size_t nb_joints,
 #include "uv.frag_inc.hh"
 #include "vertex_color.frag_inc.hh"
 #include "weights.frag_inc.hh"
+#include "world_fragment.frag_inc.hh"
 
   // print some warnings
   if (nb_joints > 180)
@@ -216,6 +217,8 @@ void load_shaders(const size_t nb_joints,
                                             base_color_map_frag_len);
   const std::string metallic_roughness_map_frag_src(
       (char*)metallic_roughness_map_frag, metallic_roughness_map_frag_len);
+  const std::string world_frag_src((char*)world_fragment_frag,
+                                   world_fragment_frag_len);
   const std::string vertex_color_frag_src((char*)vertex_color_frag,
                                           vertex_color_frag_len);
   const std::string& vert_src =
@@ -244,6 +247,8 @@ void load_shaders(const size_t nb_joints,
       "debug_applied_normal_mapping", vert_src, perturbed_normal_frag_src);
   shaders["debug_vertex_color"] =
       shader("debug_vertex_color", vert_src, vertex_color_frag_src);
+  shaders["debug_frag_pos"] =
+      shader("debug_frag_pos", vert_src, world_frag_src);
   shaders["pbr_metal_rough"] =
       shader("pbr_metal_rough", vert_src, pbr_metallic_roughness_frag_src);
   if (nb_joints > 0)

@@ -151,4 +151,4 @@ void material_info_window(
     const std::vector<gltf_insight::material>& loaded_materials,
     bool* open = nullptr);
 
-void scene_outline_window(gltf_node& sene);
+void scene_outline_window(gltf_node& sene, bool* open = nullptr);

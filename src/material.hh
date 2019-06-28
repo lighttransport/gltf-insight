@@ -58,7 +58,7 @@ enum class shading_type {
 /// Type of alpha blending requested
 enum class alpha_coverage : int { opaque = 0, mask = 1, blend = 2 };
 
-static inline std::string to_string(alpha_coverage c) {
+static std::string to_string(alpha_coverage c) {
   switch (c) {
     case alpha_coverage::blend:
       return "blend";
@@ -67,9 +67,10 @@ static inline std::string to_string(alpha_coverage c) {
     case alpha_coverage::mask:
       return "mask";
   }
+  return "error";
 }
 
-static inline std::string to_string(shading_type s) {
+static std::string to_string(shading_type s) {
   switch (s) {
     case shading_type::pbr_metal_rough:
       return "PBR metallic roughness";
@@ -78,6 +79,7 @@ static inline std::string to_string(shading_type s) {
     case shading_type::unlit:
       return "Unlit";
   }
+  return "error";
 }
 
 /// The maximum number of texture attachement our shader system can have

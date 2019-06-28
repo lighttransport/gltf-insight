@@ -1020,9 +1020,9 @@ void scene_outline_window_recur(gltf_node& node) {
     ImGui::TreePop();
   }
 }
-void scene_outline_window(gltf_node& scene) {
-  ImGui::Begin("Scene outline");
-  scene_outline_window_recur(scene);
+void scene_outline_window(gltf_node& scene, bool* open) {
+  if (open && !*open) return;
+  if (ImGui::Begin("Scene outline", open)) scene_outline_window_recur(scene);
   ImGui::End();
 }
 
