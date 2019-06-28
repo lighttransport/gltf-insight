@@ -1,6 +1,5 @@
 dist: xenial
 language: cpp
-sudo: false
 matrix:
   allow_failures:
     - os: osx
@@ -26,37 +25,29 @@ matrix:
         - libxcursor-dev 
         - libxi-dev
     compiler: clang
-    env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug
+    #env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug
+    env: COMPILER_VERSION=-3.9 BUILD_TYPE=Release UPLOAD=true
+
+    
+  - os: linux
+  - dist: xenial
   - addons: *1
-    compiler: clang
-    env: COMPILER_VERSION=3.9 BUILD_TYPE=Release
-  - addons: &2
-      apt:
-        sources:
-        - george-edison55-precise-backports
-        - ubuntu-toolchain-r-test
-        packages:
-        - g++-4.9
-        - clang-3.9
-        - cmake
-        - mesa-common-dev 
-        - xorg-dev
-        - libgl1-mesa-dev 
-        - libxrandr-dev 
-        - libxcb-xinerama0 
-        - libxinerama-dev 
-        - libxcursor-dev 
-        - libxi-dev
     compiler: gcc
-    env: COMPILER_VERSION=4.9 BUILD_TYPE=Debug EXTRA_CXXFLAGS="-fsanitize=address"
-  - addons: *2
-    compiler: gcc
-    env: COMPILER_VERSION=4.9 BUILD_TYPE=Release EXTRA_CXXFLAGS="-fsanitize=address"
-  - addons: *1
-    compiler: clang
-    env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
+    env: COMPILER_VERSION=-4.9 BUILD_TYPE=Release UPLOAD=false
+
+# TODO sanitizer builds
+#  - addons: *1
+#    compiler: gcc
+#    env: COMPILER_VERSION=4.9 BUILD_TYPE=Release EXTRA_CXXFLAGS="-fsanitize=address"
+#  - addons: *1
+#    compiler: clang
+#    env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
+
   - os: osx
   - osx_image: xcode10.2
+  compiler: clang
+  env: 
+  
 
 before_install:
   - git submodule update --init --recursive
@@ -64,8 +55,8 @@ before_install:
 
 
 script:
-  - export CC="${CC}-${COMPILER_VERSION}"
-  - export CXX="${CXX}-${COMPILER_VERSION}"
+  - export CC="${CC}${COMPILER_VERSION}"
+  - export CXX="${CXX}${COMPILER_VERSION}"
   - ${CC} -v
   - mkdir build
   - cd build
@@ -78,14 +69,15 @@ script:
      chmod +x linuxdeploy-x86_64.AppImage
      ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage -d ../icons/gltf-insight.desktop -i ../icons/gltf-insight.svg
     fi
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; echo "TODO: code here to build the .app bundle?"          ; fi
 
 after_success:
   - |
     if [ "$TRAVIS_OS_NAME" = "linux" ]; then
      ls -lh *.AppImage # Assuming you have some files in out/ that you would like to upload
-     wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
-     bash upload.sh gltf-insight*.AppImage
+     if [ "$UPLOAD" = true ]; then
+      wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
+      bash upload.sh gltf-insight*.AppImage
+     fi
     fi
   - echo "after_success is done"
 
