@@ -1,12 +1,10 @@
 dist: xenial
 language: cpp
 matrix:
-  allow_failures:
-    - os: osx
   include:
   - os: linux
-  - dist: xenial
-  - addons: &1
+    dist: xenial
+    addons: &1
       apt:
         sources:
         - george-edison55-precise-backports
@@ -25,13 +23,11 @@ matrix:
         - libxcursor-dev 
         - libxi-dev
     compiler: clang
-    #env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug
     env: COMPILER_VERSION=-3.9 BUILD_TYPE=Release UPLOAD=true
 
-    
   - os: linux
-  - dist: xenial
-  - addons: *1
+    dist: xenial
+    addons: *1
     compiler: gcc
     env: COMPILER_VERSION=-4.9 BUILD_TYPE=Release UPLOAD=false
 
@@ -43,10 +39,9 @@ matrix:
 #    compiler: clang
 #    env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
 
-  allow_failures:
   - os: osx
-  - osx_image: xcode10.2
-  compiler: clang
+    osx_image: xcode10.2
+    compiler: clang
 
   
 
@@ -61,7 +56,7 @@ script:
   - ${CC} -v
   - mkdir build
   - cd build
-  - cmake .. -DCMAKE_INSTALL_PREFIX=/usr
+  - cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
   - make -j 2
   - |
     if [ "$TRAVIS_OS_NAME" = "linux" ]; then
