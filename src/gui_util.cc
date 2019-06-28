@@ -486,20 +486,24 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 #endif
 
 #ifdef __APPLE__
-  // create GL3 context. At least 3.3 should be supported on recent mac machines(2009~)
+  // create GL3 context. At least 3.2 should be supported on recent mac machines(2009~)
   // https://support.apple.com/en-us/HT202823
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // It looks this is important on macOS.
-#endif
-
+#else
   glfwWindowHint(GLFW_SAMPLES, 16);
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
+#endif
 
   window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
   glfwMakeContextCurrent(window);
-  glfwSwapInterval(0);  // Enable vsync
+#ifdef __APPLE__
+  glfwSwapInterval(1);  // Enable vsync
+#else
+  glfwSwapInterval(0); 
+#endif
   glfwSetKeyCallback(window, key_callback);
 
   // glad must be called after glfwMakeContextCurrent()
@@ -1064,12 +1068,15 @@ GLuint load_gltf_insight_icon() {
   data = stbi_load_from_memory(gltf_insight_256_png, gltf_insight_256_png_len,
                                &w, &h, &c, 4);
 
-  if (!data) throw std::runtime_error("Could not load gltf-insight logo!");
+  if (!data) {
+    throw std::runtime_error("Could not load gltf-insight logo!");
+  }
 
   glGenTextures(1, &gl_image);
   glBindTexture(GL_TEXTURE_2D, gl_image);
   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE,
                data);
+
   glGenerateMipmap(GL_TEXTURE_2D);
   glBindTexture(GL_TEXTURE_2D, 0);
 
