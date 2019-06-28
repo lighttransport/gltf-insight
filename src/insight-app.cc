@@ -1380,6 +1380,7 @@ void app::fill_sequencer(gltf_insight::AnimSequence& sequence,
 
 #include <cstdio>
 #ifdef WIN32
+#include <Windows.h>
 #include <shellapi.h>
 #else
 #endif
