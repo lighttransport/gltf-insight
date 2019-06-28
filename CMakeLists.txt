@@ -205,10 +205,10 @@ target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/s
 add_sanitizers(${BUILD_TARGET})
 
 
-
-
 if(APPLE)
-    list(APPEND EXT_LIBRARIES " -framework Cocoa  -framework CoreFoundation -framework ApplicationServices ")
+  list(APPEND EXT_LIBRARIES "-framework Cocoa")
+  list(APPEND EXT_LIBRARIES	"-framework CoreFoundation" )
+  list(APPEND EXT_LIBRARIES	"-framework ApplicationServices")
 endif()
 
 target_link_libraries(
