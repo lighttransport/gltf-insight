@@ -111,7 +111,7 @@ struct mesh {
 struct editor_lighting {
   glm::vec3 color = glm::vec3(1.f, 1.f, 1.f);
   float multiplier = 1.f;
-  glm::vec3 non_normalized_direction = glm::vec3(1.f, 1.f, 1.f);
+  glm::vec3 non_normalized_direction = glm::vec3(-1.f, -0.2f, -1.f);
   glm::vec3 get_directional_light_direction() const;
 
   bool control_open = true;
