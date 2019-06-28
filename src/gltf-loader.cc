@@ -205,7 +205,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                    const std::vector<tinygltf::Primitive>& primitives,
                    std::vector<draw_call_submesh>& draw_call_descriptor,
                    std::vector<GLuint>& VAOs,
-                   std::vector<std::array<GLuint, 7>>& VBOs,
+                   std::vector<std::array<GLuint, VBO_count>>& VBOs,
                    std::vector<std::vector<unsigned>>& indices,
                    std::vector<std::vector<float>>& vertex_coord,
                    std::vector<std::vector<float>>& texture_coord,
@@ -514,7 +514,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       glBindVertexArray(VAOs[submesh]);
 
       // Layout "0" = vertex coordinates
-      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][0]);
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_position]);
       glBufferData(GL_ARRAY_BUFFER,
                    vertex_coord[submesh].size() * sizeof(float),
                    vertex_coord[submesh].data(), GL_DYNAMIC_DRAW);
@@ -523,7 +523,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       glEnableVertexAttribArray(0);
 
       // Layout "1" = vertex normal
-      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][1]);
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_normal]);
       glBufferData(GL_ARRAY_BUFFER, normals[submesh].size() * sizeof(float),
                    normals[submesh].data(), GL_DYNAMIC_DRAW);
       glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
@@ -533,7 +533,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       // We we haven't loaded any texture, don't even bother with UVs
       if (textures.size() > 0) {
         // Layout "2" = vertex UV
-        glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][2]);
+        glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_uv]);
         glBufferData(GL_ARRAY_BUFFER,
                      texture_coord[submesh].size() * sizeof(float),
                      texture_coord[submesh].data(), GL_STATIC_DRAW);
@@ -543,15 +543,15 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       }
 
       // colors is layout 3
-      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][3]);
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_color]);
       glBufferData(GL_ARRAY_BUFFER, colors[submesh].size() * sizeof(float),
                    colors[submesh].data(), GL_DYNAMIC_DRAW);
       glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
                             nullptr);
       glEnableVertexAttribArray(3);
 
-      // Layout "3" joints assignment vector
-      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][4]);
+      // Layout "4" joints assignment vector
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_joints]);
       glBufferData(GL_ARRAY_BUFFER,
                    joints[submesh].size() * sizeof(unsigned short),
                    joints[submesh].data(), GL_STATIC_DRAW);
@@ -559,8 +559,8 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
                             4 * sizeof(unsigned short), nullptr);
       glEnableVertexAttribArray(4);
 
-      // Layout "4" joints weights
-      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][5]);
+      // Layout "5" joints weights
+      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_weights]);
       glBufferData(GL_ARRAY_BUFFER, weights[submesh].size() * sizeof(float),
                    weights[submesh].data(), GL_STATIC_DRAW);
       glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
@@ -568,7 +568,7 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       glEnableVertexAttribArray(5);
 
       // EBO
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][6]);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][VBO_layout_EBO]);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER,
                    indices[submesh].size() * sizeof(unsigned),
                    indices[submesh].data(), GL_STATIC_DRAW);

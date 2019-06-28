@@ -30,6 +30,18 @@ SOFTWARE.
 #include "glad/glad.h"
 #include "material.hh"
 #include "shader.hh"
+
+// These values are used to define shader varying inputs:
+static constexpr auto VBO_count = 7;
+static constexpr auto VBO_layout_EBO = VBO_count - 1;
+
+static constexpr auto VBO_layout_position = 0;
+static constexpr auto VBO_layout_normal = 1;
+static constexpr auto VBO_layout_uv = 2;
+static constexpr auto VBO_layout_color = 3;
+static constexpr auto VBO_layout_joints = 4;
+static constexpr auto VBO_layout_weights = 5;
+
 /// Debug output
 void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
                             GLenum severity, GLsizei length,

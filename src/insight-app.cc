@@ -334,7 +334,7 @@ void app::load() {
     glGenVertexArrays(GLsizei(nb_submeshes), current_mesh.VAOs.data());
     for (auto& VBO : current_mesh.VBOs) {
       // We have 5 vertex attributes per vertex + 1 element array.
-      glGenBuffers(7, VBO.data());
+      glGenBuffers(VBO_count, VBO.data());
     }
 
     // For each submesh of the mesh, load the data
@@ -496,7 +496,7 @@ void app::load() {
 }
 
 mesh::~mesh() {
-  for (auto& VBO : VBOs) glDeleteBuffers(6, VBO.data());
+  for (auto& VBO : VBOs) glDeleteBuffers(VBO_count, VBO.data());
   glDeleteVertexArrays(GLsizei(VAOs.size()), VAOs.data());
 
   displayed = true, skinned = false;
@@ -1126,14 +1126,14 @@ void app::cpu_compute_morphed_display_mesh(
 void app::gpu_update_morphed_submesh(
     size_t submesh_id, std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<std::array<GLuint, 7>>& VBOs) {
+    std::vector<std::array<GLuint, VBO_count>>& VBOs) {
   // upload to GPU
-  glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][0]);
+  glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][VBO_layout_position]);
   glBufferData(GL_ARRAY_BUFFER,
                display_position[submesh_id].size() * sizeof(float),
                display_position[submesh_id].data(), GL_DYNAMIC_DRAW);
 
-  glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][1]);
+  glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][VBO_layout_position]);
   glBufferData(GL_ARRAY_BUFFER,
                display_normal[submesh_id].size() * sizeof(float),
                display_normal[submesh_id].data(), GL_DYNAMIC_DRAW);
@@ -1154,7 +1154,7 @@ void app::perform_software_morphing(
     const std::vector<std::vector<float>>& normals,
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<std::array<GLuint, 7>>& VBOs) {
+    std::vector<std::array<GLuint, VBO_count>>& VBOs) {
   // evaluation cache:
   static std::vector<bool> clean;
   static std::vector<std::vector<float>> cached_weights;

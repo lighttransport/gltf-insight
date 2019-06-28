@@ -87,7 +87,7 @@ struct mesh {
 
   // Rendering
   std::vector<GLuint> VAOs;
-  std::vector<std::array<GLuint, 7>> VBOs;
+  std::vector<std::array<GLuint, VBO_count>> VBOs;
   std::vector<draw_call_submesh> draw_call_descriptors;
 
   // Each mesh comes with a set of shader objects to be used. They need to be
@@ -264,7 +264,7 @@ class app {
   void gpu_update_morphed_submesh(
       size_t submesh_id, std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
-      std::vector<std::array<GLuint, 7>>& VBOs);
+      std::vector<std::array<GLuint, VBO_count>>& VBOs);
 
   void perform_software_morphing(
       gltf_node mesh_skeleton_graph, size_t submesh_id,
@@ -273,7 +273,7 @@ class app {
       const std::vector<std::vector<float>>& normals,
       std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
-      std::vector<std::array<GLuint, 7>>& VBOs);
+      std::vector<std::array<GLuint, VBO_count>>& VBOs);
 
   void draw_bone_overlay(gltf_node& mesh_skeleton_graph, int active_joint_node,
                          const glm::mat4& view_matrix,
