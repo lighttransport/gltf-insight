@@ -25,11 +25,21 @@ SOFTWARE.
 
 #include <array>
 #include <cstring>
-#include <glm/glm.hpp>
-#include <glm/gtc/quaternion.hpp>
 #include <string>
 #include <utility>
 #include <vector>
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 struct gltf_node;
 

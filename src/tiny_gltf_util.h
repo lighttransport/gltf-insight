@@ -14,39 +14,39 @@
 
 #include "tiny_gltf.h"
 
-static bool has_mesh(const tinygltf::Node& node) { return node.mesh >= 0; }
+inline bool has_mesh(const tinygltf::Node& node) { return node.mesh >= 0; }
 
-static std::vector<int> get_all_mesh_nodes_indices(
+inline std::vector<int> get_all_mesh_nodes_indices(
     const tinygltf::Model& model, const tinygltf::Scene& scene) {
   std::vector<int> output;
   const auto& node_list = scene.nodes;
 
   for (auto node_index : node_list) {
-    if (has_mesh(model.nodes[node_index])) output.push_back(node_index);
+    if (has_mesh(model.nodes[size_t(node_index)])) output.push_back(node_index);
   }
 
   return output;
 }
 
-static int find_node_with_mesh_in_children(const tinygltf::Model& model,
+inline int find_node_with_mesh_in_children(const tinygltf::Model& model,
                                            int root) {
-  const auto& root_node = model.nodes[root];
+  const auto& root_node = model.nodes[size_t(root)];
   if (has_mesh(root_node)) return root;
 
   for (auto child : root_node.children) {
     const auto result = find_node_with_mesh_in_children(model, child);
-    if (result > 0 && model.nodes[result].mesh >= 0) return result;
+    if (result > 0 && model.nodes[size_t(result)].mesh >= 0) return result;
   }
 
   return -1;
 }
 
-static int find_main_scene(const tinygltf::Model& model) {
+inline int find_main_scene(const tinygltf::Model& model) {
   return model.defaultScene >= 0 ? model.defaultScene : 0;
 }
 
-static int find_main_mesh_node(const tinygltf::Model& model) {
-  const auto& node_list = model.scenes[find_main_scene(model)].nodes;
+inline int find_main_mesh_node(const tinygltf::Model& model) {
+  const auto& node_list = model.scenes[size_t(find_main_scene(model))].nodes;
 
   for (auto node : node_list) {
     const auto mesh_node = find_node_with_mesh_in_children(model, node);
@@ -60,7 +60,7 @@ namespace tinygltf {
 
 namespace util {
 
-static std::string PrintMode(int mode) {
+inline std::string PrintMode(int mode) {
   if (mode == TINYGLTF_MODE_POINTS) {
     return "POINTS";
   } else if (mode == TINYGLTF_MODE_LINE) {
@@ -77,7 +77,7 @@ static std::string PrintMode(int mode) {
   return "**UNKNOWN**";
 }
 
-static std::string PrintTarget(int target) {
+inline std::string PrintTarget(int target) {
   if (target == 34962) {
     return "GL_ARRAY_BUFFER";
   } else if (target == 34963) {
@@ -87,7 +87,7 @@ static std::string PrintTarget(int target) {
   }
 }
 
-static std::string PrintType(int ty) {
+inline std::string PrintType(int ty) {
   if (ty == TINYGLTF_TYPE_SCALAR) {
     return "SCALAR";
   } else if (ty == TINYGLTF_TYPE_VECTOR) {
@@ -110,7 +110,7 @@ static std::string PrintType(int ty) {
   return "**UNKNOWN**";
 }
 
-static std::string PrintComponentType(int ty) {
+inline std::string PrintComponentType(int ty) {
   if (ty == TINYGLTF_COMPONENT_TYPE_BYTE) {
     return "BYTE";
   } else if (ty == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
@@ -132,22 +132,22 @@ static std::string PrintComponentType(int ty) {
   return "**UNKNOWN**";
 }
 
-static int GetAnimationSamplerInputCount(
+inline int GetAnimationSamplerInputCount(
     const tinygltf::AnimationSampler& sampler, const tinygltf::Model& model) {
-  const tinygltf::Accessor& accessor = model.accessors[sampler.input];
+  const tinygltf::Accessor& accessor = model.accessors[size_t(sampler.input)];
   return int(accessor.count);
 }
 
-static int GetAnimationSamplerOutputCount(
+inline int GetAnimationSamplerOutputCount(
     const tinygltf::AnimationSampler& sampler, const tinygltf::Model& model) {
-  const tinygltf::Accessor& accessor = model.accessors[sampler.output];
+  const tinygltf::Accessor& accessor = model.accessors[size_t(sampler.output)];
   return int(accessor.count);
 }
 
-static bool GetAnimationSamplerInputMinMax(
+inline bool GetAnimationSamplerInputMinMax(
     const tinygltf::AnimationSampler& sampler, const tinygltf::Model& model,
     float* min_value, float* max_value) {
-  const tinygltf::Accessor& accessor = model.accessors[sampler.input];
+  const tinygltf::Accessor& accessor = model.accessors[size_t(sampler.input)];
 
   // Assume scalar value.
   if ((accessor.minValues.size() > 0) && (accessor.maxValues.size() > 0)) {
@@ -162,22 +162,22 @@ static bool GetAnimationSamplerInputMinMax(
 }
 
 // Utility function for decoding animation value
-static inline float DecodeAnimationChannelValue(int8_t c) {
+inline float DecodeAnimationChannelValue(int8_t c) {
   return std::max(float(c) / 127.0f, -1.0f);
 }
-static inline float DecodeAnimationChannelValue(uint8_t c) {
+inline float DecodeAnimationChannelValue(uint8_t c) {
   return float(c) / 255.0f;
 }
-static inline float DecodeAnimationChannelValue(int16_t c) {
+inline float DecodeAnimationChannelValue(int16_t c) {
   return std::max(float(c) / 32767.0f, -1.0f);
 }
-static inline float DecodeAnimationChannelValue(uint16_t c) {
+inline float DecodeAnimationChannelValue(uint16_t c) {
   return float(c) / 65525.0f;
 }
 
-static inline const uint8_t* GetBufferAddress(
-    const int i, const Accessor& accessor, const BufferView& bufferViewObject,
-    const Buffer& buffer) {
+inline const uint8_t* GetBufferAddress(const int i, const Accessor& accessor,
+                                       const BufferView& bufferViewObject,
+                                       const Buffer& buffer) {
   if (i >= int(accessor.count)) return nullptr;
 
   int byte_stride = accessor.ByteStride(bufferViewObject);
@@ -192,11 +192,12 @@ static inline const uint8_t* GetBufferAddress(
   return addr;
 }
 
-static inline bool DecodeScalarAnimationValue(
-    const size_t i, const tinygltf::Accessor& accessor,
-    const tinygltf::Model& model, float* scalar) {
-  const BufferView& bufferView = model.bufferViews[accessor.bufferView];
-  const Buffer& buffer = model.buffers[bufferView.buffer];
+inline bool DecodeScalarAnimationValue(const size_t i,
+                                       const tinygltf::Accessor& accessor,
+                                       const tinygltf::Model& model,
+                                       float* scalar) {
+  const BufferView& bufferView = model.bufferViews[size_t(accessor.bufferView)];
+  const Buffer& buffer = model.buffers[size_t(bufferView.buffer)];
 
   const uint8_t* addr = GetBufferAddress(int(i), accessor, bufferView, buffer);
   if (addr == nullptr) {
@@ -231,7 +232,7 @@ static inline bool DecodeScalarAnimationValue(
   return true;
 }
 
-static bool DecodeTranslationAnimationValue(const size_t i,
+inline bool DecodeTranslationAnimationValue(const size_t i,
                                             const tinygltf::Accessor& accessor,
                                             const tinygltf::Model& model,
                                             float* xyz) {
@@ -240,8 +241,8 @@ static bool DecodeTranslationAnimationValue(const size_t i,
     return false;
   }
 
-  const BufferView& bufferView = model.bufferViews[accessor.bufferView];
-  const Buffer& buffer = model.buffers[bufferView.buffer];
+  const BufferView& bufferView = model.bufferViews[size_t(accessor.bufferView)];
+  const Buffer& buffer = model.buffers[size_t(bufferView.buffer)];
 
   const uint8_t* addr = GetBufferAddress(int(i), accessor, bufferView, buffer);
   if (addr == nullptr) {
@@ -258,7 +259,7 @@ static bool DecodeTranslationAnimationValue(const size_t i,
   return true;
 }
 
-static bool DecodeScaleAnimationValue(const size_t i,
+inline bool DecodeScaleAnimationValue(const size_t i,
                                       const tinygltf::Accessor& accessor,
                                       const tinygltf::Model& model,
                                       float* xyz) {
@@ -267,8 +268,8 @@ static bool DecodeScaleAnimationValue(const size_t i,
     return false;
   }
 
-  const BufferView& bufferView = model.bufferViews[accessor.bufferView];
-  const Buffer& buffer = model.buffers[bufferView.buffer];
+  const BufferView& bufferView = model.bufferViews[size_t(accessor.bufferView)];
+  const Buffer& buffer = model.buffers[size_t(bufferView.buffer)];
 
   const uint8_t* addr = GetBufferAddress(int(i), accessor, bufferView, buffer);
   if (addr == nullptr) {
@@ -285,20 +286,18 @@ static bool DecodeScaleAnimationValue(const size_t i,
   return true;
 }
 
-static bool DecodeRotationAnimationValue(const size_t i,
+inline bool DecodeRotationAnimationValue(const size_t i,
                                          const tinygltf::Accessor& accessor,
                                          const tinygltf::Model& model,
                                          float* xyzw) {
-  const BufferView& bufferView = model.bufferViews[accessor.bufferView];
-  const Buffer& buffer = model.buffers[bufferView.buffer];
+  const BufferView& bufferView = model.bufferViews[size_t(accessor.bufferView)];
+  const Buffer& buffer = model.buffers[size_t(bufferView.buffer)];
 
   const uint8_t* addr = GetBufferAddress(int(i), accessor, bufferView, buffer);
   if (addr == nullptr) {
     std::cerr << "Invalid glTF data?" << std::endl;
     return false;
   }
-
-  float value = 0.0f;
 
   if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_BYTE) {
     xyzw[0] = DecodeAnimationChannelValue(

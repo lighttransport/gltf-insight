@@ -76,37 +76,37 @@ void app::load_as_metal_roughness(size_t i, material& currently_loading,
   for (auto& value : gltf_material.values) {
     if (value.first == "baseColorFactor") {
       const auto base_color = value.second.ColorFactor();
-      pbr_metal_rough.base_color_factor.r = (float)base_color[0];
-      pbr_metal_rough.base_color_factor.g = (float)base_color[1];
-      pbr_metal_rough.base_color_factor.b = (float)base_color[2];
-      pbr_metal_rough.base_color_factor.a = (float)base_color[3];
+      pbr_metal_rough.base_color_factor.r = float(base_color[0]);
+      pbr_metal_rough.base_color_factor.g = float(base_color[1]);
+      pbr_metal_rough.base_color_factor.b = float(base_color[2]);
+      pbr_metal_rough.base_color_factor.a = float(base_color[3]);
     }
 
     else if (value.first == "metallicFactor") {
       const auto factor = value.second.Factor();
       if (factor >= 0 && factor <= 1) {
-        pbr_metal_rough.metallic_factor = (float)factor;
+        pbr_metal_rough.metallic_factor = float(factor);
       }
     }
 
     else if (value.first == "roughnessFactor") {
       const auto factor = value.second.Factor();
       if (factor >= 0 && factor <= 1) {
-        pbr_metal_rough.roughness_factor = (float)factor;
+        pbr_metal_rough.roughness_factor = float(factor);
       }
     }
 
     else if (value.first == "baseColorTexture") {
       const auto index = value.second.TextureIndex();
-      if (index < textures.size()) {
-        pbr_metal_rough.base_color_texture = textures[index];
+      if (index < int(textures.size())) {
+        pbr_metal_rough.base_color_texture = textures[size_t(index)];
       }
     }
 
     else if (value.first == "metallicRoughnessTexture") {
       const auto index = value.second.TextureIndex();
-      if (index < textures.size()) {
-        pbr_metal_rough.metallic_roughness_texture = textures[index];
+      if (index < int(textures.size())) {
+        pbr_metal_rough.metallic_roughness_texture = textures[size_t(index)];
       }
     }
 
@@ -119,11 +119,11 @@ void app::load_as_metal_roughness(size_t i, material& currently_loading,
 }
 
 void app::load() {
-  load_glTF_asset(gltf_ctx, input_filename, model);
+  load_glTF_asset();
 
   const auto nb_textures = model.images.size();
   textures.resize(nb_textures);
-  load_all_textures(model, nb_textures, textures);
+  load_all_textures(nb_textures);
 
   // TODO extract "load_materials" function
   loaded_material.resize(model.materials.size());
@@ -142,33 +142,33 @@ void app::load() {
     for (auto& value : gltf_material.additionalValues) {
       if (value.first == "normalTexture") {
         const auto index = value.second.TextureIndex();
-        if (index < textures.size())
-          currently_loading.normal_texture = textures[index];
+        if (index < int(textures.size()))
+          currently_loading.normal_texture = textures[size_t(index)];
       }
 
       else if (value.first == "occlusionTexture") {
         const auto index = value.second.TextureIndex();
-        if (index < textures.size())
-          currently_loading.occlusion_texture = textures[index];
+        if (index < int(textures.size()))
+          currently_loading.occlusion_texture = textures[size_t(index)];
       }
 
       else if (value.first == "emissiveTexture") {
         const auto index = value.second.TextureIndex();
-        if (index < textures.size())
-          currently_loading.emissive_texture = textures[index];
+        if (index < int(textures.size()))
+          currently_loading.emissive_texture = textures[size_t(index)];
       }
 
       else if (value.first == "emissiveFactor") {
         const auto color_value = value.second.ColorFactor();
-        currently_loading.emissive_factor.r = (float)color_value[0];
-        currently_loading.emissive_factor.g = (float)color_value[1];
-        currently_loading.emissive_factor.b = (float)color_value[2];
+        currently_loading.emissive_factor.r = float(color_value[0]);
+        currently_loading.emissive_factor.g = float(color_value[1]);
+        currently_loading.emissive_factor.b = float(color_value[2]);
       }
 
       else if (value.first == "alphaCutoff") {
         const auto factor = value.second.Factor();
-        if (factor >= 0.f && factor <= 1.f) {
-          currently_loading.alpha_cutoff = (float)factor;
+        if ((factor >= 0.0) && (factor <= 1.0)) {
+          currently_loading.alpha_cutoff = float(factor);
         }
       }
 
@@ -221,17 +221,17 @@ void app::load() {
           // Load the color
           if (value.first == "baseColorFactor") {
             const auto base_color = value.second.ColorFactor();
-            unlit.base_color_factor.r = (float)base_color[0];
-            unlit.base_color_factor.g = (float)base_color[1];
-            unlit.base_color_factor.b = (float)base_color[2];
-            unlit.base_color_factor.a = (float)base_color[3];
+            unlit.base_color_factor.r = float(base_color[0]);
+            unlit.base_color_factor.g = float(base_color[1]);
+            unlit.base_color_factor.b = float(base_color[2]);
+            unlit.base_color_factor.a = float(base_color[3]);
           }
 
           // Load the texture
           else if (value.first == "baseColorTexture") {
             const auto index = value.second.TextureIndex();
-            if (index < textures.size()) {
-              unlit.base_color_texture = textures[index];
+            if (index < int(textures.size())) {
+              unlit.base_color_texture = textures[size_t(index)];
             }
           }
         }
@@ -246,7 +246,7 @@ void app::load() {
             gltf_material.values.find("metallicFactor") !=
                 gltf_material.values.end()) {
           // We can use metallic roughness as a fallback, as per glTF extension
-          // spec §KHR_materials_pbrSpecularGlossiness.best-practices
+          // spec Â§KHR_materials_pbrSpecularGlossiness.best-practices
           load_as_metal_roughness(i, currently_loading, gltf_material);
         }
 
@@ -260,7 +260,7 @@ void app::load() {
   }
 
   const auto scene_index = find_main_scene(model);
-  const auto& scene = model.scenes[scene_index];
+  const auto& scene = model.scenes[size_t(scene_index)];
 
   gltf_scene_tree.gltf_node_index = -1;
 
@@ -287,24 +287,24 @@ void app::load() {
     loaded_meshes[i].instance = meshes_indices[i];
     auto& current_mesh = loaded_meshes[i];
 
-    const auto skin_index = model.nodes[current_mesh.instance.node].skin;
+    const auto skin_index = model.nodes[size_t(current_mesh.instance.node)].skin;
     if (skin_index >= 0) {
       current_mesh.skinned = true;
-      const auto& gltf_skin = model.skins[skin_index];
+      const auto& gltf_skin = model.skins[size_t(skin_index)];
       current_mesh.nb_joints = int(gltf_skin.joints.size());
-      create_flat_bone_list(gltf_skin, current_mesh.nb_joints, gltf_scene_tree,
+      create_flat_bone_list(gltf_skin, size_t(current_mesh.nb_joints), gltf_scene_tree,
                             current_mesh.flat_joint_list);
-      current_mesh.joint_matrices.resize(current_mesh.nb_joints);
-      load_inverse_bind_matrix_array(model, gltf_skin, current_mesh.nb_joints,
+      current_mesh.joint_matrices.resize(size_t(current_mesh.nb_joints));
+      load_inverse_bind_matrix_array(model, gltf_skin, size_t(current_mesh.nb_joints),
                                      current_mesh.inverse_bind_matrices);
       genrate_joint_inverse_bind_matrix_map(
-          gltf_skin, current_mesh.nb_joints,
+          gltf_skin, size_t(current_mesh.nb_joints),
           current_mesh.joint_inverse_bind_matrix_map);
       std::cerr << " This is a skinned mesh with " << current_mesh.nb_joints
                 << "joints \n";
     }
 
-    const auto& gltf_mesh = model.meshes[current_mesh.instance.mesh];
+    const auto& gltf_mesh = model.meshes[size_t(current_mesh.instance.mesh)];
 
     if (!gltf_mesh.name.empty())
       current_mesh.name = gltf_mesh.name;
@@ -358,7 +358,7 @@ void app::load() {
     current_mesh.morph_targets.resize(nb_submeshes);
     current_mesh.materials.resize(nb_submeshes);
     std::cerr << "loading primitive data:\n";
-    for (int s = 0; s < nb_submeshes; ++s) {
+    for (size_t s = 0; s < nb_submeshes; ++s) {
       std::cerr << "Submesh " << s << "\n";
 
       current_mesh.materials[s] = gltf_mesh.primitives[s].material;
@@ -436,17 +436,17 @@ void app::load() {
       current_mesh.nb_morph_targets =
           std::max<int>(int(target.size()), current_mesh.nb_morph_targets);
     }
-    std::vector<std::string> target_names(current_mesh.nb_morph_targets);
+    std::vector<std::string> target_names(size_t(current_mesh.nb_morph_targets));
     load_morph_target_names(gltf_mesh, target_names);
     gltf_scene_tree.pose.target_names = target_names;
 
-    load_shaders(current_mesh.nb_joints, *current_mesh.shader_list);
+    load_shaders(size_t(current_mesh.nb_joints), *current_mesh.shader_list);
   }
 
   const auto nb_animations = model.animations.size();
   animations.resize(nb_animations);
   load_animations(model, animations);
-  fill_sequencer(sequence, animations);
+  fill_sequencer();
 
   for (auto& animation : animations) {
     animation.set_gltf_graph_targets(&gltf_scene_tree);
@@ -466,12 +466,12 @@ void app::load() {
 
   // TODO this is ... mh... per node?
   auto nb_morph_targets = loaded_meshes[0].nb_morph_targets;
-  for (int i = 1; i < loaded_meshes.size(); ++i) {
+  for (size_t i = 1; i < loaded_meshes.size(); ++i) {
     nb_morph_targets =
         std::max(nb_morph_targets, loaded_meshes[i].nb_morph_targets);
   }
 
-  gltf_scene_tree.pose.blend_weights.resize(nb_morph_targets);
+  gltf_scene_tree.pose.blend_weights.resize(size_t(nb_morph_targets));
   std::generate(gltf_scene_tree.pose.blend_weights.begin(),
                 gltf_scene_tree.pose.blend_weights.end(), [] { return 0.f; });
 
@@ -499,7 +499,7 @@ mesh::~mesh() {
   for (auto& VBO : VBOs) glDeleteBuffers(VBO_count, VBO.data());
   glDeleteVertexArrays(GLsizei(VAOs.size()), VAOs.data());
 
-  displayed = true, skinned = false;
+  displayed = true; skinned = false;
   // shader_list.reset(nullptr);
 
   nb_joints = 0;
@@ -522,7 +522,7 @@ mesh::~mesh() {
   draw_call_descriptors.clear();
 }
 
-mesh& mesh::operator=(mesh&& o) throw() {
+mesh& mesh::operator=(mesh&& o) {
   nb_joints = o.nb_joints;
   nb_morph_targets = o.nb_morph_targets;
   instance = o.instance;
@@ -547,7 +547,7 @@ mesh& mesh::operator=(mesh&& o) throw() {
   return *this;
 }
 
-mesh::mesh(mesh&& other) throw() { *this = std::move(other); }
+mesh::mesh(mesh&& other) { *this = std::move(other); }
 
 mesh::mesh() : instance() {}
 
@@ -569,8 +569,8 @@ void editor_lighting::show_control() {
         non_normalized_direction.y -= .001f;
 
       const auto dir = get_directional_light_direction();
-      ImGui::Text("Actual direction is vec3(%.3f, %.3f, %.3f)", dir.x, dir.y,
-                  dir.z);
+      ImGui::Text("Actual direction is vec3(%.3f, %.3f, %.3f)", double(dir.x), double(dir.y),
+                  double(dir.z));
     }
     ImGui::End();
   }
@@ -589,7 +589,7 @@ void app::load_sensible_default_material(material& material) {
 }
 
 app::app(int argc, char** argv) {
-  parse_command_line(argc, argv, debug_output, input_filename);
+  parse_command_line(argc, argv);
 
   initialize_glfw_opengl_window(window);
   glfwSetWindowUserPointer(window, &gui_parameters);
@@ -674,22 +674,22 @@ void app::run_view_menu() {
     ImGui::MenuItem("Show ImGui Demo window", nullptr, &show_imgui_demo);
     ImGui::Separator();
     ImGui::Text("Toggle window display:");
-    ImGui::MenuItem("Images", 0, &show_asset_image_window);
-    ImGui::MenuItem("Model info", 0, &show_model_info_window);
-    ImGui::MenuItem("Animations", 0, &show_animation_window);
-    ImGui::MenuItem("Mesh Visibility", 0, &show_mesh_display_window);
-    ImGui::MenuItem("Morph Target blend weights", 0, &show_morph_target_window);
-    ImGui::MenuItem("Camera parameters", 0, &show_camera_parameter_window);
-    ImGui::MenuItem("TransformWindow", 0, &show_transform_window);
-    ImGui::MenuItem("Bone selector", 0, &show_bone_selector);
-    ImGui::MenuItem("Timeline", 0, &show_timeline);
-    ImGui::MenuItem("Shader selector", 0, &show_shader_selector_window);
-    ImGui::MenuItem("Material info", 0, &show_material_window);
-    ImGui::MenuItem("Bone display window", 0, &show_bone_display_window);
-    ImGui::MenuItem("Scene outline", 0, &show_scene_outline_window);
+    ImGui::MenuItem("Images", nullptr, &show_asset_image_window);
+    ImGui::MenuItem("Model info", nullptr, &show_model_info_window);
+    ImGui::MenuItem("Animations", nullptr, &show_animation_window);
+    ImGui::MenuItem("Mesh Visibility", nullptr, &show_mesh_display_window);
+    ImGui::MenuItem("Morph Target blend weights", nullptr, &show_morph_target_window);
+    ImGui::MenuItem("Camera parameters", nullptr, &show_camera_parameter_window);
+    ImGui::MenuItem("TransformWindow", nullptr, &show_transform_window);
+    ImGui::MenuItem("Bone selector", nullptr, &show_bone_selector);
+    ImGui::MenuItem("Timeline", nullptr, &show_timeline);
+    ImGui::MenuItem("Shader selector", nullptr, &show_shader_selector_window);
+    ImGui::MenuItem("Material info", nullptr, &show_material_window);
+    ImGui::MenuItem("Bone display window", nullptr, &show_bone_display_window);
+    ImGui::MenuItem("Scene outline", nullptr, &show_scene_outline_window);
     ImGui::Separator();
-    ImGui::MenuItem("Show Gizmo", 0, &show_gizmo);
-    ImGui::MenuItem("Editor light controls", 0, &editor_light.control_open);
+    ImGui::MenuItem("Show Gizmo", nullptr, &show_gizmo);
+    ImGui::MenuItem("Editor light controls", nullptr, &editor_light.control_open);
     ImGui::EndMenu();
   }
 }
@@ -745,7 +745,7 @@ void app::create_transparent_docking_area(const ImVec2 pos, const ImVec2 size,
   PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
   PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 
-  Begin(window_name.c_str(), NULL, host_window_flags);
+  Begin(window_name.c_str(), nullptr, host_window_flags);
   PopStyleVar(3);  // we had 3 things added on the stack
 
   const ImGuiID dockspace_id = GetID(dockspace_name.c_str());
@@ -760,14 +760,19 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
 {
   for (size_t submesh = 0; submesh < mesh.draw_call_descriptors.size();
        ++submesh) {
-    const auto& material_to_use = loaded_material[mesh.materials[submesh]];
+    const auto& material_to_use = loaded_material[size_t(mesh.materials[submesh])];
 
     if (current_display_mode == display_mode::normal) {
       switch (material_to_use.intended_shader) {
         case shading_type::pbr_metal_rough:
           shader_to_use = "pbr_metal_rough";
           break;
-        default:
+        case shading_type::pbr_specular_glossy:
+          // TODO(LTE): Implement
+          shader_to_use = "unlit";
+          std::cout << "Warn: unimplemented material shader mode.\n";
+          break;
+        case shading_type::unlit:
           shader_to_use = "unlit";
           std::cout << "Warn: unimplemented material shader mode.\n";
           break;
@@ -815,7 +820,7 @@ void app::draw_scene_recur(const glm::vec3& world_camera_position,
     draw_scene_recur(world_camera_position, *child);
 
   if (node.type == gltf_node::node_type::mesh) {
-    auto& mesh = loaded_meshes[node.gltf_mesh_id];
+    auto& mesh = loaded_meshes[size_t(node.gltf_mesh_id)];
 
     const auto normal_matrix = glm::transpose(glm::inverse(node.world_xform));
 
@@ -875,7 +880,7 @@ void app::main_loop() {
       if (save_file_dialog) {
         if (!asset_loaded)
           save_file_dialog = false;
-        else if (ImGuiFileDialog::Instance()->FileDialog("Save as...", 0, true,
+        else if (ImGuiFileDialog::Instance()->FileDialog("Save as...", nullptr, true,
                                                          ".", input_filename)) {
           if (ImGuiFileDialog::Instance()->IsOk) {
             auto save_as_filename =
@@ -946,12 +951,10 @@ void app::main_loop() {
             z_far);
 
       run_3D_gizmo(
-          view_matrix, projection_matrix, root_node_model_matrix,
-          asset_loaded && active_joint >= 0 &&
-                  active_joint < loaded_meshes[0].flat_joint_list.size()
-              ? loaded_meshes[0].flat_joint_list[active_joint]
-              : nullptr,
-          camera_position, gui_parameters);
+          asset_loaded && (active_joint >= 0) &&
+                  (active_joint < int(loaded_meshes[0].flat_joint_list.size()))
+              ? loaded_meshes[0].flat_joint_list[size_t(active_joint)]
+              : nullptr);
 
       update_mesh_skeleton_graph_transforms(gltf_scene_tree);
 
@@ -968,9 +971,9 @@ void app::main_loop() {
         for (auto& a_mesh : loaded_meshes) {
           if (!a_mesh.displayed) continue;
 
-          if (active_joint >= 0 && active_joint < a_mesh.flat_joint_list.size())
+          if ((active_joint >= 0) && (active_joint < int(a_mesh.flat_joint_list.size())))
             active_bone_gltf_node =
-                a_mesh.flat_joint_list[active_joint]->gltf_node_index;
+                a_mesh.flat_joint_list[size_t(active_joint)]->gltf_node_index;
 
           // Calculate all the needed matrices to render the frame, this
           // includes the "model view projection" that transform the geometry to
@@ -980,12 +983,12 @@ void app::main_loop() {
               gltf_scene_tree, root_node_model_matrix, a_mesh.joint_matrices,
               a_mesh.flat_joint_list, a_mesh.inverse_bind_matrices);
 
-          glm::mat4 mvp =
-              projection_matrix * view_matrix * root_node_model_matrix;
-          glm::mat3 normal_matrix =
-              glm::transpose(glm::inverse(root_node_model_matrix));
+          //glm::mat4 mvp =
+          //    projection_matrix * view_matrix * root_node_model_matrix;
+          //glm::mat3 normal_matrix =
+          //    glm::transpose(glm::inverse(root_node_model_matrix));
 
-          glm::mat4 draw_model_matrix = root_node_model_matrix;
+          //glm::mat4 draw_model_matrix = root_node_model_matrix;
 
           // Draw all of the submeshes of the object
           for (size_t submesh = 0;
@@ -1018,8 +1021,7 @@ std::string app::GetFilePathExtension(const std::string& FileName) {
   return "";
 }
 
-void app::parse_command_line(int argc, char** argv, bool debug_output,
-                             std::string& input_filename) const {
+void app::parse_command_line(int argc, char** argv) {
   cxxopts::Options options("gltf-insignt", "glTF data insight tool");
 
   options.add_options()("d,debug", "Enable debugging",
@@ -1046,11 +1048,10 @@ void app::parse_command_line(int argc, char** argv, bool debug_output,
   } else {
     input_filename.clear();
   }
+
 }
 
-void app::load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,
-                          const std::string& input_filename,
-                          tinygltf::Model& model) {
+void app::load_glTF_asset() {
   std::string err;
   std::string warn;
   const std::string ext = GetFilePathExtension(input_filename);
@@ -1076,8 +1077,7 @@ void app::load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,
   }
 }
 
-void app::load_all_textures(tinygltf::Model model, size_t nb_textures,
-                            std::vector<GLuint>& textures) {
+void app::load_all_textures(size_t nb_textures) {
   glGenTextures(GLsizei(nb_textures), textures.data());
 
   for (size_t i = 0; i < nb_textures; ++i) {
@@ -1096,8 +1096,9 @@ void app::load_all_textures(tinygltf::Model model, size_t nb_textures,
 void app::genrate_joint_inverse_bind_matrix_map(
     const tinygltf::Skin& skin, const std::vector<int>::size_type nb_joints,
     std::map<int, int> joint_inverse_bind_matrix_map) {
-  for (int i = 0; i < nb_joints; ++i)
-    joint_inverse_bind_matrix_map[skin.joints[i]] = i;
+  for (size_t i = 0; i < nb_joints; ++i) {
+    joint_inverse_bind_matrix_map[skin.joints[i]] = int(i);
+  }
 }
 
 void app::cpu_compute_morphed_display_mesh(
@@ -1130,12 +1131,12 @@ void app::gpu_update_morphed_submesh(
   // upload to GPU
   glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][VBO_layout_position]);
   glBufferData(GL_ARRAY_BUFFER,
-               display_position[submesh_id].size() * sizeof(float),
+               GLsizeiptr(display_position[submesh_id].size() * sizeof(float)),
                display_position[submesh_id].data(), GL_DYNAMIC_DRAW);
 
   glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][VBO_layout_position]);
   glBufferData(GL_ARRAY_BUFFER,
-               display_normal[submesh_id].size() * sizeof(float),
+               GLsizeiptr(display_normal[submesh_id].size() * sizeof(float)),
                display_normal[submesh_id].data(), GL_DYNAMIC_DRAW);
 
   //// TODO create #defines for these layout numbers, they are arbitrary
@@ -1155,9 +1156,17 @@ void app::perform_software_morphing(
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
     std::vector<std::array<GLuint, VBO_count>>& VBOs) {
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wexit-time-destructors"
+#endif
   // evaluation cache:
   static std::vector<bool> clean;
   static std::vector<std::vector<float>> cached_weights;
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
   if (mesh_skeleton_graph.pose.blend_weights.size() > 0 &&
       morph_targets[submesh_id].size() > 0) {
@@ -1216,8 +1225,8 @@ void app::perform_software_morphing(
 }
 
 void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
-                            int active_joint_node, const glm::mat4& view_matrix,
-                            const glm::mat4& projection_matrix,
+                            int active_joint_node, const glm::mat4& _view_matrix,
+                            const glm::mat4& _projection_matrix,
                             std::map<std::string, shader>& shaders,
                             const mesh& a_mesh) {
   if (!a_mesh.skinned) return;
@@ -1228,8 +1237,8 @@ void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
   // bone_display_window(&show_bone_display_window);
   shaders["debug_color"].use();
   draw_bones(mesh_skeleton_graph, active_joint_node,
-             shaders["debug_color"].get_program(), view_matrix,
-             projection_matrix, a_mesh);
+             shaders["debug_color"].get_program(), _view_matrix,
+             _projection_matrix, a_mesh);
 }
 
 void app::precompute_hardware_skinning_data(
@@ -1237,6 +1246,9 @@ void app::precompute_hardware_skinning_data(
     std::vector<glm::mat4>& joint_matrices,
     std::vector<gltf_node*>& flat_joint_list,
     std::vector<glm::mat4>& inverse_bind_matrices) {
+
+  (void)mesh_skeleton_graph;
+
   if (flat_joint_list.size() ==
       0) {  // TODO temp bodge trying to load a VRM file
     return;
@@ -1262,50 +1274,46 @@ void app::precompute_hardware_skinning_data(
   }
 }
 
-void app::run_animation_timeline(gltf_insight::AnimSequence& sequence,
-                                 bool& looping, int& selectedEntry,
-                                 int& firstFrame, bool& expanded,
-                                 int& currentFrame, double& currentPlayTime,
-                                 double& last_frame_time, bool& playing_state,
-                                 std::vector<animation>& animations) {
+void app::run_animation_timeline(gltf_insight::AnimSequence& _sequence,
+                                 bool& _looping, int& _selectedEntry,
+                                 int& _firstFrame, bool& _expanded,
+                                 int& _currentFrame, double& _currentPlayTime,
+                                 double& _last_frame_time, bool& _playing_state,
+                                 std::vector<animation>& _animations) {
   // let's create the sequencer
   double current_time = glfwGetTime();
   bool need_to_update_pose = false;
-  if (playing_state) {
-    currentPlayTime += current_time - last_frame_time;
+  if (_playing_state) {
+    _currentPlayTime += current_time - _last_frame_time;
   }
 
-  currentFrame = int(ANIMATION_FPS * currentPlayTime);
+  currentFrame = int(double(ANIMATION_FPS) * _currentPlayTime);
 
   lower_docked_prop_size = 0.25f;
   lower_docked_max_px_size = 300;
-  timeline_window(sequence, playing_state, need_to_update_pose, looping,
-                  selectedEntry, firstFrame, expanded, currentFrame,
-                  currentPlayTime, &show_timeline, lower_docked_prop_size,
+  timeline_window(_sequence, _playing_state, need_to_update_pose, _looping,
+                  _selectedEntry, _firstFrame, _expanded, currentFrame,
+                  _currentPlayTime, &show_timeline, lower_docked_prop_size,
                   lower_docked_max_px_size);
 
   // loop the sequencer now: TODO replace that true with a "is looping"
   // boolean
-  if (looping && currentFrame > sequence.mFrameMax) {
-    currentFrame = sequence.mFrameMin;
-    currentPlayTime = double(currentFrame) / ANIMATION_FPS;
+  if (_looping && _currentFrame > _sequence.mFrameMax) {
+    _currentFrame = _sequence.mFrameMin;
+    _currentPlayTime = double(_currentFrame) / double(ANIMATION_FPS);
   }
 
-  for (auto& anim : animations) {
-    anim.set_time(float(currentPlayTime));  // TODO handle timeline position
+  for (auto& anim : _animations) {
+    anim.set_time(float(_currentPlayTime));  // TODO handle timeline position
     // of animaiton sequence
-    anim.playing = playing_state;
-    if (need_to_update_pose || playing_state) anim.apply_pose();
+    anim.playing = _playing_state;
+    if (need_to_update_pose || _playing_state) anim.apply_pose();
   }
 
   last_frame_time = current_time;
 }
 
-void app::run_3D_gizmo(glm::mat4& view_matrix,
-                       const glm::mat4& projection_matrix,
-                       glm::mat4& model_matrix, gltf_node* active_bone,
-                       glm::vec3& camera_position,
-                       application_parameters& my_user_pointer) {
+void app::run_3D_gizmo(gltf_node* active_bone) {
   glm::vec3 vecTranslation, vecRotation, vecScale;
   glm::mat4 bone_world_xform;
 
@@ -1318,7 +1326,7 @@ void app::run_3D_gizmo(glm::mat4& view_matrix,
   const auto saved_mode = current_mode;
 
   float* manipulated_matrix = glm::value_ptr(
-      current_mode == manipulate_mesh ? model_matrix : bone_world_xform);
+      current_mode == manipulate_mesh ? root_node_model_matrix : bone_world_xform);
 
   ImGuizmo::DecomposeMatrixToComponents(
       manipulated_matrix, glm::value_ptr(vecTranslation),
@@ -1330,7 +1338,7 @@ void app::run_3D_gizmo(glm::mat4& view_matrix,
 
   transform_window(glm::value_ptr(vecTranslation), glm::value_ptr(vecRotation),
                    glm::value_ptr(vecScale), mCurrentGizmoOperation,
-                   mCurrentGizmoMode, (int*)&current_mode, &show_gizmo,
+                   mCurrentGizmoMode, reinterpret_cast<int*>(&current_mode), &show_gizmo,
                    &show_transform_window);
   if (!active_bone) {
     current_mode = manipulate_mesh;
@@ -1382,8 +1390,7 @@ void app::run_3D_gizmo(glm::mat4& view_matrix,
   }
 }
 
-void app::fill_sequencer(gltf_insight::AnimSequence& sequence,
-                         const std::vector<animation>& animations) {
+void app::fill_sequencer() {
   for (auto& animation : animations) {
     // TODO change animation sequencer to use seconds instead of frames
     sequence.myItems.push_back(gltf_insight::AnimSequence::AnimSequenceItem{
@@ -1410,11 +1417,11 @@ void app::fill_sequencer(gltf_insight::AnimSequence& sequence,
 #include <CoreFoundation/CFBundle.h>
 
 void apple_cocoa_open_url_wrap(const std::string& url_str) {
-  CFURLRef url = CFURLCreateWithBytes(NULL,                     // allocator
+  CFURLRef url = CFURLCreateWithBytes(nullptr,                     // allocator
                                       (UInt8*)url_str.c_str(),  // URLBytes
                                       url_str.length(),         // length
                                       kCFStringEncodingASCII,   // encoding
-                                      NULL                      // baseURL
+                                      nullptr                      // baseURL
   );
   LSOpenCFURLRef(url, 0);
   CFRelease(url);

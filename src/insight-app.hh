@@ -23,8 +23,10 @@ SOFTWARE.
 */
 #pragma once
 
+#ifdef _MSC_VER
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
 #endif
 
 #include "animation.hh"
@@ -33,21 +35,30 @@ SOFTWARE.
 // This includes opengl for us, along side debuging callbacks
 #include "gl_util.hh"
 
-// imgui
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <map>
 #include <vector>
 
-#include "animation.hh"
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
 #include "cxxopts.hpp"
+
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/gtx/quaternion.hpp"
 #include "glm/matrix.hpp"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #include "gltf-graph.hh"
 #include "gltf-loader.hh"
 #include "gui_util.hh"
@@ -102,8 +113,8 @@ struct mesh {
   // Standard C++ stuff
   mesh(const mesh&) = delete;
   mesh& operator=(const mesh&) = delete;
-  mesh& operator=(mesh&& o) throw();
-  mesh(mesh&& other) throw();
+  mesh& operator=(mesh&& o);
+  mesh(mesh&& other);
   mesh();
   ~mesh();
 };
@@ -124,7 +135,7 @@ class app {
  public:
   enum class display_mode : int {
     normal = 0,
-    debug = 0b101010
+    debug = 1
   } current_display_mode = display_mode::normal;
 
   void load_sensible_default_material(material& material);
@@ -239,15 +250,18 @@ class app {
 
   static std::string GetFilePathExtension(const std::string& FileName);
 
-  void parse_command_line(int argc, char** argv, bool debug_output,
-                          std::string& input_filename) const;
+  void parse_command_line(int argc, char** argv);
 
-  void load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,
-                       const std::string& input_filename,
-                       tinygltf::Model& model);
+  //void load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,
+  //                     const std::string& input_filename,
+  //                     tinygltf::Model& model);
 
-  void load_all_textures(tinygltf::Model model, size_t nb_textures,
-                         std::vector<GLuint>& textures);
+  // Load glTF asset. Initial input filename is given at `parse_command_line`
+  void load_glTF_asset();
+
+
+  // Assume `textures` are already allocated at least with the size `nb_textures`
+  void load_all_textures(size_t nb_textures);
 
   void genrate_joint_inverse_bind_matrix_map(
       const tinygltf::Skin& skin, const std::vector<int>::size_type nb_joints,
@@ -294,12 +308,8 @@ class app {
                               double& last_frame_time, bool& playing_state,
                               std::vector<animation>& animations);
 
-  void run_3D_gizmo(glm::mat4& view_matrix, const glm::mat4& projection_matrix,
-                    glm::mat4& model_matrix, gltf_node* active_bone,
-                    glm::vec3& camera_position,
-                    application_parameters& my_user_pointer);
+  void run_3D_gizmo(gltf_node* active_bone);
 
-  void fill_sequencer(gltf_insight::AnimSequence& sequence,
-                      const std::vector<animation>& animations);
+  void fill_sequencer();
 };
 }  // namespace gltf_insight

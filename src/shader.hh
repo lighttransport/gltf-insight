@@ -23,12 +23,21 @@ SOFTWARE.
 */
 #pragma once
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
 #include <glad/glad.h>
+#include "glm/glm.hpp"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 #include <string>
 #include <vector>
 
-#include "glm/glm.hpp"
 
 class shader {
   GLuint program_;

@@ -21,8 +21,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+#ifdef _MSC_VER
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
 #endif
 
 #include "animation.hh"
@@ -89,7 +91,7 @@ void animation::set_gltf_graph_targets(gltf_node* root_node) {
 
 void animation::apply_pose() {
   for (auto& channel : channels) {
-    const auto& sampler = samplers[channel.sampler_index];
+    const auto& sampler = samplers[size_t(channel.sampler_index)];
 
     // TODO probably a special case when animation has only *one* keyframe :
     // see https://github.com/KhronosGroup/glTF/issues/1597
@@ -147,7 +149,8 @@ void animation::apply_channel_target_for_interpolation_value(
     case sampler::interpolation::cubic_spline:
       apply_cubic_spline(interpolation_value, lower_frame, upper_frame,
                          lower_time, upper_time, chan);
-    default:
+      break;
+    case sampler::interpolation::not_assigned:
       break;
   }
 }
@@ -156,22 +159,24 @@ void animation::apply_step(const channel& chan, int lower_keyframe) {
   switch (chan.mode) {
     case channel::path::weight: {
       const auto nb_weights = chan.target_graph_node->pose.blend_weights.size();
-      for (int w = 0; w < nb_weights; ++w)
-        chan.target_graph_node->pose.blend_weights[w] =
-            chan.keyframes[lower_keyframe * nb_weights + w]
+      for (int w = 0; w < int(nb_weights); ++w)
+        chan.target_graph_node->pose.blend_weights[size_t(w)] =
+            chan.keyframes[size_t(lower_keyframe * int(nb_weights) + w)]
                 .second.motion.weight;
     } break;
     case channel::path::translation:
       chan.target_graph_node->pose.translation =
-          chan.keyframes[lower_keyframe].second.motion.translation;
+          chan.keyframes[size_t(lower_keyframe)].second.motion.translation;
       break;
     case channel::path::scale:
       chan.target_graph_node->pose.scale =
-          chan.keyframes[lower_keyframe].second.motion.scale;
+          chan.keyframes[size_t(lower_keyframe)].second.motion.scale;
+      break;
     case channel::path::rotation:
       chan.target_graph_node->pose.rotation =
-          chan.keyframes[lower_keyframe].second.motion.rotation;
-    default:
+          chan.keyframes[size_t(lower_keyframe)].second.motion.rotation;
+      break;
+    case channel::path::not_assigned:
       break;
   }
 }
@@ -181,45 +186,45 @@ void animation::apply_linear(const channel& chan, int lower_keyframe,
   switch (chan.mode) {
     case channel::path::weight: {
       const auto nb_weights = chan.target_graph_node->pose.blend_weights.size();
-      for (int w = 0; w < nb_weights; ++w) {
-        chan.target_graph_node->pose.blend_weights[w] =
-            glm::mix(chan.keyframes[lower_keyframe * nb_weights + w]
+      for (int w = 0; w < int(nb_weights); ++w) {
+        chan.target_graph_node->pose.blend_weights[size_t(w)] =
+            glm::mix(chan.keyframes[size_t(lower_keyframe * int(nb_weights) + w)]
                          .second.motion.weight,
-                     chan.keyframes[upper_keyframe * nb_weights + w]
+                     chan.keyframes[size_t(upper_keyframe * int(nb_weights) + w)]
                          .second.motion.weight,
                      mix);
       }
     } break;
     case channel::path::translation: {
       glm::vec3 lower_translation =
-          chan.keyframes[lower_keyframe].second.motion.translation;
+          chan.keyframes[size_t(lower_keyframe)].second.motion.translation;
       glm::vec3 upper_translation =
-          chan.keyframes[upper_keyframe].second.motion.translation;
+          chan.keyframes[size_t(upper_keyframe)].second.motion.translation;
       glm::vec3 result = glm::mix(lower_translation, upper_translation, mix);
 
       chan.target_graph_node->pose.translation = result;
     } break;
     case channel::path::scale: {
       glm::vec3 lower_scale =
-          chan.keyframes[lower_keyframe].second.motion.scale;
+          chan.keyframes[size_t(lower_keyframe)].second.motion.scale;
       glm::vec3 upper_scale =
-          chan.keyframes[upper_keyframe].second.motion.scale;
+          chan.keyframes[size_t(upper_keyframe)].second.motion.scale;
       glm::vec3 result = glm::mix(lower_scale, upper_scale, mix);
 
       chan.target_graph_node->pose.scale = result;
     } break;
     case channel::path::rotation: {
       glm::quat lower_rotation =
-          chan.keyframes[lower_keyframe].second.motion.rotation;
+          chan.keyframes[size_t(lower_keyframe)].second.motion.rotation;
       glm::quat upper_rotation =
-          chan.keyframes[upper_keyframe].second.motion.rotation;
+          chan.keyframes[size_t(upper_keyframe)].second.motion.rotation;
       glm::quat result = glm::slerp(lower_rotation, upper_rotation, mix);
 
       chan.target_graph_node->pose.rotation = glm::normalize(result);
 
     } break;
     // nothing to do here for us in this case...
-    default:
+    case channel::path::not_assigned:
       break;
   }
 }
@@ -265,18 +270,18 @@ void animation::apply_cubic_spline(float interpolation_value, int lower_frame,
   const auto frame_delta = upper_time - lower_time;
 
   // Retrieve data
-  const auto p0 = chan.keyframes[value(lower_frame)];
-  const auto unscaled_m0 = chan.keyframes[output_tangent(lower_frame)];
-  const auto unscaled_m1 = chan.keyframes[input_tangent(upper_frame)];
-  const auto p1 = chan.keyframes[value(upper_frame)];
+  const auto p0 = chan.keyframes[size_t(value(lower_frame))];
+  const auto unscaled_m0 = chan.keyframes[size_t(output_tangent(lower_frame))];
+  const auto unscaled_m1 = chan.keyframes[size_t(input_tangent(upper_frame))];
+  const auto p1 = chan.keyframes[size_t(value(upper_frame))];
   // m0 and m1 need to be scaled by this value (delta between the 2 keyframes
   // being interpolated)
 
   switch (chan.mode) {
     case channel::path::weight: {
       const auto nb_weights = chan.target_graph_node->pose.blend_weights.size();
-      for (int w = 0; w < nb_weights; ++w) {
-        chan.target_graph_node->pose.blend_weights[w] =
+      for (int w = 0; w < int(nb_weights); ++w) {
+        chan.target_graph_node->pose.blend_weights[size_t(w)] =
             cubic_spline_interpolate(
                 interpolation_value, p0.second.motion.weight,
                 frame_delta * unscaled_m0.second.motion.weight,
@@ -305,8 +310,8 @@ void animation::apply_cubic_spline(float interpolation_value, int lower_frame,
           p1.second.motion.rotation,
           frame_delta * unscaled_m1.second.motion.rotation);
     } break;
-    default:
-      break;
+    case channel::path::not_assigned: {
+    } break;
   }
 }
 
