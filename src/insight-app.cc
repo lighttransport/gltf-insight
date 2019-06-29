@@ -287,15 +287,17 @@ void app::load() {
     loaded_meshes[i].instance = meshes_indices[i];
     auto& current_mesh = loaded_meshes[i];
 
-    const auto skin_index = model.nodes[size_t(current_mesh.instance.node)].skin;
+    const auto skin_index =
+        model.nodes[size_t(current_mesh.instance.node)].skin;
     if (skin_index >= 0) {
       current_mesh.skinned = true;
       const auto& gltf_skin = model.skins[size_t(skin_index)];
       current_mesh.nb_joints = int(gltf_skin.joints.size());
-      create_flat_bone_list(gltf_skin, size_t(current_mesh.nb_joints), gltf_scene_tree,
-                            current_mesh.flat_joint_list);
+      create_flat_bone_list(gltf_skin, size_t(current_mesh.nb_joints),
+                            gltf_scene_tree, current_mesh.flat_joint_list);
       current_mesh.joint_matrices.resize(size_t(current_mesh.nb_joints));
-      load_inverse_bind_matrix_array(model, gltf_skin, size_t(current_mesh.nb_joints),
+      load_inverse_bind_matrix_array(model, gltf_skin,
+                                     size_t(current_mesh.nb_joints),
                                      current_mesh.inverse_bind_matrices);
       genrate_joint_inverse_bind_matrix_map(
           gltf_skin, size_t(current_mesh.nb_joints),
@@ -436,7 +438,8 @@ void app::load() {
       current_mesh.nb_morph_targets =
           std::max<int>(int(target.size()), current_mesh.nb_morph_targets);
     }
-    std::vector<std::string> target_names(size_t(current_mesh.nb_morph_targets));
+    std::vector<std::string> target_names(
+        size_t(current_mesh.nb_morph_targets));
     load_morph_target_names(gltf_mesh, target_names);
     gltf_scene_tree.pose.target_names = target_names;
 
@@ -499,7 +502,8 @@ mesh::~mesh() {
   for (auto& VBO : VBOs) glDeleteBuffers(VBO_count, VBO.data());
   glDeleteVertexArrays(GLsizei(VAOs.size()), VAOs.data());
 
-  displayed = true; skinned = false;
+  displayed = true;
+  skinned = false;
   // shader_list.reset(nullptr);
 
   nb_joints = 0;
@@ -569,8 +573,8 @@ void editor_lighting::show_control() {
         non_normalized_direction.y -= .001f;
 
       const auto dir = get_directional_light_direction();
-      ImGui::Text("Actual direction is vec3(%.3f, %.3f, %.3f)", double(dir.x), double(dir.y),
-                  double(dir.z));
+      ImGui::Text("Actual direction is vec3(%.3f, %.3f, %.3f)", double(dir.x),
+                  double(dir.y), double(dir.z));
     }
     ImGui::End();
   }
@@ -678,8 +682,10 @@ void app::run_view_menu() {
     ImGui::MenuItem("Model info", nullptr, &show_model_info_window);
     ImGui::MenuItem("Animations", nullptr, &show_animation_window);
     ImGui::MenuItem("Mesh Visibility", nullptr, &show_mesh_display_window);
-    ImGui::MenuItem("Morph Target blend weights", nullptr, &show_morph_target_window);
-    ImGui::MenuItem("Camera parameters", nullptr, &show_camera_parameter_window);
+    ImGui::MenuItem("Morph Target blend weights", nullptr,
+                    &show_morph_target_window);
+    ImGui::MenuItem("Camera parameters", nullptr,
+                    &show_camera_parameter_window);
     ImGui::MenuItem("TransformWindow", nullptr, &show_transform_window);
     ImGui::MenuItem("Bone selector", nullptr, &show_bone_selector);
     ImGui::MenuItem("Timeline", nullptr, &show_timeline);
@@ -689,7 +695,8 @@ void app::run_view_menu() {
     ImGui::MenuItem("Scene outline", nullptr, &show_scene_outline_window);
     ImGui::Separator();
     ImGui::MenuItem("Show Gizmo", nullptr, &show_gizmo);
-    ImGui::MenuItem("Editor light controls", nullptr, &editor_light.control_open);
+    ImGui::MenuItem("Editor light controls", nullptr,
+                    &editor_light.control_open);
     ImGui::EndMenu();
   }
 }
@@ -760,7 +767,8 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
 {
   for (size_t submesh = 0; submesh < mesh.draw_call_descriptors.size();
        ++submesh) {
-    const auto& material_to_use = loaded_material[size_t(mesh.materials[submesh])];
+    const auto& material_to_use =
+        loaded_material[size_t(mesh.materials[submesh])];
 
     if (current_display_mode == display_mode::normal) {
       switch (material_to_use.intended_shader) {
@@ -880,8 +888,8 @@ void app::main_loop() {
       if (save_file_dialog) {
         if (!asset_loaded)
           save_file_dialog = false;
-        else if (ImGuiFileDialog::Instance()->FileDialog("Save as...", nullptr, true,
-                                                         ".", input_filename)) {
+        else if (ImGuiFileDialog::Instance()->FileDialog(
+                     "Save as...", nullptr, true, ".", input_filename)) {
           if (ImGuiFileDialog::Instance()->IsOk) {
             auto save_as_filename =
                 ImGuiFileDialog::Instance()->GetFilepathName();
@@ -971,7 +979,8 @@ void app::main_loop() {
         for (auto& a_mesh : loaded_meshes) {
           if (!a_mesh.displayed) continue;
 
-          if ((active_joint >= 0) && (active_joint < int(a_mesh.flat_joint_list.size())))
+          if ((active_joint >= 0) &&
+              (active_joint < int(a_mesh.flat_joint_list.size())))
             active_bone_gltf_node =
                 a_mesh.flat_joint_list[size_t(active_joint)]->gltf_node_index;
 
@@ -983,12 +992,12 @@ void app::main_loop() {
               gltf_scene_tree, root_node_model_matrix, a_mesh.joint_matrices,
               a_mesh.flat_joint_list, a_mesh.inverse_bind_matrices);
 
-          //glm::mat4 mvp =
+          // glm::mat4 mvp =
           //    projection_matrix * view_matrix * root_node_model_matrix;
-          //glm::mat3 normal_matrix =
+          // glm::mat3 normal_matrix =
           //    glm::transpose(glm::inverse(root_node_model_matrix));
 
-          //glm::mat4 draw_model_matrix = root_node_model_matrix;
+          // glm::mat4 draw_model_matrix = root_node_model_matrix;
 
           // Draw all of the submeshes of the object
           for (size_t submesh = 0;
@@ -1048,7 +1057,6 @@ void app::parse_command_line(int argc, char** argv) {
   } else {
     input_filename.clear();
   }
-
 }
 
 void app::load_glTF_asset() {
@@ -1156,7 +1164,6 @@ void app::perform_software_morphing(
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
     std::vector<std::array<GLuint, VBO_count>>& VBOs) {
-
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wexit-time-destructors"
@@ -1225,7 +1232,8 @@ void app::perform_software_morphing(
 }
 
 void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
-                            int active_joint_node, const glm::mat4& _view_matrix,
+                            int active_joint_node,
+                            const glm::mat4& _view_matrix,
                             const glm::mat4& _projection_matrix,
                             std::map<std::string, shader>& shaders,
                             const mesh& a_mesh) {
@@ -1246,7 +1254,6 @@ void app::precompute_hardware_skinning_data(
     std::vector<glm::mat4>& joint_matrices,
     std::vector<gltf_node*>& flat_joint_list,
     std::vector<glm::mat4>& inverse_bind_matrices) {
-
   (void)mesh_skeleton_graph;
 
   if (flat_joint_list.size() ==
@@ -1325,8 +1332,9 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
 
   const auto saved_mode = current_mode;
 
-  float* manipulated_matrix = glm::value_ptr(
-      current_mode == manipulate_mesh ? root_node_model_matrix : bone_world_xform);
+  float* manipulated_matrix =
+      glm::value_ptr(current_mode == manipulate_mesh ? root_node_model_matrix
+                                                     : bone_world_xform);
 
   ImGuizmo::DecomposeMatrixToComponents(
       manipulated_matrix, glm::value_ptr(vecTranslation),
@@ -1338,8 +1346,8 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
 
   transform_window(glm::value_ptr(vecTranslation), glm::value_ptr(vecRotation),
                    glm::value_ptr(vecScale), mCurrentGizmoOperation,
-                   mCurrentGizmoMode, reinterpret_cast<int*>(&current_mode), &show_gizmo,
-                   &show_transform_window);
+                   mCurrentGizmoMode, reinterpret_cast<int*>(&current_mode),
+                   &show_gizmo, &show_transform_window);
   if (!active_bone) {
     current_mode = manipulate_mesh;
   }
@@ -1415,37 +1423,26 @@ void app::fill_sequencer() {
 #ifdef __APPLE__
 #include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CFBundle.h>
-
-void apple_cocoa_open_url_wrap(const std::string& url_str) {
-  CFURLRef url = CFURLCreateWithBytes(nullptr,                     // allocator
-                                      (UInt8*)url_str.c_str(),  // URLBytes
-                                      url_str.length(),         // length
-                                      kCFStringEncodingASCII,   // encoding
-                                      nullptr                      // baseURL
-  );
-  LSOpenCFURLRef(url, 0);
-  CFRelease(url);
-}
 #endif
-
 void app::open_url(std::string url) {
-  bool ran = false;
-#ifdef WIN32
-  (void)ShellExecuteA(0, 0, url.c_str(), 0, 0, SW_SHOW);
-  ran = true;
-#endif
-#ifdef __linux__
+#if defined(WIN32)
+  (void)ShellExecuteA(nullptr, nullptr, url.c_str(), nullptr, nullptr, SW_SHOW);
+#elif defined(__linux__)
   std::string command = "xdg-open " + url;
   (void)std::system(command.c_str());
-  ran = true;
+#elif defined(__APPLE__)
+  CFURLRef cfurl = CFURLCreateWithBytes(
+      nullptr,                                      // allocator
+      reinterpret_cast<const UInt8*>(url.c_str()),  // URLBytes
+      static_cast<long>(url.length()),              // length
+      kCFStringEncodingASCII,                       // encoding
+      nullptr                                       // baseURL
+  );
+  LSOpenCFURLRef(cfurl, nullptr);
+  CFRelease(cfurl);
+#else
+  std::cerr
+      << "Warn: Cannot open URLs on this platform. We should have displayed "
+      << url << ". Please send bug request on github\n";
 #endif
-#ifdef __APPLE__
-  apple_cocoa_open_url_wrap(url);
-  ran = true;
-#endif
-
-  if (!ran)
-    std::cerr
-        << "Warn: Cannot open URLs on this platform. We should have displayed "
-        << url << "\n";
 }
