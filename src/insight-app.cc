@@ -832,7 +832,8 @@ void app::draw_scene_recur(const glm::vec3& world_camera_position,
 
     bool defer = false;
     for (auto material : mesh.materials)
-      if (loaded_material[material].alpha_mode == alpha_coverage::blend) {
+      if (loaded_material[size_t(material)].alpha_mode ==
+          alpha_coverage::blend) {
         defer = true;
         break;
       }
@@ -866,7 +867,7 @@ void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
 
       for (const auto& to_draw : alpha) {
         auto node = to_draw.node;
-        const auto& mesh = loaded_meshes[node->gltf_mesh_id];
+        const auto& mesh = loaded_meshes[size_t(node->gltf_mesh_id)];
         const auto normal_matrix =
             glm::transpose(glm::inverse(node->world_xform));
         draw_mesh(world_camera_position, mesh, normal_matrix,
