@@ -59,6 +59,12 @@ SOFTWARE.
 #pragma clang diagnostic pop
 #endif
 
+#ifdef __clang__
+#if __has_warning("-Wc++2a-compat")
+#pragma clang diagnostic ignored "-Wc++2a-compat"
+#endif
+#endif
+
 void gui_new_frame() {
   glfwPollEvents();
   ImGui_ImplOpenGL3_NewFrame();
