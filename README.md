@@ -24,7 +24,7 @@ general:
 material:
  - [x] `KHR_materials_unlit`
  - [ ] `KHR_materials_pbrSpecularGlossiness`
- - [ ] `KHR_texture_transform` 
+ - [ ] `KHR_texture_transform`
 
 
 lighting:
@@ -35,8 +35,9 @@ Latest coninious build are available for [**Linux** (AppImage)](https://github.c
 
 ## Requirements
 
-* CMake
+* CMake 3.5 or later
 * C++11 compiler
+  * clang: 3.9 or later
 * OpenGL 3.0
 
 ## Supported platforms
@@ -62,7 +63,7 @@ This program can play the animations defined in a glTF asset by the following me
   * [x] skin - Hardware blending with max **4 joints** attributes per vertex
   * [ ] skin - Software blending between an arbitrary number of joints per vertex
   * [ ] **TODO** animation editing features
-  
+
 * Data visualization
   * [x] Skinning weights
 
@@ -100,7 +101,7 @@ make
 
 #### On Ubuntu
 
-You may need to install a few dependencies : 
+You may need to install a few dependencies :
 
 ```bash
 sudo apt install git cmake mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-xinerama0 libxinerama-dev libxcursor-dev libxi-dev
@@ -108,7 +109,7 @@ sudo apt install git cmake mesa-common-dev libgl1-mesa-dev libxrandr-dev libxcb-
 
 #### On CentOS7
 
-You can use cmake3 package and You may need to install a few dependencies : 
+You can use cmake3 package and You may need to install a few dependencies :
 
 ```bash
 sudo yum install git cmake3 libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel
