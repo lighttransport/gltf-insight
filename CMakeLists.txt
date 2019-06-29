@@ -159,6 +159,15 @@ else()
   file(GLOB SHADER shaders/*.vert shaders/*.frag)
 endif()
 
+# Increase warning level for clang.
+# Only apply source files of `gltf-insght`
+# https://stackoverflow.com/questions/13638408/override-compile-flags-for-single-files
+# TODO(LTE): GLOB is not recommended so do not use GLOB to list up source files at `SOURCES`
+IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  # Assume C++ sources
+  set_source_files_properties(${SOURCES} PROPERTIES COMPILE_FLAGS "-Weverything -Wno-system-headers -Werror -Wno-padded -Wno-c++98-compat-pedantic -Wno-documentation -Wno-documentation-unknown-command -Wno-reserved-id-macro")
+ENDIF ()
+
 #find xxd's executable
 if(WIN32)
   set(SHADER_PACKER ${CMAKE_CURRENT_SOURCE_DIR}/bin/xxd.exe)
@@ -226,10 +235,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/icons/gltf-insight.svg DESTINATION share/icons)
 endif()
 
-# # Increase warning level for clang.
-# IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-#     target_compile_options(${BUILD_TARGET} PRIVATE -Weverything -Wno-system-headers -Werror -Wno-padded -Wno-c++98-compat-pedantic -Wno-documentation -Wno-documentation-unknown-command -Wno-reserved-id-macro)
-# ENDIF ()
 
 # [VisualStudio]
 if (WIN32)

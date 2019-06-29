@@ -23,13 +23,25 @@ SOFTWARE.
 */
 #pragma once
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
 // include glad first
 #include <glad/glad.h>
 
-#include <array>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
+
+#include <array>
 #include <string>
+
 
 class shader;
 
@@ -58,7 +70,7 @@ enum class shading_type {
 /// Type of alpha blending requested
 enum class alpha_coverage : int { opaque = 0, mask = 1, blend = 2 };
 
-static std::string to_string(alpha_coverage c) {
+static inline std::string to_string(alpha_coverage c) {
   switch (c) {
     case alpha_coverage::blend:
       return "blend";
@@ -70,7 +82,7 @@ static std::string to_string(alpha_coverage c) {
   return "error";
 }
 
-static std::string to_string(shading_type s) {
+static inline std::string to_string(shading_type s) {
   switch (s) {
     case shading_type::pbr_metal_rough:
       return "PBR metallic roughness";

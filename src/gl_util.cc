@@ -28,6 +28,9 @@ SOFTWARE.
 
 void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
                    GLsizei length, const GLchar* message, void* userParam) {
+  (void)length;
+  (void)userParam;
+
   // ignore non-significant error/warning codes
   if (id == 131169 || id == 131185 || id == 131218 || id == 131204) return;
 
@@ -175,14 +178,15 @@ void load_shaders(const size_t nb_joints,
   // TODO put the GLSL code ouside of here, load them from files
   // Main vertex shader, that perform GPU skinning
 
-  const std::string no_skinning_vert_src((char*)no_skinning_vert,
-                                         no_skinning_vert_len);
+  const std::string no_skinning_vert_src(
+      reinterpret_cast<char*>(no_skinning_vert), no_skinning_vert_len);
 
   const std::string skinning_vert_src = [&] {
     // TODO a real shader template system may be useful
     // Write in shader source code the value of `nb_joints`
-    std::string skinning_template_vert_src((char*)skinning_template_vert,
-                                           skinning_template_vert_len);
+    std::string skinning_template_vert_src(
+        reinterpret_cast<char*>(skinning_template_vert),
+        skinning_template_vert_len);
     size_t index = skinning_template_vert_src.find("$nb_joints");
     if (index == std::string::npos) {
       std::cerr
@@ -197,30 +201,37 @@ void load_shaders(const size_t nb_joints,
     return skinning_template_vert_src;
   }();
 
-  const std::string unlit_frag_src((char*)unlit_frag, unlit_frag_len);
-  const std::string draw_debug_color_src((char*)draw_debug_color_frag,
-                                         draw_debug_color_frag_len);
-  const std::string uv_frag_src((char*)uv_frag, uv_frag_len);
-  const std::string normals_frag_src((char*)normals_frag, normals_frag_len);
-  const std::string weights_frag_src((char*)weights_frag, weights_frag_len);
+  const std::string unlit_frag_src(reinterpret_cast<char*>(unlit_frag),
+                                   unlit_frag_len);
+  const std::string draw_debug_color_src(
+      reinterpret_cast<char*>(draw_debug_color_frag),
+      draw_debug_color_frag_len);
+  const std::string uv_frag_src(reinterpret_cast<char*>(uv_frag), uv_frag_len);
+  const std::string normals_frag_src(reinterpret_cast<char*>(normals_frag),
+                                     normals_frag_len);
+  const std::string weights_frag_src(reinterpret_cast<char*>(weights_frag),
+                                     weights_frag_len);
   const std::string pbr_metallic_roughness_frag_src(
-      (char*)pbr_metallic_roughness_frag, pbr_metallic_roughness_frag_len);
-  const std::string normal_map_frag_src((char*)normal_map_frag,
-                                        normal_map_frag_len);
-  const std::string perturbed_normal_frag_src((char*)perturbed_normal_frag,
-                                              perturbed_normal_frag_len);
-  const std::string occlusion_map_frag_src((char*)occlusion_map_frag,
-                                           occlusion_map_frag_len);
-  const std::string emissive_map_frag_src((char*)emissive_map_frag,
-                                          emissive_map_frag_len);
-  const std::string base_color_map_frag_src((char*)base_color_map_frag,
-                                            base_color_map_frag_len);
+      reinterpret_cast<char*>(pbr_metallic_roughness_frag),
+      pbr_metallic_roughness_frag_len);
+  const std::string normal_map_frag_src(
+      reinterpret_cast<char*>(normal_map_frag), normal_map_frag_len);
+  const std::string perturbed_normal_frag_src(
+      reinterpret_cast<char*>(perturbed_normal_frag),
+      perturbed_normal_frag_len);
+  const std::string occlusion_map_frag_src(
+      reinterpret_cast<char*>(occlusion_map_frag), occlusion_map_frag_len);
+  const std::string emissive_map_frag_src(
+      reinterpret_cast<char*>(emissive_map_frag), emissive_map_frag_len);
+  const std::string base_color_map_frag_src(
+      reinterpret_cast<char*>(base_color_map_frag), base_color_map_frag_len);
   const std::string metallic_roughness_map_frag_src(
-      (char*)metallic_roughness_map_frag, metallic_roughness_map_frag_len);
-  const std::string world_frag_src((char*)world_fragment_frag,
+      reinterpret_cast<char*>(metallic_roughness_map_frag),
+      metallic_roughness_map_frag_len);
+  const std::string world_frag_src(reinterpret_cast<char*>(world_fragment_frag),
                                    world_fragment_frag_len);
-  const std::string vertex_color_frag_src((char*)vertex_color_frag,
-                                          vertex_color_frag_len);
+  const std::string vertex_color_frag_src(
+      reinterpret_cast<char*>(vertex_color_frag), vertex_color_frag_len);
   const std::string& vert_src =
       nb_joints != 0 ? skinning_vert_src : no_skinning_vert_src;
 
@@ -280,5 +291,5 @@ void update_uniforms(std::map<std::string, shader>& shaders, bool use_ibl,
 void perform_draw_call(const draw_call_submesh& draw_call_to_perform) {
   glBindVertexArray(draw_call_to_perform.VAO);
   glDrawElements(draw_call_to_perform.draw_mode,
-                 GLsizei(draw_call_to_perform.count), GL_UNSIGNED_INT, 0);
+                 GLsizei(draw_call_to_perform.count), GL_UNSIGNED_INT, nullptr);
 }

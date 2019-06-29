@@ -25,20 +25,31 @@ SOFTWARE.
 
 #include <tiny_gltf.h>
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/quaternion.hpp>
 #include <glm/matrix.hpp>
+
+#include "glad/include/glad/glad.h"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
+#include "animation.hh"
+
 #include <memory>
 #include <vector>
 
-#include "animation.hh"
-#include "glad/include/glad/glad.h"
-
 struct gltf_node {
-  ~gltf_node();
+  //~gltf_node();
 
   /// A node can be a mesh, or a bone, or can just be empty.
   ///

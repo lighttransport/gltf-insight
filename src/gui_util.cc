@@ -21,14 +21,21 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+#ifdef _MSC_VER
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
 #endif
 
 #include "gui_util.hh"
 
 // Need to access some OpenGL functions in there:
 #include "gl_util.hh"
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
 
 // Include embeded data.
 // These files defines each an array of bytes and a size.
@@ -47,6 +54,16 @@ SOFTWARE.
 
 // image loader
 #include "stb_image.h"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
+#ifdef __clang__
+#if __has_warning("-Wc++2a-compat")
+#pragma clang diagnostic ignored "-Wc++2a-compat"
+#endif
+#endif
 
 void gui_new_frame() {
   glfwPollEvents();
@@ -114,8 +131,8 @@ void asset_images_window(const std::vector<GLuint>& textures, bool* open) {
     ImGui::Text("Number of textures [%zu]", textures.size());
     ImGui::BeginChild("##ScrollableRegion0", ImVec2(256, 286), false,
                       ImGuiWindowFlags_AlwaysVerticalScrollbar);
-    for (int i = 0; i < textures.size(); ++i) {
-      auto& texture = textures[i];
+    for (int i = 0; i < int(textures.size()); ++i) {
+      auto& texture = textures[size_t(i)];
       std::string name = "texture [" + std::to_string(i) + "]";
       if (ImGui::CollapsingHeader(name.c_str())) {
         ImGui::Image(ImTextureID(size_t(texture)), ImVec2(256.f, 256.f));
@@ -126,7 +143,7 @@ void asset_images_window(const std::vector<GLuint>& textures, bool* open) {
   ImGui::End();
 }
 
-void error_callback(int error, const char* description) {
+static void error_callback(int error, const char* description) {
   std::cerr << "GLFW Error : " << error << ", " << description << std::endl;
 }
 
@@ -148,7 +165,7 @@ void describe_node_topology_in_imgui_tree(const tinygltf::Model& model,
                                           int node_index) {
   std::string node_desc = "node [" + std::to_string(node_index) + "]";
   if (ImGui::TreeNode(node_desc.c_str())) {
-    const auto& node = model.nodes[node_index];
+    const auto& node = model.nodes[size_t(node_index)];
     if (!node.name.empty()) ImGui::Text("name [%s]", node.name.c_str());
 
     for (auto child : node.children) {
@@ -170,12 +187,12 @@ void model_info_window(const tinygltf::Model& model, bool* open) {
     }
 
     ImGui::Text("Main node with a mesh [%d]", main_node_index);
-    const auto& main_node = model.nodes[main_node_index];
+    const auto& main_node = model.nodes[size_t(main_node_index)];
 
     if (main_node.skin >= 0) {
       // mesh.weights
       ImGui::Text("Main mesh uses skin [%d]", main_node.skin);
-      const auto& skin = model.skins[main_node.skin];
+      const auto& skin = model.skins[size_t(main_node.skin)];
       ImGui::Text("Skin [%d] skeleton root node [%d]", main_node.skin,
                   skin.skeleton);
       ImGui::Text("Skin joint count [%zu]", skin.joints.size());
@@ -208,10 +225,10 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
   ImGuiCombo("animations", &idx, animation_names);
 
   // const tinygltf::Animation &animation = model.animations[size_t(idx)];
-  const auto& animation = animations[idx];
+  const auto& animation = animations[size_t(idx)];
 
-  ImGui::Text("Min time [%f]", animation.min_time);
-  ImGui::Text("Max time [%f]", animation.max_time);
+  ImGui::Text("Min time [%f]", double(animation.min_time));
+  ImGui::Text("Max time [%f]", double(animation.max_time));
 
   //
   // channels
@@ -222,7 +239,7 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
     ImGui::InputInt("channel", &channel_idx, 1, 1);
     channel_idx = std::max<int>(
         std::min<int>(channel_idx, int(animation.channels.size()) - 1), 0);
-    const auto& channel = animation.channels[channel_idx];
+    const auto& channel = animation.channels[size_t(channel_idx)];
 
     // ImGui::Text("sampler [%d]", channel.sampler);
     ImGui::Text("target node [%d] path [%s]", channel.target_node, [channel] {
@@ -236,7 +253,6 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
         case animation::channel::path::weight:
           return "weight";
         case animation::channel::path::not_assigned:
-        default:
           return "ERROR";
       }
     }());
@@ -246,78 +262,77 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
 
         // TODO look up the new "tables" thingy
         ImGui::Columns(2);
-        ImGui::Separator(), ImGui::Text("Frame");
-        ImGui::NextColumn(), ImGui::Text("Weight Value");
-        ImGui::NextColumn(), ImGui::Separator();
+        ImGui::Separator(); ImGui::Text("Frame");
+        ImGui::NextColumn(); ImGui::Text("Weight Value");
+        ImGui::NextColumn(); ImGui::Separator();
         for (auto keyframe : channel.keyframes) {
           {
             ImGui::Text("%d", keyframe.first);
-            ImGui::NextColumn(),
-                ImGui::Text("%f", keyframe.second.motion.weight);
-            ImGui::NextColumn(), ImGui::Separator();
+            ImGui::NextColumn();
+                ImGui::Text("%f", double(keyframe.second.motion.weight));
+            ImGui::NextColumn(); ImGui::Separator();
           }
         }
         ImGui::Columns();
         break;
       case animation::channel::path::translation:
         ImGui::Columns(4);
-        ImGui::Separator(), ImGui::Text("Frame");
-        ImGui::NextColumn(), ImGui::Text("X");
-        ImGui::NextColumn(), ImGui::Text("Y");
-        ImGui::NextColumn(), ImGui::Text("Z");
-        ImGui::NextColumn(), ImGui::Separator();
+        ImGui::Separator(); ImGui::Text("Frame");
+        ImGui::NextColumn(); ImGui::Text("X");
+        ImGui::NextColumn(); ImGui::Text("Y");
+        ImGui::NextColumn(); ImGui::Text("Z");
+        ImGui::NextColumn(); ImGui::Separator();
         for (auto keyframe : channel.keyframes) {
           ImGui::Text("%d", keyframe.first);
           ImGui::NextColumn();
           auto v = keyframe.second.motion.translation;
-          ImGui::Text("%f", v.x);
-          ImGui::NextColumn(), ImGui::Text("%f", v.y);
-          ImGui::NextColumn(), ImGui::Text("%f", v.z);
-          ImGui::NextColumn(), ImGui::Separator();
+          ImGui::Text("%f", double(v.x));
+          ImGui::NextColumn(); ImGui::Text("%f", double(v.y));
+          ImGui::NextColumn(); ImGui::Text("%f", double(v.z));
+          ImGui::NextColumn(); ImGui::Separator();
         }
         ImGui::Columns();
         break;
       case animation::channel::path::scale:
         ImGui::Columns(4);
-        ImGui::Separator(), ImGui::Text("Frame");
+        ImGui::Separator(); ImGui::Text("Frame");
         ImGui::NextColumn();
-        ImGui::Text("X"), ImGui::NextColumn();
-        ImGui::Text("Y"), ImGui::NextColumn();
-        ImGui::Text("Z"), ImGui::NextColumn();
+        ImGui::Text("X"); ImGui::NextColumn();
+        ImGui::Text("Y"); ImGui::NextColumn();
+        ImGui::Text("Z"); ImGui::NextColumn();
         ImGui::Separator();
         for (auto keyframe : channel.keyframes) {
           ImGui::Text("%d", keyframe.first);
           ImGui::NextColumn();
           auto v = keyframe.second.motion.scale;
-          ImGui::Text("%f", v.x);
-          ImGui::NextColumn(), ImGui::Text("%f", v.y);
-          ImGui::NextColumn(), ImGui::Text("%f", v.z);
-          ImGui::NextColumn(), ImGui::Separator();
+          ImGui::Text("%f", double(v.x));
+          ImGui::NextColumn(); ImGui::Text("%f", double(v.y));
+          ImGui::NextColumn(); ImGui::Text("%f", double(v.z));
+          ImGui::NextColumn(); ImGui::Separator();
         }
         ImGui::Columns();
         break;
       case animation::channel::path::rotation:
         ImGui::Columns(5);
-        ImGui::Separator(), ImGui::Text("Frame");
-        ImGui::NextColumn(), ImGui::Text("X");
-        ImGui::NextColumn(), ImGui::Text("Y");
-        ImGui::NextColumn(), ImGui::Text("Z");
-        ImGui::NextColumn(), ImGui::Text("W");
-        ImGui::NextColumn(), ImGui::Separator();
+        ImGui::Separator(); ImGui::Text("Frame");
+        ImGui::NextColumn(); ImGui::Text("X");
+        ImGui::NextColumn(); ImGui::Text("Y");
+        ImGui::NextColumn(); ImGui::Text("Z");
+        ImGui::NextColumn(); ImGui::Text("W");
+        ImGui::NextColumn(); ImGui::Separator();
         for (auto keyframe : channel.keyframes) {
           ImGui::Text("%d", keyframe.first);
           ImGui::NextColumn();
           auto quat = keyframe.second.motion.rotation;
-          ImGui::Text("%f", quat.x);
-          ImGui::NextColumn(), ImGui::Text("%f", quat.y);
-          ImGui::NextColumn(), ImGui::Text("%f", quat.z);
-          ImGui::NextColumn(), ImGui::Text("%f", quat.w);
-          ImGui::NextColumn(), ImGui::Separator();
+          ImGui::Text("%f", double(quat.x));
+          ImGui::NextColumn(); ImGui::Text("%f", double(quat.y));
+          ImGui::NextColumn(); ImGui::Text("%f", double(quat.z));
+          ImGui::NextColumn(); ImGui::Text("%f", double(quat.w));
+          ImGui::NextColumn(); ImGui::Separator();
         }
         ImGui::Columns();
         break;
       case animation::channel::path::not_assigned:
-      default:
         ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.1f, 1.0f),
                            "ERROR Unknown target path name");
     }
@@ -334,7 +349,7 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
     ImGui::InputInt("sampler", &sampler_idx, 1, 1);
     sampler_idx = std::max<int>(
         std::min<int>(sampler_idx, int(animation.samplers.size()) - 1), 0);
-    const auto& sampler = animation.samplers[sampler_idx];
+    const auto& sampler = animation.samplers[size_t(sampler_idx)];
 
     ImGui::Text("Interpolation method [%s]", [sampler] {
       switch (sampler.mode) {
@@ -345,21 +360,20 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
         case animation::sampler::interpolation::cubic_spline:
           return "CUBICSPLINE";
         case animation::sampler::interpolation::not_assigned:
-        default:
           return "ERROR";
       }
     }());
 
-    ImGui::Text("Keyframe range : %f, %f [secs]", sampler.min_v, sampler.max_v);
+    ImGui::Text("Keyframe range : %f, %f [secs]", double(sampler.min_v), double(sampler.max_v));
     ImGui::Text("# of key frames : %zu", sampler.keyframes.size());
 
-    ImGui::Columns(2), ImGui::Text("Frame Number");
-    ImGui::NextColumn(), ImGui::Text("Timestamp");
-    ImGui::NextColumn(), ImGui::Separator();
+    ImGui::Columns(2); ImGui::Text("Frame Number");
+    ImGui::NextColumn(); ImGui::Text("Timestamp");
+    ImGui::NextColumn(); ImGui::Separator();
     for (auto keyframe : sampler.keyframes) {
       ImGui::Text("%d", keyframe.first);
-      ImGui::NextColumn(), ImGui::Text("%f", keyframe.second);
-      ImGui::NextColumn(), ImGui::Separator();
+      ImGui::NextColumn(); ImGui::Text("%f", double(keyframe.second));
+      ImGui::NextColumn(); ImGui::Separator();
     }
     ImGui::Columns();
   }
@@ -389,31 +403,31 @@ void skinning_data_window(
   ImGui::Text("Submesh[%zu]", size_t(submesh_id));
   ImGui::BeginChild("##scrollable_data_region", ImVec2(600, 800), false,
                     ImGuiWindowFlags_AlwaysVerticalScrollbar);
-  const auto vertex_count = weights[submesh_id].size() / 4;
-  assert(vertex_count == joints[submesh_id].size() / 4);
+  const auto vertex_count = weights[size_t(submesh_id)].size() / 4;
+  assert(vertex_count == joints[size_t(submesh_id)].size() / 4);
 
-  const auto& weight = weights[submesh_id];
-  const auto& joint = joints[submesh_id];
+  const auto& weight = weights[size_t(submesh_id)];
+  const auto& joint = joints[size_t(submesh_id)];
 
   ImGui::Columns(5);
   ImGui::Text("Vertex Index");
-  ImGui::NextColumn(), ImGui::Text("0");
-  ImGui::NextColumn(), ImGui::Text("1");
-  ImGui::NextColumn(), ImGui::Text("2");
-  ImGui::NextColumn(), ImGui::Text("3");
+  ImGui::NextColumn(); ImGui::Text("0");
+  ImGui::NextColumn(); ImGui::Text("1");
+  ImGui::NextColumn(); ImGui::Text("2");
+  ImGui::NextColumn(); ImGui::Text("3");
   ImGui::NextColumn();
   ImGui::Separator();
 
   for (size_t i = 0; i < vertex_count; ++i) {
     ImGui::Text("%zu", i);
-    ImGui::NextColumn(), ImGui::Text("%f * %d", weight[i * 4], joint[i * 4]);
-    ImGui::NextColumn(),
-        ImGui::Text("%f * %d", weight[i * 4 + 1], joint[i * 4 + 1]);
-    ImGui::NextColumn(),
-        ImGui::Text("%f * %d", weight[i * 4 + 2], joint[i * 4 + 2]);
-    ImGui::NextColumn(),
-        ImGui::Text("%f * %d", weight[i * 4 + 3], joint[i * 4 + 3]);
-    ImGui::NextColumn(), ImGui::Separator();
+    ImGui::NextColumn(); ImGui::Text("%f * %d", double(weight[i * 4]), joint[i * 4]);
+    ImGui::NextColumn();
+        ImGui::Text("%f * %d", double(weight[i * 4 + 1]), joint[i * 4 + 1]);
+    ImGui::NextColumn();
+        ImGui::Text("%f * %d", double(weight[i * 4 + 2]), joint[i * 4 + 2]);
+    ImGui::NextColumn();
+        ImGui::Text("%f * %d", double(weight[i * 4 + 3]), joint[i * 4 + 3]);
+    ImGui::NextColumn(); ImGui::Separator();
   }
   ImGui::Columns();
   ImGui::EndChild();
@@ -428,21 +442,21 @@ void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets,
       std::string name;
 
       if (mesh_skeleton_graph.pose.target_names.empty() ||
-          mesh_skeleton_graph.pose.target_names[w].empty())
+          mesh_skeleton_graph.pose.target_names[size_t(w)].empty())
         name = "Morph Target [" + std::to_string(w) + "]";
       else
-        name = mesh_skeleton_graph.pose.target_names[w];
+        name = mesh_skeleton_graph.pose.target_names[size_t(w)];
 
       ImGui::SliderFloat(
-          name.c_str(), &mesh_skeleton_graph.pose.blend_weights[w], 0, 1, "%f");
-      mesh_skeleton_graph.pose.blend_weights[w] =
-          glm::clamp(mesh_skeleton_graph.pose.blend_weights[w], 0.f, 1.f);
+          name.c_str(), &mesh_skeleton_graph.pose.blend_weights[size_t(w)], 0, 1, "%f");
+      mesh_skeleton_graph.pose.blend_weights[size_t(w)] =
+          glm::clamp(mesh_skeleton_graph.pose.blend_weights[size_t(w)], 0.f, 1.f);
     }
   }
   ImGui::End();
 }
 
-void load_and_set_window_icons(GLFWwindow*& window) {
+static void load_and_set_window_icons(GLFWwindow*& window) {
   int x, y, c;
   std::array<GLFWimage, 3> images;
 
@@ -451,19 +465,19 @@ void load_and_set_window_icons(GLFWwindow*& window) {
   // We are loading only a few sizes of the availalbe icons
 
   images[2].pixels = stbi_load_from_memory(
-      gltf_insight_48_png, gltf_insight_48_png_len, &x, &y, &c, 4);
+      gltf_insight_48_png, int(gltf_insight_48_png_len), &x, &y, &c, 4);
   assert(x == 48 && y == 48 && "loaded data should be 48px icon");
   images[2].width = x;
   images[2].height = y;
 
   images[1].pixels = stbi_load_from_memory(
-      gltf_insight_32_png, gltf_insight_32_png_len, &x, &y, &c, 4);
+      gltf_insight_32_png, int(gltf_insight_32_png_len), &x, &y, &c, 4);
   assert(x == 32 && y == 32 && "loaded data should be 32px icon");
   images[1].width = x;
   images[1].height = y;
 
   images[0].pixels = stbi_load_from_memory(
-      gltf_insight_16_png, gltf_insight_16_png_len, &x, &y, &c, 4);
+      gltf_insight_16_png, int(gltf_insight_16_png_len), &x, &y, &c, 4);
   assert(x == 16 && y == 16 && "loaded data should be 16px icon");
   images[0].width = x;
   images[0].height = y;
@@ -502,7 +516,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 #ifdef __APPLE__
   glfwSwapInterval(1);  // Enable vsync
 #else
-  glfwSwapInterval(0); 
+  glfwSwapInterval(0);
 #endif
   glfwSetKeyCallback(window, key_callback);
 
@@ -747,7 +761,7 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
                    ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoResize |
                        ImGuiWindowFlags_NoCollapse)) {
     const auto adjust_time = [&] {
-      currentPlayTime = double(currentFrame) / ANIMATION_FPS;
+      currentPlayTime = double(currentFrame) / double(ANIMATION_FPS);
       need_to_update_pose = true;
     };
 
@@ -800,7 +814,7 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
     // add a UI to edit that particular item
     if (selectedEntry != -1) {
       const gltf_insight::AnimSequence::AnimSequenceItem& item =
-          loaded_sequence.myItems[selectedEntry];
+          loaded_sequence.myItems[size_t(selectedEntry)];
       ImGui::Text("I am a %s, please edit me",
                   gltf_insight::SequencerItemTypeNames[item.mType]);
       // switch (type) ....
@@ -820,7 +834,7 @@ void shader_selector_window(const std::vector<std::string>& shader_names,
 
     if (display_mode == 0x2A) {
       ImGuiCombo("Choose shader", &selected_shader, shader_names);
-      shader_to_use = shader_names[selected_shader];
+      shader_to_use = shader_names[size_t(selected_shader)];
     }
   }
   ImGui::End();
@@ -843,7 +857,7 @@ void about_window(GLuint logo, bool* open) {
     ImGui::SetWindowFontScale(1.25);
     ImGui::Columns(2);
     ImGui::SetColumnWidth(-1, 256 + ImGui::GetStyle().WindowPadding.x);
-    ImGui::Image((ImTextureID)(size_t)logo, ImVec2(256, 256));
+    ImGui::Image(ImTextureID(size_t(logo)), ImVec2(256, 256));
     ImGui::NextColumn();
     ImGui::Text("glTF-insight\n\n");
 #if CMAKE_CI
@@ -894,8 +908,8 @@ void about_window(GLuint logo, bool* open) {
 }
 
 void material_info_window(
-    const gltf_insight::material& dummy,
-    const std::vector<gltf_insight::material>& loaded_materials, bool* open) {
+    gltf_insight::material& dummy,
+    std::vector<gltf_insight::material>& loaded_materials, bool* open) {
   static constexpr int tsize = 128;
   if (open && !*open) return;
   if (ImGui::Begin("Materials", open)) {
@@ -906,8 +920,8 @@ void material_info_window(
     ImGui::InputInt("Material index", &index);
     index = glm::clamp(index, -1, int(loaded_materials.size()) - 1);
 
-    const auto& selected = index != -1 && index < loaded_materials.size()
-                               ? loaded_materials[index]
+    auto& selected = index != -1 && (index < int(loaded_materials.size()))
+                               ? loaded_materials[size_t(index)]
                                : dummy;
 
     ImGui::Text("Name: %s", selected.name.c_str());
@@ -915,10 +929,10 @@ void material_info_window(
                 gltf_insight::to_string(selected.intended_shader).c_str());
 
     ImGui::ColorEdit3(
-        "Emissive factor", (float*)glm::value_ptr(selected.emissive_factor),
+        "Emissive factor", glm::value_ptr(selected.emissive_factor),
         ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker);
     ImGui::Text("Alpha Mode [%s]", to_string(selected.alpha_mode).c_str());
-    ImGui::Text("Alpha cutoff [%.3f]", selected.alpha_cutoff);
+    ImGui::Text("Alpha cutoff [%.3f]", double(selected.alpha_cutoff));
     auto read_only_bool = selected.double_sided;
     ImGui::Checkbox("Double Sided", &read_only_bool);
 
@@ -932,13 +946,13 @@ void material_info_window(
     ImGui::NextColumn();
     ImGui::Text(ICON_II_ARROW_RIGHT_B " Emissive");
     ImGui::NextColumn();
-    ImGui::Image((ImTextureID)(size_t)(selected.normal_texture),
+    ImGui::Image(ImTextureID(size_t(selected.normal_texture)),
                  ImVec2(tsize, tsize));
     ImGui::NextColumn();
-    ImGui::Image((ImTextureID)(size_t)(selected.occlusion_texture),
+    ImGui::Image(ImTextureID(size_t(selected.occlusion_texture)),
                  ImVec2(tsize, tsize));
     ImGui::NextColumn();
-    ImGui::Image((ImTextureID)(size_t)(selected.emissive_texture),
+    ImGui::Image(ImTextureID(size_t(selected.emissive_texture)),
                  ImVec2(tsize, tsize));
     ImGui::NextColumn();
     ImGui::Columns();
@@ -947,28 +961,28 @@ void material_info_window(
                        "Shader specific data:");
     switch (selected.intended_shader) {
       case gltf_insight::shading_type::pbr_metal_rough: {
-        const auto& pbr_metal_rough =
+        auto& pbr_metal_rough =
             selected.shader_inputs.pbr_metal_roughness;
         ImGui::Columns(2);
         ImGui::ColorEdit4(
             "Base Color Factor",
-            (float*)glm::value_ptr(pbr_metal_rough.base_color_factor),
+            glm::value_ptr(pbr_metal_rough.base_color_factor),
             ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker);
         ImGui::NextColumn();
         ImGui::Text("Roughness [%.3f]\nMetallic_factor [%.3f]",
-                    pbr_metal_rough.roughness_factor,
-                    pbr_metal_rough.metallic_factor);
+                    double(pbr_metal_rough.roughness_factor),
+                    double(pbr_metal_rough.metallic_factor));
         ImGui::NextColumn();
         ImGui::Text(ICON_II_ARROW_RIGHT_B " Albedo (BaseColor) Map:");
         ImGui::NextColumn();
         ImGui::Text(ICON_II_ARROW_RIGHT_B " Metal Roughness map:");
         ImGui::NextColumn();
-        ImGui::Image((ImTextureID)(size_t)(pbr_metal_rough.base_color_texture),
+        ImGui::Image(ImTextureID(size_t(pbr_metal_rough.base_color_texture)),
                      ImVec2(tsize, tsize));
 
         ImGui::NextColumn();
         ImGui::Image(
-            (ImTextureID)(size_t)(pbr_metal_rough.metallic_roughness_texture),
+            ImTextureID(size_t(pbr_metal_rough.metallic_roughness_texture)),
             ImVec2(tsize, tsize));
         ImGui::NextColumn();
         ImGui::Columns();
@@ -978,12 +992,12 @@ void material_info_window(
       } break;
 
       case gltf_insight::shading_type::unlit: {
-        const auto& unlit = selected.shader_inputs.unlit;
+        auto& unlit = selected.shader_inputs.unlit;
         ImGui::ColorEdit4(
             "Base Color Factor",
-            (float*)glm::value_ptr(unlit.base_color_factor),
+            glm::value_ptr(unlit.base_color_factor),
             ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker);
-        ImGui::Image((ImTextureID)(size_t)(unlit.base_color_texture),
+        ImGui::Image(ImTextureID(size_t(unlit.base_color_texture)),
                      ImVec2(2 * tsize, 2 * tsize));
 
       } break;
@@ -992,7 +1006,7 @@ void material_info_window(
   ImGui::End();
 }
 
-void scene_outline_window_recur(gltf_node& node) {
+static void scene_outline_window_recur(gltf_node& node) {
   std::string node_name;
 
   if (node.type == gltf_node::node_type::mesh) node_name += "mesh ";
@@ -1008,7 +1022,7 @@ void scene_outline_window_recur(gltf_node& node) {
       for (int col = 0; col < 4; col++) {
         // ImGui::InputFloat("###",
         // (float*)&glm::value_ptr(node.local_xform)[i]);
-        ImGui::Text("%.3f", node.local_xform[col][line]);
+        ImGui::Text("%.3f", double(node.local_xform[col][line]));
         ImGui::NextColumn();
       }
     ImGui::Columns();
@@ -1028,6 +1042,8 @@ void scene_outline_window(gltf_node& scene, bool* open) {
 
 void mouse_button_callback(GLFWwindow* window, int button, int action,
                            int mods) {
+  (void)mods;
+
   auto* param = reinterpret_cast<application_parameters*>(
       glfwGetWindowUserPointer(window));
 
@@ -1065,7 +1081,7 @@ GLuint load_gltf_insight_icon() {
   int w, h, c;
   stbi_uc* data = nullptr;
   GLuint gl_image;
-  data = stbi_load_from_memory(gltf_insight_256_png, gltf_insight_256_png_len,
+  data = stbi_load_from_memory(gltf_insight_256_png, int(gltf_insight_256_png_len),
                                &w, &h, &c, 4);
 
   if (!data) {

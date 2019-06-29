@@ -50,6 +50,12 @@
  * Gavin Bell
  */
 #include <math.h>
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
 #include "trackball.h"
 
 #ifdef _MSC_VER
@@ -106,7 +112,7 @@ static void vcross(const float *v1, const float *v2, float *cross) {
 }
 
 static float vlength(const float *v) {
-  return sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+  return sqrtf(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
 }
 
 static void vscale(float *v, float div) {
@@ -115,7 +121,7 @@ static void vscale(float *v, float div) {
   v[2] *= div;
 }
 
-static void vnormal(float *v) { vscale(v, 1.0 / vlength(v)); }
+static void vnormal(float *v) { vscale(v, 1.0f / vlength(v)); }
 
 static float vdot(const float *v1, const float *v2) {
   return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];

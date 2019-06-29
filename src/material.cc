@@ -33,17 +33,17 @@ GLuint gltf_insight::fallback_textures::pure_flat_normal_map = 0;
 
 void gltf_insight::setup_fallback_textures() {
   static constexpr std::array<uint8_t, 16> pure_white_image_2{
-      255, 255, 255, 255, 255, 255, 255, 255,
-      255, 255, 255, 255, 255, 255, 255, 255,
+      {255, 255, 255, 255, 255, 255, 255, 255,
+      255, 255, 255, 255, 255, 255, 255, 255}
   };
 
   static constexpr std::array<uint8_t, 16> pure_black_image_2{
-      0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255,
+      {0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255}
   };
 
   static constexpr std::array<uint8_t, 16> pure_flat_normal_2{
-      128, 128, 255, 255, 128, 128, 255, 255,
-      128, 128, 255, 255, 128, 128, 255, 255};
+      {128, 128, 255, 255, 128, 128, 255, 255,
+      128, 128, 255, 255, 128, 128, 255, 255}};
 
   glGenTextures(1, &fallback_textures::pure_white_texture);
   glBindTexture(GL_TEXTURE_2D, fallback_textures::pure_white_texture);
@@ -102,9 +102,9 @@ void material::fill_material_texture_slots() {
 }
 
 void material::bind_textures() const {
-  for (int i = 0; i < textures_used; ++i) {
-    glActiveTexture(GL_TEXTURE0 + i);
-    glBindTexture(GL_TEXTURE_2D, texture_slots[i]);
+  for (int i = 0; i < int(textures_used); ++i) {
+    glActiveTexture(GLenum(GL_TEXTURE0 + i));
+    glBindTexture(GL_TEXTURE_2D, texture_slots[size_t(i)]);
   }
 }
 
@@ -158,13 +158,23 @@ void material::set_shader_uniform(const shader& shading_program) const {
   }
 }
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
 GLuint material::brdf_lut = 0;
 #include "brdflut.png_inc.hh"
 #include "stb_image.h"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 void material::load_brdf_lut() {
   int x, y, c;
   stbi_uc* brdf_lut_data =
-      stbi_load_from_memory(brdflut_png, brdflut_png_len, &x, &y, &c, 4);
+      stbi_load_from_memory(brdflut_png, int(brdflut_png_len), &x, &y, &c, 4);
   glGenTextures(1, &brdf_lut);
   glBindTexture(GL_TEXTURE_2D, brdf_lut);
   glTexImage2D(GL_TEXTURE_2D, 0, c == 4 ? GL_RGBA : GL_RGB, x, y, 0,

@@ -21,21 +21,23 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+#ifdef _MSC_VER
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
 #endif
 #include "gltf-graph.hh"
 
 #include "gl_util.hh"
 #include "tiny_gltf_util.h"
 
-bool draw_joint_point = true;
-bool draw_bone_segment = true;
-bool draw_childless_bone_extension = true;
-bool draw_mesh_anchor_point = false;
-bool draw_bone_axes = false;
+static bool draw_joint_point = true;
+static bool draw_bone_segment = true;
+static bool draw_childless_bone_extension = true;
+static bool draw_mesh_anchor_point = false;
+static bool draw_bone_axes = false;
 
-gltf_node::~gltf_node() = default;
+//gltf_node::~gltf_node() = default;
 
 gltf_node::gltf_node(node_type t, gltf_node* p)
     : type(t), local_xform(1.f), world_xform(1.f), parent(p) {}
@@ -48,7 +50,7 @@ void gltf_node::add_child() {
 
 gltf_node* gltf_node::get_ptr() { return this; }
 
-gltf_node* find_index_in_children(gltf_node* node, int index) {
+static gltf_node* find_index_in_children(gltf_node* node, int index) {
   if (node->gltf_node_index == index) return node;
 
   gltf_node* found = nullptr;
@@ -161,7 +163,7 @@ void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
                          int gltf_index) {
   std::cout << "loading node " << gltf_index << "\n";
   // get the gltf node object
-  const auto& root_node = model.nodes[gltf_index];
+  const auto& root_node = model.nodes[size_t(gltf_index)];
   glm::mat4 xform = load_node_local_xform(root_node);
   // set data inside root
   graph_root.local_xform = xform;
@@ -179,7 +181,7 @@ void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
 
 void set_mesh_attachement(const tinygltf::Model& model, gltf_node& graph_root) {
   if (graph_root.gltf_node_index != -1) {
-    const auto& node = model.nodes[graph_root.gltf_node_index];
+    const auto& node = model.nodes[size_t(graph_root.gltf_node_index)];
 
     if (has_mesh(node)) {
       graph_root.gltf_mesh_id = node.mesh;
@@ -189,14 +191,16 @@ void set_mesh_attachement(const tinygltf::Model& model, gltf_node& graph_root) {
   for (auto& child : graph_root.children) set_mesh_attachement(model, *child);
 }
 
-void get_number_of_meshes_recur(const gltf_node& root, size_t& number) {
+#if 0 // UNUSED
+static void get_number_of_meshes_recur(const gltf_node& root, size_t& number) {
   if (root.type == gltf_node::node_type::mesh) ++number;
   for (auto child : root.children) {
     get_number_of_meshes_recur(*child, number);
   }
 }
+#endif
 
-void get_list_of_mesh_recur(const gltf_node& root,
+static void get_list_of_mesh_recur(const gltf_node& root,
                             std::vector<gltf_mesh_instance>& meshes) {
   if (root.type == gltf_node::node_type::mesh) {
     gltf_mesh_instance inst;
@@ -215,7 +219,7 @@ std::vector<gltf_mesh_instance> get_list_of_mesh_instances(
   return meshes;
 }
 
-void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end,
+static void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end,
                const glm::vec4 draw_color, const float line_width) {
   glUseProgram(shader);
   glLineWidth(line_width);
@@ -322,6 +326,7 @@ void create_flat_bone_list(const tinygltf::Skin& skin,
                            const std::vector<int>::size_type nb_joints,
                            gltf_node mesh_skeleton_graph,
                            std::vector<gltf_node*>& flatened_bone_list) {
+  (void)nb_joints;
   create_flat_bone_array(mesh_skeleton_graph, flatened_bone_list, skin.joints);
   sort_bone_array(flatened_bone_list, skin);
 }
@@ -332,7 +337,7 @@ void create_flat_bone_list(const tinygltf::Skin& skin,
 int find_skeleton_root(const tinygltf::Model& model,
                        const std::vector<int>& joints, int start_node) {
   // Get the node to get the children
-  const auto& node = model.nodes[start_node];
+  const auto& node = model.nodes[size_t(start_node)];
 
   for (int child : node.children) {
     // If we are part of the skeleton, return our parent

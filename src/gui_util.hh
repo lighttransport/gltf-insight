@@ -22,6 +22,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 #pragma once
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
 // include glad first
 #include "glad/include/glad/glad.h"
 
@@ -34,22 +40,35 @@ SOFTWARE.
 #include "ImGuiFileDialog.h"
 #include "ImGuizmo.h"
 #include "ImSequencer.h"
-#include "animation.hh"
 #include "examples/imgui_impl_glfw.h"
 #include "examples/imgui_impl_opengl3.h"
 #include "glm/glm.hpp"
-#include "gltf-graph.hh"
 #include "imgui.h"
 #include "imgui_internal.h"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
+#include "animation.hh"
+#include "gltf-graph.hh"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
+#include "material.hh"
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
 
 // after:
 #include <glm/common.hpp>
 
 #include "animation-sequencer.inc.h"
-#include "animation.hh"
-#include "material.hh"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 struct application_parameters {
   glm::vec3& camera_position;
@@ -146,9 +165,10 @@ void camera_parameters_window(float& fovy, float& z_far, bool* open = nullptr);
 GLuint load_gltf_insight_icon();
 void about_window(GLuint logo, bool* open = nullptr);
 
+// NOTE(LTE): material may have a chance to be modified, so no `const` qualifiers.
 void material_info_window(
-    const gltf_insight::material& dummy,
-    const std::vector<gltf_insight::material>& loaded_materials,
+    gltf_insight::material& dummy,
+    std::vector<gltf_insight::material>& loaded_materials,
     bool* open = nullptr);
 
 void scene_outline_window(gltf_node& sene, bool* open = nullptr);
