@@ -240,8 +240,8 @@ void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
   const auto gltf_mesh_node = root.get_node_with_index(a_mesh.instance.node);
   const glm::mat4 mesh_xform = gltf_mesh_node->world_xform;
 
-  for (size_t i = 0; i < a_mesh.nb_joints; ++i) {
-    const auto joint_node = a_mesh.flat_joint_list[i];
+  for (int i = 0; i < a_mesh.nb_joints; ++i) {
+    const auto joint_node = a_mesh.flat_joint_list[size_t(i)];
     const auto joint_index = size_t(
         a_mesh.joint_inverse_bind_matrix_map.at(joint_node->gltf_node_index));
 
