@@ -43,10 +43,10 @@ SOFTWARE.
 #pragma clang diagnostic pop
 #endif
 
-#include "animation.hh"
-
 #include <memory>
 #include <vector>
+
+#include "animation.hh"
 
 struct gltf_node {
   //~gltf_node();
@@ -79,6 +79,8 @@ struct gltf_node {
 
   /// Get `this` easily
   gltf_node* get_ptr();
+
+  gltf_node* skin_mesh_node = nullptr;
 
   /// Find node with set glTF index in children
   gltf_node* get_node_with_index(int index);

@@ -37,7 +37,7 @@ static bool draw_childless_bone_extension = true;
 static bool draw_mesh_anchor_point = false;
 static bool draw_bone_axes = false;
 
-//gltf_node::~gltf_node() = default;
+// gltf_node::~gltf_node() = default;
 
 gltf_node::gltf_node(node_type t, gltf_node* p)
     : type(t), local_xform(1.f), world_xform(1.f), parent(p) {}
@@ -191,7 +191,7 @@ void set_mesh_attachement(const tinygltf::Model& model, gltf_node& graph_root) {
   for (auto& child : graph_root.children) set_mesh_attachement(model, *child);
 }
 
-#if 0 // UNUSED
+#if 0  // UNUSED
 static void get_number_of_meshes_recur(const gltf_node& root, size_t& number) {
   if (root.type == gltf_node::node_type::mesh) ++number;
   for (auto child : root.children) {
@@ -201,7 +201,7 @@ static void get_number_of_meshes_recur(const gltf_node& root, size_t& number) {
 #endif
 
 static void get_list_of_mesh_recur(const gltf_node& root,
-                            std::vector<gltf_mesh_instance>& meshes) {
+                                   std::vector<gltf_mesh_instance>& meshes) {
   if (root.type == gltf_node::node_type::mesh) {
     gltf_mesh_instance inst;
     inst.mesh = root.gltf_mesh_id;
@@ -219,8 +219,9 @@ std::vector<gltf_mesh_instance> get_list_of_mesh_instances(
   return meshes;
 }
 
-static void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end,
-               const glm::vec4 draw_color, const float line_width) {
+static void draw_line(GLuint shader, const glm::vec3 origin,
+                      const glm::vec3 end, const glm::vec4 draw_color,
+                      const float line_width) {
   glUseProgram(shader);
   glLineWidth(line_width);
   glUniform4f(glGetUniformLocation(shader, "debug_color"), draw_color.r,
@@ -236,60 +237,49 @@ static void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end
 void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
                 glm::mat4 view_matrix, glm::mat4 projection_matrix,
                 const gltf_insight::mesh& a_mesh) {
-  // recurse down the scene tree
-  for (auto& child : root.children)
-    draw_bones(*child, active_joint_node_index, shader, view_matrix,
-               projection_matrix, a_mesh);
+  const auto gltf_mesh_node = root.get_node_with_index(a_mesh.instance.node);
+  const glm::mat4 mesh_xform = gltf_mesh_node->world_xform;
 
-  // on current node, set debug_shader model view projection to draw our local
-  // space
-  glUseProgram(shader);
-  glm::mat4 mvp = projection_matrix * view_matrix * root.world_xform;
-  glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
-                     glm::value_ptr(mvp));
+  for (size_t i = 0; i < a_mesh.nb_joints; ++i) {
+    const auto joint_node = a_mesh.flat_joint_list[i];
+    const auto joint_index = size_t(
+        a_mesh.joint_inverse_bind_matrix_map.at(joint_node->gltf_node_index));
 
-  // draw XYZ axes
-  if (draw_bone_axes) draw_space_base(shader, 2.f, .125f);
+    const auto joint_inverse_bind_matrix =
+        a_mesh.inverse_bind_matrices[joint_index];
+    const auto joint_matrix = a_mesh.joint_matrices[joint_index];
 
-  // If this node is actually a bone
-  if (root.type == gltf_node::node_type::bone) {
-    // Draw segment to child bones
-    if (draw_bone_segment) {
-      for (auto child : root.children) {
-        if (child->type == gltf_node::node_type::bone) {
-          draw_line(shader, glm::vec3(0.f), child->local_xform[3],
-                    root.gltf_node_index == active_joint_node_index
-                        ? glm::vec4(1.f, .5f, .5f, 1.f)
-                        : glm::vec4(0.f, .5f, .5f, 1.f),
-                    8);
-        }
+    const bool is_active =
+        active_joint_node_index == joint_node->gltf_node_index;
+
+    glUseProgram(shader);
+    glm::mat4 mvp = projection_matrix * view_matrix * mesh_xform *
+                    joint_matrix * glm::inverse(joint_inverse_bind_matrix);
+
+    glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
+                       glm::value_ptr(mvp));
+
+    for (auto child : joint_node->children)
+      if (child->type == gltf_node::node_type::bone) {
+        draw_line(shader, glm::vec3(0.f), child->local_xform[3],
+                  (is_active ? glm::vec4(1.f, .5f, .5f, 1.f)
+                             : glm::vec4(0.f, .5f, .5f, 1.f)),
+                  8);
       }
 
-      // The "last" bone of many rig doesn't have a child joint. Draw a line in
-      // another color to show it anyway TODO make lenght a setting
-      if (draw_childless_bone_extension && root.children.empty())
-        draw_line(shader, glm::vec3(0.f),
-                  glm::vec3(0.f, .25f, 0.f) /*Y is length*/,
-                  root.gltf_node_index == active_joint_node_index
-                      ? glm::vec4(.5f, .25f, .5f, 1.f)
-                      : glm::vec4(.5f, .75f, .5f, 1.f),
-                  6);
+    if (draw_childless_bone_extension && joint_node->children.empty()) {
+      draw_line(shader, glm::vec3(0.f),
+                glm::vec3(0.f, .25f, 0.f) /*Y is length*/,
+                is_active ? glm::vec4(.5f, .25f, .5f, 1.f)
+                          : glm::vec4(.5f, .75f, .5f, 1.f),
+                6);
     }
 
-    // Red dot on joint
     if (draw_joint_point)
-      draw_space_origin_point(10, shader,
-                              root.gltf_node_index == active_joint_node_index
-                                  ? glm::vec4(0, 1, 1, 1)
-                                  : glm::vec4(1, 0, 0, 1));
+      draw_space_origin_point(
+          10, shader,
+          is_active ? glm::vec4(0, 1, 1, 1) : glm::vec4(1, 0, 0, 1));
   }
-
-  // Yellow dot on mesh pivot
-  if (draw_mesh_anchor_point && root.type == gltf_node::node_type::mesh)
-    draw_space_origin_point(10, shader, glm::vec4(1, 1, 0, 1));
-
-  // Unset shader program
-  glUseProgram(0);
 }
 
 void create_flat_bone_array(gltf_node& root,

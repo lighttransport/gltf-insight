@@ -295,6 +295,11 @@ void app::load() {
       current_mesh.nb_joints = int(gltf_skin.joints.size());
       create_flat_bone_list(gltf_skin, size_t(current_mesh.nb_joints),
                             gltf_scene_tree, current_mesh.flat_joint_list);
+
+      for (auto joint : current_mesh.flat_joint_list)
+        joint->skin_mesh_node =
+            gltf_scene_tree.get_node_with_index(current_mesh.instance.node);
+
       current_mesh.joint_matrices.resize(size_t(current_mesh.nb_joints));
       load_inverse_bind_matrix_array(model, gltf_skin,
                                      size_t(current_mesh.nb_joints),
@@ -1140,7 +1145,7 @@ void app::load_all_textures(size_t nb_textures) {
 
 void app::genrate_joint_inverse_bind_matrix_map(
     const tinygltf::Skin& skin, const std::vector<int>::size_type nb_joints,
-    std::map<int, int> joint_inverse_bind_matrix_map) {
+    std::map<int, int>& joint_inverse_bind_matrix_map) {
   for (size_t i = 0; i < nb_joints; ++i) {
     joint_inverse_bind_matrix_map[skin.joints[i]] = int(i);
   }
@@ -1361,10 +1366,25 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
   glm::vec3 vecTranslation, vecRotation, vecScale;
   glm::mat4 bone_world_xform;
 
+  glm::mat4 bind_matrix(1.f), joint_matrix(1.f);
+  gltf_node* mesh_node = nullptr;
+  mesh* a_mesh = nullptr;
+
+  glm::mat4 delta_matrix(1.f);
+
   if (!active_bone) {
     current_mode = manipulate_mesh;
   } else {
-    bone_world_xform = active_bone->world_xform;
+    a_mesh = &loaded_meshes[(size_t)active_bone->skin_mesh_node->gltf_mesh_id];
+
+    mesh_node = gltf_scene_tree.get_node_with_index(a_mesh->instance.node);
+
+    const auto joint_index = size_t(
+        a_mesh->joint_inverse_bind_matrix_map.at(active_bone->gltf_node_index));
+
+    bind_matrix = glm::inverse(a_mesh->inverse_bind_matrices[joint_index]);
+    joint_matrix = a_mesh->joint_matrices[joint_index];
+    bone_world_xform = mesh_node->world_xform * joint_matrix * bind_matrix;
   }
 
   const auto saved_mode = current_mode;
@@ -1405,7 +1425,8 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
   if (show_gizmo)
     ImGuizmo::Manipulate(
         glm::value_ptr(view_matrix), glm::value_ptr(projection_matrix),
-        mCurrentGizmoOperation, mCurrentGizmoMode, manipulated_matrix);
+        mCurrentGizmoOperation, mCurrentGizmoMode, manipulated_matrix,
+        (float*)glm::value_ptr(delta_matrix));
 
   if (current_mode == 1) {
     // todo modify active_bone->pose to match the new bone global matrix
@@ -1416,22 +1437,45 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
     static glm::quat rotation;
     static glm::vec4 perspective;
 
-    // Get the referential
-    const auto bone_parent_world =
-        active_bone->parent ? active_bone->parent->world_xform : glm::mat4(1.f);
+    glm::mat4 parent_joint_matrix(1.f), parent_bind_matrix(1.f);
 
-    // Get the bone transform in paren't referential
-    const glm::mat4 bone_pose_xform =
-        glm::inverse(bone_parent_world) * bone_world_xform;
+    if (active_bone->parent) try {
+        const auto joint_index =
+            size_t(a_mesh->joint_inverse_bind_matrix_map.at(
+                active_bone->parent->gltf_node_index));
+
+        parent_bind_matrix =
+            glm::inverse(a_mesh->inverse_bind_matrices[joint_index]);
+        parent_joint_matrix = a_mesh->joint_matrices[joint_index];
+      } catch (const std::exception& e) {
+        std::cerr << e.what() << "\n";
+      }
+
+    // Get the referential
+    const auto referential =
+        mesh_node->local_xform * parent_joint_matrix * parent_bind_matrix;
 
     // Decompose that matrix into position rotation sacale
-    glm::decompose(bone_pose_xform, scale, rotation, position, skew,
-                   perspective);
+    glm::decompose(glm::inverse(referential) * bone_world_xform, scale,
+                   rotation, position, skew, perspective);
+
+    ImGui::Text("Decomposed pose :");
+    ImGui::Text("t = %f %f %f", position.x, position.y, position.z);
+    ImGui::Text("r = %f %f %f %f", rotation.w, rotation.x, rotation.y,
+                rotation.z);
+    ImGui::Text("s = %f %f %f", scale.x, scale.y, scale.z);
+
+    ImGui::Text("Current pose:");
+    ImGui::Text("t = %f %f %f", pose.translation.x, pose.translation.y,
+                pose.translation.z);
+    ImGui::Text("r = %f %f %f %f", pose.rotation.w, pose.rotation.x,
+                pose.rotation.y, pose.rotation.z);
+    ImGui::Text("s = %f %f %f", pose.scale.x, pose.scale.y, pose.scale.z);
 
     // apply to pose
-    pose.translation = position;
-    pose.rotation = rotation;
-    pose.scale = scale;
+    // pose.translation = position;
+    // pose.rotation = rotation;
+    // pose.scale = scale;
   }
 }
 

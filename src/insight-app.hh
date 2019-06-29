@@ -270,7 +270,7 @@ class app {
 
   void genrate_joint_inverse_bind_matrix_map(
       const tinygltf::Skin& skin, const std::vector<int>::size_type nb_joints,
-      std::map<int, int> joint_inverse_bind_matrix_map);
+      std::map<int, int>& joint_inverse_bind_matrix_map);
 
   void cpu_compute_morphed_display_mesh(
       gltf_node mesh_skeleton_graph, size_t submesh_id,
