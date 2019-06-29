@@ -518,17 +518,17 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       glBufferData(GL_ARRAY_BUFFER,
                    vertex_coord[submesh].size() * sizeof(float),
                    vertex_coord[submesh].data(), GL_DYNAMIC_DRAW);
-      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
-                            nullptr);
-      glEnableVertexAttribArray(0);
+      glVertexAttribPointer(VBO_layout_position, 3, GL_FLOAT, GL_FALSE,
+                            3 * sizeof(float), nullptr);
+      glEnableVertexAttribArray(VBO_layout_position);
 
       // Layout "1" = vertex normal
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_normal]);
       glBufferData(GL_ARRAY_BUFFER, normals[submesh].size() * sizeof(float),
                    normals[submesh].data(), GL_DYNAMIC_DRAW);
-      glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
-                            nullptr);
-      glEnableVertexAttribArray(1);
+      glVertexAttribPointer(VBO_layout_normal, 3, GL_FLOAT, GL_FALSE,
+                            3 * sizeof(float), nullptr);
+      glEnableVertexAttribArray(VBO_layout_normal);
 
       // We we haven't loaded any texture, don't even bother with UVs
       if (textures.size() > 0) {
@@ -537,35 +537,36 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
         glBufferData(GL_ARRAY_BUFFER,
                      texture_coord[submesh].size() * sizeof(float),
                      texture_coord[submesh].data(), GL_STATIC_DRAW);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
-                              nullptr);
-        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(VBO_layout_uv, 2, GL_FLOAT, GL_FALSE,
+                              2 * sizeof(float), nullptr);
+        glEnableVertexAttribArray(VBO_layout_uv);
       }
 
       // colors is layout 3
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_color]);
       glBufferData(GL_ARRAY_BUFFER, colors[submesh].size() * sizeof(float),
                    colors[submesh].data(), GL_DYNAMIC_DRAW);
-      glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
-                            nullptr);
-      glEnableVertexAttribArray(3);
+      glVertexAttribPointer(VBO_layout_color, 4, GL_FLOAT, GL_FALSE,
+                            4 * sizeof(float), nullptr);
+      glEnableVertexAttribArray(VBO_layout_color);
 
       // Layout "4" joints assignment vector
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_joints]);
       glBufferData(GL_ARRAY_BUFFER,
                    joints[submesh].size() * sizeof(unsigned short),
                    joints[submesh].data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(4, 4, GL_UNSIGNED_SHORT, GL_FALSE,
-                            4 * sizeof(unsigned short), nullptr);
+      glVertexAttribPointer(VBO_layout_joints, 4, GL_UNSIGNED_SHORT, GL_FALSE,
+                            VBO_layout_joints * sizeof(unsigned short),
+                            nullptr);
       glEnableVertexAttribArray(4);
 
       // Layout "5" joints weights
       glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_weights]);
       glBufferData(GL_ARRAY_BUFFER, weights[submesh].size() * sizeof(float),
                    weights[submesh].data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
-                            nullptr);
-      glEnableVertexAttribArray(5);
+      glVertexAttribPointer(VBO_layout_weights, 4, GL_FLOAT, GL_FALSE,
+                            4 * sizeof(float), nullptr);
+      glEnableVertexAttribArray(VBO_layout_weights);
 
       // EBO
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][VBO_layout_EBO]);
