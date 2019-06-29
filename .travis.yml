@@ -68,11 +68,13 @@ script:
 
 after_success:
   - |
-    if [ "$TRAVIS_OS_NAME" = "linux" ]; then
-     ls -lh *.AppImage # Assuming you have some files in out/ that you would like to upload
-     if [ "$UPLOAD" = true ]; then
-      wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
-      bash upload.sh gltf-insight*.AppImage
+    if [ "$TRAVIS_BRANCH" = "devel" ]; then
+     if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+      ls -lh *.AppImage # Assuming you have some files in out/ that you would like to upload
+      if [ "$UPLOAD" = true ]; then
+       wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
+       bash upload.sh gltf-insight*.AppImage
+      fi
      fi
     fi
   - echo "after_success is done"
