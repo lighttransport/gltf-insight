@@ -33,13 +33,13 @@ SOFTWARE.
 #include "material.hh"
 
 // This includes opengl for us, along side debuging callbacks
-#include "gl_util.hh"
-
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <map>
 #include <vector>
+
+#include "gl_util.hh"
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -47,7 +47,6 @@ SOFTWARE.
 #endif
 
 #include "cxxopts.hpp"
-
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/quaternion.hpp"
@@ -163,8 +162,14 @@ class app {
                  glm::mat3 normal_matrix, glm::mat4 model_matrix);
 
   void draw_scene(const glm::vec3& world_camera_position);
-  void draw_scene_recur(const glm::vec3& world_camera_position,
-                        const gltf_node& node);
+
+  struct defered_draw {
+    gltf_node* node;
+    defered_draw(gltf_node* n) : node(n) {}
+  };
+
+  void draw_scene_recur(const glm::vec3& world_camera_position, gltf_node& node,
+                        std::vector<defered_draw>& alpha_models);
 
   editor_lighting editor_light;
 
@@ -252,15 +257,15 @@ class app {
 
   void parse_command_line(int argc, char** argv);
 
-  //void load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,
+  // void load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,
   //                     const std::string& input_filename,
   //                     tinygltf::Model& model);
 
   // Load glTF asset. Initial input filename is given at `parse_command_line`
   void load_glTF_asset();
 
-
-  // Assume `textures` are already allocated at least with the size `nb_textures`
+  // Assume `textures` are already allocated at least with the size
+  // `nb_textures`
   void load_all_textures(size_t nb_textures);
 
   void genrate_joint_inverse_bind_matrix_map(

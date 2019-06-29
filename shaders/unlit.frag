@@ -22,7 +22,7 @@ void main()
 {
   vec4 color = interpolated_colors * base_color_factor * texture(base_color_texture, interpolated_uv);
 
-  if(alpha_mode == ALPHA_MASK || alpha_mode == ALPHA_BLEND)
+  if(alpha_mode == ALPHA_MASK)
   {
 	if(color.a < alpha_cutoff)
 	{

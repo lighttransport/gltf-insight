@@ -811,8 +811,7 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
     }
 
     if (material_to_use.alpha_mode == alpha_coverage::blend) {
-      // just make sure alpha blending is enabled. We don't really need
-      // to worry too much about it
+      glDisable(GL_CULL_FACE);
       glEnable(GL_BLEND);
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       glBlendEquation(GL_FUNC_ADD);
@@ -823,21 +822,58 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
 }
 
 void app::draw_scene_recur(const glm::vec3& world_camera_position,
-                           const gltf_node& node) {
+                           gltf_node& node,
+                           std::vector<defered_draw>& alpha_models) {
   for (auto child : node.children)
-    draw_scene_recur(world_camera_position, *child);
+    draw_scene_recur(world_camera_position, *child, alpha_models);
 
   if (node.type == gltf_node::node_type::mesh) {
     auto& mesh = loaded_meshes[size_t(node.gltf_mesh_id)];
 
-    const auto normal_matrix = glm::transpose(glm::inverse(node.world_xform));
+    bool defer = false;
+    for (auto material : mesh.materials)
+      if (loaded_material[material].alpha_mode == alpha_coverage::blend) {
+        defer = true;
+        break;
+      }
 
-    draw_mesh(world_camera_position, mesh, normal_matrix, node.world_xform);
+    if (!defer) {
+      const auto normal_matrix = glm::transpose(glm::inverse(node.world_xform));
+      draw_mesh(world_camera_position, mesh, normal_matrix, node.world_xform);
+    } else {
+      alpha_models.push_back(node.get_ptr());
+    }
   }
 }
 
 void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
-  draw_scene_recur(world_camera_position, gltf_scene_tree);
+  std::vector<defered_draw> alpha;
+  draw_scene_recur(world_camera_position, gltf_scene_tree, alpha);
+
+  if (!alpha.empty()) {
+    {
+      // sort by distance from camera
+      if (alpha.size() > 1)
+        std::sort(alpha.begin(), alpha.end(),
+                  [&](const defered_draw& a, const defered_draw b) {
+                    const glm::vec3 a_pos = world_camera_position -
+                                            glm::vec3(a.node->world_xform[3]);
+                    const glm::vec3 b_pos = world_camera_position -
+                                            glm::vec3(b.node->world_xform[3]);
+
+                    return glm::length2(a_pos) < glm::length2(b_pos);
+                  });
+
+      for (const auto& to_draw : alpha) {
+        auto node = to_draw.node;
+        const auto& mesh = loaded_meshes[node->gltf_mesh_id];
+        const auto normal_matrix =
+            glm::transpose(glm::inverse(node->world_xform));
+        draw_mesh(world_camera_position, mesh, normal_matrix,
+                  node->world_xform);
+      }
+    }
+  }
 }
 
 void app::main_loop() {
@@ -1415,7 +1451,7 @@ void app::fill_sequencer() {
   }
 }
 
-#include <cstdio>
+#include <cstdlib>
 #ifdef WIN32
 #include <Windows.h>
 #include <shellapi.h>
