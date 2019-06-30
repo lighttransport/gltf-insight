@@ -1365,121 +1365,144 @@ void app::run_animation_timeline(gltf_insight::AnimSequence& _sequence,
 void app::run_3D_gizmo(gltf_node* active_bone) {
   glm::vec3 vecTranslation, vecRotation, vecScale;
   glm::mat4 bone_world_xform;
-
-  glm::mat4 bind_matrix(1.f), joint_matrix(1.f);
+  glm::mat4 bind_matrix(1.f), joint_matrix(1.f), delta_matrix(1.f),
+      before_manipulate_matrix(1.f);
   gltf_node* mesh_node = nullptr;
   mesh* a_mesh = nullptr;
 
-  glm::mat4 delta_matrix(1.f);
-
+  // If we got a null pointer for the active bone, the mode *has* to be mesh
+  // manipulation, because bone manipulation in that case would not make any
+  // sense
   if (!active_bone) {
     current_mode = manipulate_mesh;
-  } else {
-    a_mesh = &loaded_meshes[size_t(active_bone->skin_mesh_node->gltf_mesh_id)];
+  }
 
+  // Otherwise, there's a currently selected "active" bone. We need to calculate
+  // the world matrix of how it's drawn according to the mesh it is attached to.
+  // This is not the actual world xform of the gltf node that represnt it, but a
+  // transform relative to the mesh calculated from it's bind matrix and joint
+  // matrix. These matrices have already been loaded and/or computed, they
+  // actually depend (for the joint matrix) of that world xoform, we retreive
+  // them so we will not do the work twice:
+  else {
+    // Get the mesh
+    a_mesh = &loaded_meshes[size_t(active_bone->skin_mesh_node->gltf_mesh_id)];
     mesh_node = gltf_scene_tree.get_node_with_index(a_mesh->instance.node);
 
+    // Get the number of the node inside the mesh data (it's index for the
+    // "joint matrices", "inverse bind matrices" and "flat bone list" arrays)
     const auto joint_index = size_t(
         a_mesh->joint_inverse_bind_matrix_map.at(active_bone->gltf_node_index));
 
+    // Compute the world transform
     bind_matrix = glm::inverse(a_mesh->inverse_bind_matrices[joint_index]);
     joint_matrix = a_mesh->joint_matrices[joint_index];
     bone_world_xform = mesh_node->world_xform * joint_matrix * bind_matrix;
   }
 
+  // The mode to be used is modifiable by the window we are going to display. If
+  // that mode change, we need to wait before next frame to be able to
+  // manipulate a transform reliably
   const auto saved_mode = current_mode;
 
+  // Select the matrix to use depending on currently selected mode
   float* manipulated_matrix =
       glm::value_ptr(current_mode == manipulate_mesh ? root_node_model_matrix
                                                      : bone_world_xform);
 
+  // We need to get "human understandable" numbers from that matrix for the
+  // position/rotation/scale.
   ImGuizmo::DecomposeMatrixToComponents(
       manipulated_matrix, glm::value_ptr(vecTranslation),
       glm::value_ptr(vecRotation), glm::value_ptr(vecScale));
 
-  // This is used to check if user manipulated these values in the GUI
+  // This is used to check if user manipulated these values in the GUI, to avoid
+  // problems of numerical stability
   const glm::vec3 savedTr = vecTranslation, savedRot = vecRotation,
                   savedScale = vecScale;
 
+  // Display the transform window
   transform_window(glm::value_ptr(vecTranslation), glm::value_ptr(vecRotation),
                    glm::value_ptr(vecScale), mCurrentGizmoOperation,
                    mCurrentGizmoMode, reinterpret_cast<int*>(&current_mode),
                    &show_gizmo, &show_transform_window);
+
+  // If there's no active bone, make sure selected mode *stays* as mesh, even if
+  // user's changed to bone mode
   if (!active_bone) {
     current_mode = manipulate_mesh;
   }
 
+  // If the mode has been changed by the user, return. We will do manipulation
+  // for the next frame
   if (current_mode != saved_mode)
     return;  // If we just gone from mesh to bone, we are not manipulating the
 
+  // If any of these values has been changed in the GUI, recompose the
+  // manipulated matrix from these TRS vectors
   if (savedTr != vecTranslation || savedRot != vecRotation ||
       savedScale != vecScale)
     ImGuizmo::RecomposeMatrixFromComponents(
         glm::value_ptr(vecTranslation), glm::value_ptr(vecRotation),
         glm::value_ptr(vecScale), manipulated_matrix);
 
-  auto& io = ImGui::GetIO();
+  // If we display the gizmo
+  if (show_gizmo) {
+    // Get the screen geometry from ImGui and pass it to ImGuizmo:
+    auto& io = ImGui::GetIO();
+    ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-  ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-
-  const auto unmanipulated_matrix = glm::make_mat4(manipulated_matrix);
-
-  if (show_gizmo)
+    // Save this unchanged matrix, it is going to be useful
+    before_manipulate_matrix = glm::make_mat4(manipulated_matrix);
     ImGuizmo::Manipulate(
         glm::value_ptr(view_matrix), glm::value_ptr(projection_matrix),
         mCurrentGizmoOperation, mCurrentGizmoMode, manipulated_matrix,
         static_cast<float*>(glm::value_ptr(delta_matrix)));
+  }
 
-  if (current_mode == 1) {
-    gltf_node::animation_state& pose = active_bone->pose;
-
-    // we actually don't need the skew and perpective ones, but GLM API does
-    static glm::vec3 position(0.f), scale(1.f), skew(1.f);
-    static glm::quat rotation(1.f, 0.f, 0.f, 0.f);
-    static glm::vec4 perspective(1.f);
-    (void)skew;
-    (void)perspective;
-
-    // pose is relative to the parent
+  // If we are manipulating the mesh, the matrix has been updated as it should
+  // have been. However, if we are manipulating a joint, we need to update the
+  // "pose" information of that joint, not that joint transform matrix. The
+  // animation system uses the pose data to calculate these xform, so they
+  // would overriden immediately, plus the actual displayed bone location is
+  // aligned with the mesh, it is not the actual xform of the joint node in
+  // the glTF scene graph.
+  if (current_mode == manipulate_joint) {
+    // Pose is relative to the parent. Attempt to fetch a parent node xform. If
+    // we don't find any parent node, assume parent is the world root, and thus
+    // has an identity xform
     glm::mat4 parent_bone_world_xform(1.f);
-
-    // check if there's a parent bone
     if (active_bone->parent) {
       parent_bone_world_xform = active_bone->parent->world_xform;
     }
 
     // The pose is expressed in the world referential, but skeleton and
     // manipulator are in the mesh's referential. The skeleton and mesh don't
-    // necessarly line-up
-
-    glm::mat4 transformed_world_xform = active_bone->world_xform;
-    // glm::inverse(mesh_node->world_xform) *
-    // delta_matrix;
-
-    // Decompose that matrix into position rotation scale
-
-    // This matrix once decomposed is the same transform as the currently held
-    // pose
+    // necessary line-up!
     auto currently_posed =
-        glm::inverse(parent_bone_world_xform) * active_bone->world_xform;
+        // The current pose of the bone : it's xform relative to the parent glTF
+        // node
+        glm::inverse(parent_bone_world_xform) * active_bone->world_xform *
 
-    // TODO apply the gizmo delta matrix to the above without making everything
-    // explode
+        // The manipulation made with the gizmo by taking the new mesh-oriented
+        // world xform, relative to the untouched xform
+        glm::inverse(before_manipulate_matrix) * bone_world_xform;
 
-    ImGui::Text("Decomposed result :");
-    ImGui::Text("t = %f %f %f", position.x, position.y, position.z);
-    ImGui::Text("r = %f %f %f %f", rotation.w, rotation.x, rotation.y,
-                rotation.z);
-    ImGui::Text("s = %f %f %f", scale.x, scale.y, scale.z);
-
-    ImGui::Text("Current pose:");
-    ImGui::Text("t = %f %f %f", pose.translation.x, pose.translation.y,
-                pose.translation.z);
-    ImGui::Text("r = %f %f %f %f", pose.rotation.w, pose.rotation.x,
-                pose.rotation.y, pose.rotation.z);
-    ImGui::Text("s = %f %f %f", pose.scale.x, pose.scale.y, pose.scale.z);
-
+    // The easiest way to detect that something was changed is to use this delta
+    // matrix. We cannot use it to apply the transformation because it's not in
+    // the right referential, however, if the object wasn't manipulated, it's an
+    // identity matrix. We could apply it at every frame, but the result could
+    // drift due to floating point numerical instability while
+    // decomposing/recomposing TRS matrices that way
     if (delta_matrix != glm::mat4(1.f)) {
+      // we actually don't need the skew and perpective ones, but GLM API does
+      static glm::vec3 position(0.f), scale(1.f), skew(1.f);
+      static glm::quat rotation(1.f, 0.f, 0.f, 0.f);
+      static glm::vec4 perspective(1.f);
+      glm::decompose(currently_posed, scale, rotation, position, skew,
+                     perspective);
+
+      gltf_node::animation_state& pose = active_bone->pose;
       pose.translation = position;
       pose.rotation = rotation;
       pose.scale = scale;
