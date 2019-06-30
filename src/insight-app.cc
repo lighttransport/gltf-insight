@@ -1184,7 +1184,7 @@ void app::gpu_update_morphed_submesh(
                GLsizeiptr(display_position[submesh_id].size() * sizeof(float)),
                display_position[submesh_id].data(), GL_DYNAMIC_DRAW);
 
-  glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][VBO_layout_position]);
+  glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][VBO_layout_normal]);
   glBufferData(GL_ARRAY_BUFFER,
                GLsizeiptr(display_normal[submesh_id].size() * sizeof(float)),
                display_normal[submesh_id].data(), GL_DYNAMIC_DRAW);
