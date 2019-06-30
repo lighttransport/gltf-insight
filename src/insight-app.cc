@@ -974,6 +974,8 @@ void app::main_loop() {
         material_info_window(dummy_material, loaded_material,
                              &show_material_window);
 
+        bone_display_window(&show_bone_display_window);
+
         editor_light.show_control();
 
         if (show_bone_selector) {

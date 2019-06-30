@@ -81,6 +81,9 @@ void gl_new_frame(GLFWwindow* window, ImVec4 clear_color, int& display_w,
   glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
   glEnable(GL_DEPTH_TEST);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glBlendEquation(GL_FUNC_ADD);
 }
 
 void gl_gui_end_frame(GLFWwindow* window) {
@@ -262,73 +265,102 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
 
         // TODO look up the new "tables" thingy
         ImGui::Columns(2);
-        ImGui::Separator(); ImGui::Text("Frame");
-        ImGui::NextColumn(); ImGui::Text("Weight Value");
-        ImGui::NextColumn(); ImGui::Separator();
+        ImGui::Separator();
+        ImGui::Text("Frame");
+        ImGui::NextColumn();
+        ImGui::Text("Weight Value");
+        ImGui::NextColumn();
+        ImGui::Separator();
         for (auto keyframe : channel.keyframes) {
           {
             ImGui::Text("%d", keyframe.first);
             ImGui::NextColumn();
-                ImGui::Text("%f", double(keyframe.second.motion.weight));
-            ImGui::NextColumn(); ImGui::Separator();
+            ImGui::Text("%f", double(keyframe.second.motion.weight));
+            ImGui::NextColumn();
+            ImGui::Separator();
           }
         }
         ImGui::Columns();
         break;
       case animation::channel::path::translation:
         ImGui::Columns(4);
-        ImGui::Separator(); ImGui::Text("Frame");
-        ImGui::NextColumn(); ImGui::Text("X");
-        ImGui::NextColumn(); ImGui::Text("Y");
-        ImGui::NextColumn(); ImGui::Text("Z");
-        ImGui::NextColumn(); ImGui::Separator();
+        ImGui::Separator();
+        ImGui::Text("Frame");
+        ImGui::NextColumn();
+        ImGui::Text("X");
+        ImGui::NextColumn();
+        ImGui::Text("Y");
+        ImGui::NextColumn();
+        ImGui::Text("Z");
+        ImGui::NextColumn();
+        ImGui::Separator();
         for (auto keyframe : channel.keyframes) {
           ImGui::Text("%d", keyframe.first);
           ImGui::NextColumn();
           auto v = keyframe.second.motion.translation;
           ImGui::Text("%f", double(v.x));
-          ImGui::NextColumn(); ImGui::Text("%f", double(v.y));
-          ImGui::NextColumn(); ImGui::Text("%f", double(v.z));
-          ImGui::NextColumn(); ImGui::Separator();
+          ImGui::NextColumn();
+          ImGui::Text("%f", double(v.y));
+          ImGui::NextColumn();
+          ImGui::Text("%f", double(v.z));
+          ImGui::NextColumn();
+          ImGui::Separator();
         }
         ImGui::Columns();
         break;
       case animation::channel::path::scale:
         ImGui::Columns(4);
-        ImGui::Separator(); ImGui::Text("Frame");
+        ImGui::Separator();
+        ImGui::Text("Frame");
         ImGui::NextColumn();
-        ImGui::Text("X"); ImGui::NextColumn();
-        ImGui::Text("Y"); ImGui::NextColumn();
-        ImGui::Text("Z"); ImGui::NextColumn();
+        ImGui::Text("X");
+        ImGui::NextColumn();
+        ImGui::Text("Y");
+        ImGui::NextColumn();
+        ImGui::Text("Z");
+        ImGui::NextColumn();
         ImGui::Separator();
         for (auto keyframe : channel.keyframes) {
           ImGui::Text("%d", keyframe.first);
           ImGui::NextColumn();
           auto v = keyframe.second.motion.scale;
           ImGui::Text("%f", double(v.x));
-          ImGui::NextColumn(); ImGui::Text("%f", double(v.y));
-          ImGui::NextColumn(); ImGui::Text("%f", double(v.z));
-          ImGui::NextColumn(); ImGui::Separator();
+          ImGui::NextColumn();
+          ImGui::Text("%f", double(v.y));
+          ImGui::NextColumn();
+          ImGui::Text("%f", double(v.z));
+          ImGui::NextColumn();
+          ImGui::Separator();
         }
         ImGui::Columns();
         break;
       case animation::channel::path::rotation:
         ImGui::Columns(5);
-        ImGui::Separator(); ImGui::Text("Frame");
-        ImGui::NextColumn(); ImGui::Text("X");
-        ImGui::NextColumn(); ImGui::Text("Y");
-        ImGui::NextColumn(); ImGui::Text("Z");
-        ImGui::NextColumn(); ImGui::Text("W");
-        ImGui::NextColumn(); ImGui::Separator();
+        ImGui::Separator();
+        ImGui::Text("Frame");
+        ImGui::NextColumn();
+        ImGui::Text("X");
+        ImGui::NextColumn();
+        ImGui::Text("Y");
+        ImGui::NextColumn();
+        ImGui::Text("Z");
+        ImGui::NextColumn();
+        ImGui::Text("W");
+        ImGui::NextColumn();
+        ImGui::Separator();
         for (auto keyframe : channel.keyframes) {
           ImGui::Text("%d", keyframe.first);
           ImGui::NextColumn();
           auto quat = keyframe.second.motion.rotation;
           ImGui::Text("%f", double(quat.x));
-          ImGui::NextColumn(); ImGui::Text("%f", double(quat.y));
-          ImGui::NextColumn(); ImGui::Text("%f", double(quat.z));
-          ImGui::NextColumn(); ImGui::Text("%f", double(quat.w));
-          ImGui::NextColumn(); ImGui::Separator();
+          ImGui::NextColumn();
+          ImGui::Text("%f", double(quat.y));
+          ImGui::NextColumn();
+          ImGui::Text("%f", double(quat.z));
+          ImGui::NextColumn();
+          ImGui::Text("%f", double(quat.w));
+          ImGui::NextColumn();
+          ImGui::Separator();
         }
         ImGui::Columns();
         break;
@@ -364,16 +396,22 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
       }
     }());
 
-    ImGui::Text("Keyframe range : %f, %f [secs]", double(sampler.min_v), double(sampler.max_v));
+    ImGui::Text("Keyframe range : %f, %f [secs]", double(sampler.min_v),
+                double(sampler.max_v));
     ImGui::Text("# of key frames : %zu", sampler.keyframes.size());
 
-    ImGui::Columns(2); ImGui::Text("Frame Number");
-    ImGui::NextColumn(); ImGui::Text("Timestamp");
-    ImGui::NextColumn(); ImGui::Separator();
+    ImGui::Columns(2);
+    ImGui::Text("Frame Number");
+    ImGui::NextColumn();
+    ImGui::Text("Timestamp");
+    ImGui::NextColumn();
+    ImGui::Separator();
     for (auto keyframe : sampler.keyframes) {
       ImGui::Text("%d", keyframe.first);
-      ImGui::NextColumn(); ImGui::Text("%f", double(keyframe.second));
-      ImGui::NextColumn(); ImGui::Separator();
+      ImGui::NextColumn();
+      ImGui::Text("%f", double(keyframe.second));
+      ImGui::NextColumn();
+      ImGui::Separator();
     }
     ImGui::Columns();
   }
@@ -411,23 +449,29 @@ void skinning_data_window(
 
   ImGui::Columns(5);
   ImGui::Text("Vertex Index");
-  ImGui::NextColumn(); ImGui::Text("0");
-  ImGui::NextColumn(); ImGui::Text("1");
-  ImGui::NextColumn(); ImGui::Text("2");
-  ImGui::NextColumn(); ImGui::Text("3");
+  ImGui::NextColumn();
+  ImGui::Text("0");
+  ImGui::NextColumn();
+  ImGui::Text("1");
+  ImGui::NextColumn();
+  ImGui::Text("2");
+  ImGui::NextColumn();
+  ImGui::Text("3");
   ImGui::NextColumn();
   ImGui::Separator();
 
   for (size_t i = 0; i < vertex_count; ++i) {
     ImGui::Text("%zu", i);
-    ImGui::NextColumn(); ImGui::Text("%f * %d", double(weight[i * 4]), joint[i * 4]);
     ImGui::NextColumn();
-        ImGui::Text("%f * %d", double(weight[i * 4 + 1]), joint[i * 4 + 1]);
+    ImGui::Text("%f * %d", double(weight[i * 4]), joint[i * 4]);
     ImGui::NextColumn();
-        ImGui::Text("%f * %d", double(weight[i * 4 + 2]), joint[i * 4 + 2]);
+    ImGui::Text("%f * %d", double(weight[i * 4 + 1]), joint[i * 4 + 1]);
     ImGui::NextColumn();
-        ImGui::Text("%f * %d", double(weight[i * 4 + 3]), joint[i * 4 + 3]);
-    ImGui::NextColumn(); ImGui::Separator();
+    ImGui::Text("%f * %d", double(weight[i * 4 + 2]), joint[i * 4 + 2]);
+    ImGui::NextColumn();
+    ImGui::Text("%f * %d", double(weight[i * 4 + 3]), joint[i * 4 + 3]);
+    ImGui::NextColumn();
+    ImGui::Separator();
   }
   ImGui::Columns();
   ImGui::EndChild();
@@ -447,10 +491,11 @@ void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets,
       else
         name = mesh_skeleton_graph.pose.target_names[size_t(w)];
 
-      ImGui::SliderFloat(
-          name.c_str(), &mesh_skeleton_graph.pose.blend_weights[size_t(w)], 0, 1, "%f");
-      mesh_skeleton_graph.pose.blend_weights[size_t(w)] =
-          glm::clamp(mesh_skeleton_graph.pose.blend_weights[size_t(w)], 0.f, 1.f);
+      ImGui::SliderFloat(name.c_str(),
+                         &mesh_skeleton_graph.pose.blend_weights[size_t(w)], 0,
+                         1, "%f");
+      mesh_skeleton_graph.pose.blend_weights[size_t(w)] = glm::clamp(
+          mesh_skeleton_graph.pose.blend_weights[size_t(w)], 0.f, 1.f);
     }
   }
   ImGui::End();
@@ -500,12 +545,13 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 #endif
 
 #ifdef __APPLE__
-  // create GL3 context. At least 3.2 should be supported on recent mac machines(2009~)
-  // https://support.apple.com/en-us/HT202823
+  // create GL3 context. At least 3.2 should be supported on recent mac
+  // machines(2009~) https://support.apple.com/en-us/HT202823
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // It looks this is important on macOS.
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
+                 GL_TRUE);  // It looks this is important on macOS.
 #else
   glfwWindowHint(GLFW_SAMPLES, 16);
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
@@ -907,9 +953,9 @@ void about_window(GLuint logo, bool* open) {
   ImGui::End();
 }
 
-void material_info_window(
-    gltf_insight::material& dummy,
-    std::vector<gltf_insight::material>& loaded_materials, bool* open) {
+void material_info_window(gltf_insight::material& dummy,
+                          std::vector<gltf_insight::material>& loaded_materials,
+                          bool* open) {
   static constexpr int tsize = 128;
   if (open && !*open) return;
   if (ImGui::Begin("Materials", open)) {
@@ -921,8 +967,8 @@ void material_info_window(
     index = glm::clamp(index, -1, int(loaded_materials.size()) - 1);
 
     auto& selected = index != -1 && (index < int(loaded_materials.size()))
-                               ? loaded_materials[size_t(index)]
-                               : dummy;
+                         ? loaded_materials[size_t(index)]
+                         : dummy;
 
     ImGui::Text("Name: %s", selected.name.c_str());
     ImGui::Text("Type: %s",
@@ -961,8 +1007,7 @@ void material_info_window(
                        "Shader specific data:");
     switch (selected.intended_shader) {
       case gltf_insight::shading_type::pbr_metal_rough: {
-        auto& pbr_metal_rough =
-            selected.shader_inputs.pbr_metal_roughness;
+        auto& pbr_metal_rough = selected.shader_inputs.pbr_metal_roughness;
         ImGui::Columns(2);
         ImGui::ColorEdit4(
             "Base Color Factor",
@@ -994,8 +1039,7 @@ void material_info_window(
       case gltf_insight::shading_type::unlit: {
         auto& unlit = selected.shader_inputs.unlit;
         ImGui::ColorEdit4(
-            "Base Color Factor",
-            glm::value_ptr(unlit.base_color_factor),
+            "Base Color Factor", glm::value_ptr(unlit.base_color_factor),
             ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoPicker);
         ImGui::Image(ImTextureID(size_t(unlit.base_color_texture)),
                      ImVec2(2 * tsize, 2 * tsize));
@@ -1081,8 +1125,8 @@ GLuint load_gltf_insight_icon() {
   int w, h, c;
   stbi_uc* data = nullptr;
   GLuint gl_image;
-  data = stbi_load_from_memory(gltf_insight_256_png, int(gltf_insight_256_png_len),
-                               &w, &h, &c, 4);
+  data = stbi_load_from_memory(gltf_insight_256_png,
+                               int(gltf_insight_256_png_len), &w, &h, &c, 4);
 
   if (!data) {
     throw std::runtime_error("Could not load gltf-insight logo!");

@@ -259,13 +259,14 @@ void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
     glUniformMatrix4fv(glGetUniformLocation(shader, "mvp"), 1, GL_FALSE,
                        glm::value_ptr(mvp));
 
-    for (auto child : joint_node->children)
-      if (child->type == gltf_node::node_type::bone) {
-        draw_line(shader, glm::vec3(0.f), child->local_xform[3],
-                  (is_active ? glm::vec4(1.f, .5f, .5f, 1.f)
-                             : glm::vec4(0.f, .5f, .5f, 1.f)),
-                  8);
-      }
+    if (draw_bone_segment)
+      for (auto child : joint_node->children)
+        if (child->type == gltf_node::node_type::bone) {
+          draw_line(shader, glm::vec3(0.f), child->local_xform[3],
+                    (is_active ? glm::vec4(1.f, .5f, .5f, 1.f)
+                               : glm::vec4(0.f, .5f, .5f, 1.f)),
+                    8);
+        }
 
     if (draw_childless_bone_extension && joint_node->children.empty()) {
       draw_line(shader, glm::vec3(0.f),

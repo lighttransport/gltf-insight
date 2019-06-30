@@ -20,11 +20,22 @@ uniform float alpha_cutoff;
 
 void main()
 {
-  vec4 color = interpolated_colors * base_color_factor * texture(base_color_texture, interpolated_uv);
+  vec4 color = base_color_factor * texture(base_color_texture, interpolated_uv);
+  if(interpolated_colors != vec4(0))
+  color *= interpolated_colors;
 
   if(alpha_mode == ALPHA_MASK)
   {
 	if(color.a < alpha_cutoff)
+	{
+		discard;
+	}
+  }
+
+  //slight blend optimization
+  if(alpha_mode == ALPHA_BLEND)
+  {
+	if(color.a < 0.01)
 	{
 		discard;
 	}
