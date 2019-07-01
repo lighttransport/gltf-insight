@@ -53,14 +53,25 @@ shader::shader(const char* shader_name, const char* vertex_shader_source_code,
   const GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
   program_ = glCreateProgram();
 
-  // Load source code
-  glShaderSource(vertex_shader, 1,
-                 static_cast<const GLchar* const*>(&vertex_shader_source_code),
-                 nullptr);
+#ifdef __EMSCRIPTEN__
+  const std::string shader_preamble =
+      "#version 300 es\nprecision mediump float;\n";
+#else
+  const std::string shader_preamble = "#version 330\n";
+#endif
 
-  glShaderSource(
-      fragment_shader, 1,
-      static_cast<const GLchar* const*>(&fragment_shader_source_code), nullptr);
+  // prepend version header
+  std::string vtx_source =
+      shader_preamble + std::string(vertex_shader_source_code);
+  std::string frag_source =
+      shader_preamble + std::string(fragment_shader_source_code);
+  const GLchar* vtx_source_ptrs[1] = {vtx_source.c_str()};
+  const GLchar* frag_source_ptrs[1] = {frag_source.c_str()};
+
+  // Load source code
+  glShaderSource(vertex_shader, 1, vtx_source_ptrs, nullptr);
+
+  glShaderSource(fragment_shader, 1, frag_source_ptrs, nullptr);
 
   // Compile shader
   GLint success = 0;

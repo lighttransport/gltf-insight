@@ -1,5 +1,3 @@
-#version 330
-
 out vec4 output_color;
 in vec4 interpolated_colors;
 

@@ -1,5 +1,3 @@
-#version 330
-
 #define ALPHA_OPAQUE 0
 #define ALPHA_MASK 1
 #define ALPHA_BLEND 2
@@ -205,7 +203,7 @@ void main()
 	//surface reflectance
 	float reflectance = max(max(specular_color.r, specular_color.g), specular_color.b);
 
-	float reflectance90 = clamp(reflectance * 25, 0.0, 1.0);
+	float reflectance90 = clamp(reflectance * 25.0f, 0.0f, 1.f);
 	vec3 specular_env_r0 = specular_color.rgb;
 	vec3 specular_env_r90 =  vec3(1.0f, 1.0f, 1.0f) * reflectance90;
 
@@ -243,7 +241,7 @@ void main()
 	float G = geometric_occlusion(pbr_inputs);
 	float D = microfaced_distribution(pbr_inputs);
 
-	vec3 diffuse_contribution = (1.0 - F) * diffuse(pbr_inputs);
+	vec3 diffuse_contribution = (1.0f - F) * diffuse(pbr_inputs);
 	vec3 sepcular_contribution = F * G * D / (4.0f * n_dot_l * n_dot_v);
 	vec3 color = n_dot_l * light_color * (diffuse_contribution + sepcular_contribution);
 

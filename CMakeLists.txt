@@ -252,7 +252,7 @@ if(EMSCRIPTEN)
   set_target_properties(${BUILD_TARGET} PROPERTIES SUFFIX ".html")
   target_compile_definitions(${BUILD_TARGET} PUBLIC -DEMSCRIPTEN=1)
   file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/gltf-samples DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
-  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "--emrun -s ALLOW_MEMORY_GROWTH=1 -s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1  -s ERROR_ON_MISSING_LIBRARIES=0 -s ERROR_ON_UNDEFINED_SYMBOLS=0 --preload-file gltf-samples")
+  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "--emrun --no-heap-copy -s ALLOW_MEMORY_GROWTH=1 -s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1 -s ERROR_ON_MISSING_LIBRARIES=0 -s ERROR_ON_UNDEFINED_SYMBOLS=0 --preload-file gltf-samples")
 endif()
 
 target_link_libraries(

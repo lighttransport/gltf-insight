@@ -8,6 +8,8 @@ For example, you can display and tweak animation prameters this tool(since glTF 
 
 `gltf-insight` also could be another reference viewer for glTF animation and PBR shading.
 
+More to say, `gltf-insight` also could be used for playground and reference implementation for your glTF extension.
+
 `gltf-insight` uses [TinyGLTF](https://github.com/syoyo/tinygltf) for load/save glTF model and ImGUI for GUI.
 
 

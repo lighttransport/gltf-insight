@@ -1,5 +1,3 @@
-#version 330
-
 out vec4 output_color;
 uniform vec4 debug_color;
 

@@ -1,5 +1,3 @@
-#version 330
-
 in vec2 interpolated_uv;
 uniform sampler2D emissive_texture;
 uniform vec3 emissive_factor;

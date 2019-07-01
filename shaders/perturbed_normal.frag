@@ -1,5 +1,3 @@
-#version 330
-
 in vec2 interpolated_uv;
 in vec3 interpolated_normal;
 in vec3 fragment_world_position;

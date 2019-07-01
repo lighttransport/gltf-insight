@@ -1,5 +1,3 @@
-#version 330
-
 in vec2 interpolated_uv;
 uniform sampler2D base_color_texture;
 uniform vec4  base_color_factor;
