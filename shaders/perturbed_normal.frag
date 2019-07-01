@@ -2,10 +2,11 @@
 
 in vec2 interpolated_uv;
 in vec3 interpolated_normal;
-in vec3 camera_position;
 in vec3 fragment_world_position;
 
 uniform sampler2D normal_texture;
+uniform vec3 camera_position;
+
 out vec4 output_color;
 
 mat3 cotangent_frame(vec3 N, vec3 p, vec2 uv)
