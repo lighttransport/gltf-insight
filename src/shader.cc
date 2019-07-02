@@ -110,7 +110,7 @@ void shader::set_uniform(const char* name, const float value) const {
 
   const auto location = glGetUniformLocation(program_, name);
   if (location != -1) glUniform1f(location, value);
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(UNIFORM_DEBUG_VERBOSE) && (defined(DEBUG) || defined(_DEBUG))
   else
     std::cerr << "Warn: uniform " << name << " cannot be set in shader "
               << shader_name_ << "\n";
@@ -122,7 +122,7 @@ void shader::set_uniform(const char* name, const int value) const {
 
   const auto location = glGetUniformLocation(program_, name);
   if (location != -1) glUniform1i(location, value);
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(UNIFORM_DEBUG_VERBOSE) && (defined(DEBUG) || defined(_DEBUG))
   else
     std::cerr << "Warn: uniform " << name << " cannot be set in shader "
               << shader_name_ << "\n";
@@ -134,7 +134,7 @@ void shader::set_uniform(const char* name, const glm::vec4& v) const {
 
   const auto location = glGetUniformLocation(program_, name);
   if (location != -1) glUniform4f(location, v.x, v.y, v.z, v.w);
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(UNIFORM_DEBUG_VERBOSE) && (defined(DEBUG) || defined(_DEBUG))
   else
     std::cerr << "Warn: uniform " << name << " cannot be set in shader "
               << shader_name_ << "\n";
@@ -146,7 +146,7 @@ void shader::set_uniform(const char* name, const glm::vec3& v) const {
 
   const auto location = glGetUniformLocation(program_, name);
   if (location != -1) glUniform3f(location, v.x, v.y, v.z);
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(UNIFORM_DEBUG_VERBOSE) && (defined(DEBUG) || defined(_DEBUG))
   else
     std::cerr << "Warn: uniform " << name << " cannot be set in shader "
               << shader_name_ << "\n";
@@ -159,7 +159,7 @@ void shader::set_uniform(const char* name, const glm::mat4& m) const {
 
   if (location != -1)
     glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(m));
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(UNIFORM_DEBUG_VERBOSE) && (defined(DEBUG) || defined(_DEBUG))
   else
     std::cerr << "Warn: uniform " << name << " cannot be set in shader "
               << shader_name_ << "\n";
@@ -172,7 +172,7 @@ void shader::set_uniform(const char* name, const glm::mat3& m) const {
 
   if (location != -1)
     glUniformMatrix3fv(location, 1, GL_FALSE, glm::value_ptr(m));
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(UNIFORM_DEBUG_VERBOSE) && (defined(DEBUG) || defined(_DEBUG))
   else
     std::cerr << "Warn: uniform " << name << " cannot be set in shader "
               << shader_name_ << "\n";
@@ -188,7 +188,7 @@ void shader::set_uniform(const char* name,
   if (location != -1)
     glUniformMatrix4fv(location, GLsizei(matrices.size()), GL_FALSE,
                        glm::value_ptr(matrices[0]));
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(UNIFORM_DEBUG_VERBOSE) && (defined(DEBUG) || defined(_DEBUG))
   else
     std::cerr << "Warn: uniform " << name << " cannot be set in shader "
               << shader_name_ << "\n";
@@ -204,7 +204,7 @@ void shader::set_uniform(const char* name, size_t number_of_matrices,
   const auto location = glGetUniformLocation(program_, name);
   if (location != -1)
     glUniformMatrix4fv(location, GLsizei(number_of_matrices), GL_FALSE, data);
-#if defined(DEBUG) || defined(_DEBUG)
+#if defined(UNIFORM_DEBUG_VERBOSE) && (defined(DEBUG) || defined(_DEBUG))
   else
     std::cerr << "Warn: uniform " << name << " cannot be set in shader "
               << shader_name_ << "\n";

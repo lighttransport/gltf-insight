@@ -1,4 +1,4 @@
-#version 130
+#version 140
 
 #define ALPHA_OPAQUE 0
 #define ALPHA_MASK 1
@@ -6,13 +6,11 @@
 
 out vec4 output_color;
 
-in vec4 interpolated_colors;
-in vec2 interpolated_uv;
 in vec3 interpolated_normal;
-in vec3 interpolated_tangent;
-in vec3 interpolated_bitangent;
 in vec3 fragment_world_position;
-in mat3 tbn;
+in vec2 interpolated_uv;
+in vec4 interpolated_weights;
+in vec4 interpolated_colors;
 
 //texture maps
 uniform sampler2D normal_texture;
