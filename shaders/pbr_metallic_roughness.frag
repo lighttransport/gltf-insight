@@ -1,4 +1,4 @@
-#version 140
+#version 330
 
 #define ALPHA_OPAQUE 0
 #define ALPHA_MASK 1

@@ -1,4 +1,4 @@
-#version 130
+#version 330
 
 in vec3 interpolated_normal;
 out vec4 output_color;

@@ -640,7 +640,7 @@ void initialize_imgui(GLFWwindow* window) {
 
   // Setup Platform/Renderer bindings
   ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL3_Init("#version 140");
+  ImGui_ImplOpenGL3_Init("#version 330");
 
 #ifndef FORCE_DEFAULT_STYLE
   // Setup Style
