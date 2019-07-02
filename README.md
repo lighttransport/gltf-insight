@@ -23,7 +23,7 @@ general:
 
 material:
  - [x] `KHR_materials_unlit`
- - [ ] `KHR_materials_pbrSpecularGlossiness`
+ - [ ] `KHR_materials_pbrSpecularGlossiness` (**TODO** only suport fallback to metal_roughness ATM. Dedicated shader needed)
  - [ ] `KHR_texture_transform`
 
 
@@ -38,7 +38,7 @@ Latest coninious build are available for [**Linux** (AppImage)](https://github.c
 * CMake 3.5 or later
 * C++11 compiler
   * clang: 3.9 or later
-* OpenGL 3.0
+* OpenGL 3.3
 
 ## Supported platforms
 
@@ -76,7 +76,7 @@ git submodule update --init --recursive
 ```
 ## Build
 
-In the genral case, just run CMake to generate a build system for your own environemnet
+In the genral case, just run CMake to generate a build system for your own environment. Some scripst are provided to facilitate the setup.
 
 ### Windows + Visual Studio 2017
 
