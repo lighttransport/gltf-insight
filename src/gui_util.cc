@@ -545,15 +545,6 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
 
-#ifdef __APPLE__
-  // create GL3 context. At least 3.2 should be supported on recent mac
-  // machines(2009~) https://support.apple.com/en-us/HT202823
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
-                 GL_TRUE);  // It looks this is important on macOS.
-#else
   // Create GL 3.3 context
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -561,9 +552,9 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
 
   // still want compatibility with old OpenGL
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
-
-#endif
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
+                 GL_FALSE);  // It looks this is important on macOS.
 
   window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
   glfwMakeContextCurrent(window);

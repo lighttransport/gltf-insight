@@ -31,9 +31,9 @@ SOFTWARE.
 #include "gl_util.hh"
 #include "tiny_gltf_util.h"
 
-static bool draw_joint_point = true;
-static bool draw_bone_segment = true;
-static bool draw_childless_bone_extension = true;
+static bool draw_joint_point = false;
+static bool draw_bone_segment = false;
+static bool draw_childless_bone_extension = false;
 static bool draw_mesh_anchor_point = false;
 static bool draw_bone_axes = false;
 
@@ -348,13 +348,18 @@ int find_skeleton_root(const tinygltf::Model& model,
 #include <imgui.h>
 void bone_display_window(bool* open) {
   if (open && !*open) return;
+
   if (ImGui::Begin("Skeleton drawing options", open)) {
+    ImGui::TextColored(ImVec4(1, 0, 0, 1),
+                       "TODO: rewrite bone display in modern opengl!!!!");
+#if 0
     ImGui::Checkbox("Draw joint points", &draw_joint_point);
     ImGui::Checkbox("Draw Bone as segments", &draw_bone_segment);
     ImGui::Checkbox("Draw childless joint extnesion",
                     &draw_childless_bone_extension);
     ImGui::Checkbox("Draw Bone's base axes", &draw_bone_axes);
     ImGui::Checkbox("Draw Skeleton's Mesh base", &draw_mesh_anchor_point);
+#endif
   }
   ImGui::End();
 }
