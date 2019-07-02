@@ -259,6 +259,7 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
         case animation::channel::path::not_assigned:
           return "ERROR";
       }
+      return "ERROR";
     }());
 
     switch (channel.mode) {
@@ -395,6 +396,7 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
         case animation::sampler::interpolation::not_assigned:
           return "ERROR";
       }
+      return "ERROR";
     }());
 
     ImGui::Text("Keyframe range : %f, %f [secs]", double(sampler.min_v),
@@ -571,11 +573,8 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
     exit(EXIT_FAILURE);
   }
 
-  if (((GLVersion.major == 2) && (GLVersion.minor >= 1)) ||
-      ((GLVersion.major >= 3) && (GLVersion.minor >= 2))) {
-    // ok
-  } else {
-    std::cerr << "OpenGL 2.1 is not available." << std::endl;
+  if (!((GLVersion.major >= 3) && (GLVersion.minor >= 3))) {
+    std::cerr << "OpenGL 3.3 is not available." << std::endl;
     exit(EXIT_FAILURE);
   }
 
