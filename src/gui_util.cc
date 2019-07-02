@@ -554,6 +554,9 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
                  GL_TRUE);  // It looks this is important on macOS.
 #else
+  // Create GL 3.3 context
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_SAMPLES, 16);
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
 #endif
@@ -574,7 +577,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   }
 
   if (((GLVersion.major == 2) && (GLVersion.minor >= 1)) ||
-      (GLVersion.major >= 3)) {
+      ((GLVersion.major >= 3) && (GLVersion.minor >= 2))) {
     // ok
   } else {
     std::cerr << "OpenGL 2.1 is not available." << std::endl;
