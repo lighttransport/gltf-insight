@@ -559,6 +559,10 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_SAMPLES, 16);
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
+
+  // still want compatibility with old OpenGL
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+
 #endif
 
   window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
