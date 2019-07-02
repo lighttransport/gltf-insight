@@ -1,6 +1,5 @@
-#version 130
+#version 140
 #extension GL_ARB_explicit_attrib_location : require
-#extension GL_ARB_gpu_shader5 : enable
 
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
@@ -68,8 +67,8 @@ vec4 weight_color()
   return vec4(color, 1);
 }
 
+/*
 #ifndef GL_ARB_gpu_shader5
-
 mat4 inverse(mat4 m)
 {
   float
@@ -112,6 +111,7 @@ mat4 inverse(mat4 m)
       a20 * b03 - a21 * b01 + a22 * b00) / det;
 }
 #endif
+*/
 
 void main()
 {
