@@ -1,10 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 
-message(STATUS "Running on ${CMAKE_SYSTEM_NAME}")
-if(CMAKE_CROSSCOMPILING)
-  message(STATUS "currently running with a cross compiler")
-  else()
-  message(STATUS "we are compiling for the native platform")
+if(EMSCRIPTEN)
+	message(STATUS "emscriptem platform detected")
 endif()
 
 set(BUILD_TARGET "gltf-insight")
@@ -76,13 +73,18 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/dep
 list(APPEND UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad.c)
 
 # [glfw]
-set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "" FORCE)
-set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "" FORCE)
-set(GLFW_INSTALL OFF CACHE INTERNAL "" FORCE)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include)
-list(APPEND EXT_LIBRARIES glfw)
+if(NOT EMSCRIPTEN)
+ set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "" FORCE)
+ set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "" FORCE)
+ set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "" FORCE)
+ set(GLFW_INSTALL OFF CACHE INTERNAL "" FORCE)
+ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw)
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include)
+ list(APPEND EXT_LIBRARIES glfw)
+else()
+ message(STATUS "skipping includion of GLFW subdir. Will ask emcc to USE_GLFW=3")
+endif()
+
 
 # [glm]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glm)
@@ -178,11 +180,7 @@ IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 ENDIF ()
 
 #find xxd's executable
-if(WIN32)
-  set(SHADER_PACKER ${CMAKE_CURRENT_SOURCE_DIR}/bin/xxd.exe)
-else()
-  set(SHADER_PACKER xxd) #this should be installed on any decent
-endif()
+find_program(SHADER_PACKER xxd /usr/bin /usr/local/bin /bin ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 #Iterate over every shader file
 foreach(INPUT_FILE ${SHADER})
@@ -219,7 +217,11 @@ add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER}
 
 
 add_definitions( -DIMGUI_IMPL_OPENGL_LOADER_GLAD)
-target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
+target_include_directories(${BUILD_TARGET} PRIVATE 
+	${CMAKE_CURRENT_SOURCE_DIR}/src/ 
+	${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include
+	)
+
 add_sanitizers(${BUILD_TARGET})
 
 
@@ -227,6 +229,11 @@ if(APPLE)
   list(APPEND EXT_LIBRARIES "-framework Cocoa")
   list(APPEND EXT_LIBRARIES	"-framework CoreFoundation" )
   list(APPEND EXT_LIBRARIES	"-framework ApplicationServices")
+endif()
+if(EMSCRIPTEN)
+  message(STATUS "configuring ${BUILD_TARGET} for emscripten GLFW3 port")
+  target_compile_definitions(${BUILD_TARGET} PUBLIC -DEMSCRIPTEN=1)
+  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "-s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1")
 endif()
 
 target_link_libraries(
