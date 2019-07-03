@@ -11,7 +11,6 @@ For example, you can display and tweak animation prameters this tool(since glTF 
 `gltf-insight` uses [TinyGLTF](https://github.com/syoyo/tinygltf) for load/save glTF model and ImGUI for GUI.
 
 
-
 ## Status
 
 Work-in-progress.
@@ -113,6 +112,26 @@ You can use cmake3 package and You may need to install a few dependencies :
 
 ```bash
 sudo yum install git cmake3 libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel
+```
+
+## Emscripten (WebGL version)
+
+This program is buildable as a WebAssembly WebGL 2.0 application using Emscripten.
+
+You will need to install the latest `emsdk` tools. Then in a shell in the emscriten environement. Windows users will need GNU Mac. You can get Minimal GNU for Windows via emsdk:
+
+```cmd
+emsdk install mingw-4.6.2-32bit
+emsdk activate mingw-4.6.2-32bit
+```
+
+Then, you can use emscriptem's emcmake wrapper to easilly tell CMake to build with emscriptem:
+
+```sh
+mkdir build
+cd build
+emcmake cmake ..
+cmake --build .
 ```
 
 ## TODO
