@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.5)
 
+message(STATUS "Running on ${CMAKE_SYSTEM_NAME}")
+if(CMAKE_CROSSCOMPILING)
+  message(STATUS "currently running with a cross compiler")
+  else()
+  message(STATUS "we are compiling for the native platform")
+endif()
+
 set(BUILD_TARGET "gltf-insight")
 
 set(BUILD_VERSION_MAJOR 0)
@@ -31,9 +38,11 @@ if(MSVC)
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
 endif(MSVC)
 
+
 find_package(OpenGL REQUIRED)
 # OpenGL
 include_directories(${OPENGL_INCLUDE_DIR})
+
 
 # [ccache]
 if (GLTF_INSIGHT_USE_CCACHE)
