@@ -631,7 +631,6 @@ app::~app() {
 
 void app::run_file_menu() {
   if (ImGui::BeginMenu("File")) {
-    // TODO use ImGuiFileDialog
     if (ImGui::MenuItem("Open glTF...")) {
       open_file_dialog = true;
     }
@@ -882,8 +881,16 @@ void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
   }
 }
 
-void app::main_loop() {
-  while (!glfwWindowShouldClose(window)) {
+void app::main_loop()
+{
+  bool status = true;
+  while(status)
+  {
+    status = main_loop_frame();
+  }
+}
+
+bool app::main_loop_frame() {
     {
       // GUI
       gui_new_frame();
@@ -908,6 +915,7 @@ void app::main_loop() {
         ImGui::ShowDemoWindow(&show_imgui_demo);
       }
 
+#ifndef __EMSCRIPTEN__
       if (open_file_dialog) {
         if (ImGuiFileDialog::Instance()->FileDialog(
                 "Open glTF...", ".gltf\0.glb\0.vrm\0.*\0\0")) {
@@ -953,7 +961,7 @@ void app::main_loop() {
           save_file_dialog = false;
         }
       }
-
+#endif
       camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
 
       if (asset_loaded) {
@@ -1063,7 +1071,7 @@ void app::main_loop() {
     }
     // Render all ImGui, then swap buffers
     gl_gui_end_frame(window);
-  }
+    return !glfwWindowShouldClose(window);
 }
 
 // Private methods here :

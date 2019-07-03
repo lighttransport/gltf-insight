@@ -155,6 +155,8 @@ class app {
   void load();
   void main_loop();
 
+  bool main_loop_frame();
+
   static void open_url(std::string url);
 
  private:

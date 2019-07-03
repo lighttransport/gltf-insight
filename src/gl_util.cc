@@ -21,7 +21,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
+#ifdef __EMSCRIPTEN__
+#include <GLES3/gl3.h>
+#endif
 #include "gl_util.hh"
+
 
 #include <cstring>
 #include <iostream>
@@ -118,13 +123,15 @@ void draw_space_origin_point(float point_size, GLuint shader,
   glUniform4f(glGetUniformLocation(shader, "debug_color"), color.r, color.g,
               color.b, color.a);
   // set the size
-  glPointSize(point_size);
 
   // Since we're not even drawing a polygon, it's probably simpler to do
   // it with old-style opengl
+  /* 
+  glPointSize(point_size);
   glBegin(GL_POINTS);
   glVertex4f(0, 0, 0, 1);
   glEnd();
+  */
 }
 
 void draw_space_base(GLuint shader, const float line_width,

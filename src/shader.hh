@@ -28,7 +28,13 @@ SOFTWARE.
 #pragma clang diagnostic ignored "-Weverything"
 #endif
 
+
+#ifndef __EMSCRIPTEN__
 #include <glad/glad.h>
+#else
+#include <GLES3/gl3.h>
+#endif
+
 #include "glm/glm.hpp"
 
 #ifdef __clang__

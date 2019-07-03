@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 
 if(EMSCRIPTEN)
-  message(STATUS "Emscripte platform detected. Should use the GLES 3.0 codepath with WebGL")
+  message(STATUS "Emscripten platform detected. Should use the GLES 3.0 codepath with WebGL")
 endif()
 
 #TODO print similar messsages for other platforms
@@ -70,12 +70,13 @@ if (GLTF_INSIGHT_USE_CCACHE)
 endif()
 
 
+
+
+# [glfw]
+if(NOT EMSCRIPTEN) #TODO any GLES 3.0 system, we can include GLES3 directly
 # local glad
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/deps")
 list(APPEND UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad.c)
-
-# [glfw]
-if(NOT EMSCRIPTEN)
  set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "" FORCE)
  set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "" FORCE)
  set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "" FORCE)
@@ -100,20 +101,31 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_draw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_glfw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_opengl3.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_demo.cpp
+	  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_demo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImSequencer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImCurveEdit.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGradient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.h
     )
+
+
 include_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
 	${CMAKE_CURRENT_SOURCE_DIR}/fonts/
 	${CMAKE_CURRENT_SOURCE_DIR}/icons/
 	${CMAKE_CURRENT_SOURCE_DIR}/config/
 )
+
+if(NOT EMSCIRPTEN)
+
+include_directories(
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
+)
+  
+list(APPEND UI_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.h
+)
+endif()
 
 set(CI_BUILD -1)
 if(DEFINED ENV{TRAVIS_COMMIT})
@@ -217,12 +229,16 @@ add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
 )
 
+target_include_directories(
+${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ 
+)
 
+if(NOT EMSCRIPTEN)
 add_definitions( -DIMGUI_IMPL_OPENGL_LOADER_GLAD)
 target_include_directories(${BUILD_TARGET} PRIVATE 
-	${CMAKE_CURRENT_SOURCE_DIR}/src/ 
 	${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include
-	)
+  )
+endif()
 
 add_sanitizers(${BUILD_TARGET})
 
@@ -234,9 +250,10 @@ if(APPLE)
 endif()
 if(EMSCRIPTEN)
   message(STATUS "configuring ${BUILD_TARGET} for emscripten GLFW3 port")
+  #add_definitions("-DGLFW_INCLUDE_ES3")
   set_target_properties(${BUILD_TARGET} PROPERTIES SUFFIX ".html")
   target_compile_definitions(${BUILD_TARGET} PUBLIC -DEMSCRIPTEN=1)
-  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "-s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1 -s ERROR_ON_MISSING_LIBRARIES=0")
+  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "--emrun -s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1  -s ERROR_ON_MISSING_LIBRARIES=0 -s ERROR_ON_UNDEFINED_SYMBOLS=0")
 endif()
 
 target_link_libraries(
