@@ -101,7 +101,7 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_draw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_glfw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/examples/imgui_impl_opengl3.cpp
-	  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_demo.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/imgui_demo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImSequencer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImCurveEdit.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGradient.cpp
@@ -115,7 +115,6 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/config/
 )
 
-if(NOT EMSCIRPTEN)
 
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
@@ -125,7 +124,6 @@ list(APPEND UI_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.h
 )
-endif()
 
 set(CI_BUILD -1)
 if(DEFINED ENV{TRAVIS_COMMIT})
@@ -253,7 +251,8 @@ if(EMSCRIPTEN)
   #add_definitions("-DGLFW_INCLUDE_ES3")
   set_target_properties(${BUILD_TARGET} PROPERTIES SUFFIX ".html")
   target_compile_definitions(${BUILD_TARGET} PUBLIC -DEMSCRIPTEN=1)
-  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "--emrun -s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1  -s ERROR_ON_MISSING_LIBRARIES=0 -s ERROR_ON_UNDEFINED_SYMBOLS=0")
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/gltf-samples DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "--emrun -s ALLOW_MEMORY_GROWTH=1 -s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1  -s ERROR_ON_MISSING_LIBRARIES=0 -s ERROR_ON_UNDEFINED_SYMBOLS=0 --preload-file gltf-samples")
 endif()
 
 target_link_libraries(

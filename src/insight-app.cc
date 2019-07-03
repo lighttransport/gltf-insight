@@ -881,197 +881,193 @@ void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
   }
 }
 
-void app::main_loop()
-{
+void app::main_loop() {
   bool status = true;
-  while(status)
-  {
+  while (status) {
     status = main_loop_frame();
   }
 }
 
 bool app::main_loop_frame() {
-    {
-      // GUI
-      gui_new_frame();
+  {
+    // GUI
+    gui_new_frame();
 
-      static bool about_open = false;
-      run_menubar(about_open);
+    static bool about_open = false;
+    run_menubar(about_open);
 
-      const auto display_size = ImGui::GetIO().DisplaySize;
-      create_transparent_docking_area(
-          ImVec2(0, 20),
-          ImVec2(display_size.x,
-                 !show_timeline
-                     ? display_size.y - 20
-                     : display_size.y - 20 -
-                           std::min(lower_docked_prop_size * display_size.y,
-                                    lower_docked_max_px_size)),
-          "main_dockspace");
+    const auto display_size = ImGui::GetIO().DisplaySize;
+    create_transparent_docking_area(
+        ImVec2(0, 20),
+        ImVec2(display_size.x,
+               !show_timeline
+                   ? display_size.y - 20
+                   : display_size.y - 20 -
+                         std::min(lower_docked_prop_size * display_size.y,
+                                  lower_docked_max_px_size)),
+        "main_dockspace");
 
-      about_window(logo, &about_open);
+    about_window(logo, &about_open);
 
-      if (show_imgui_demo) {
-        ImGui::ShowDemoWindow(&show_imgui_demo);
-      }
+    if (show_imgui_demo) {
+      ImGui::ShowDemoWindow(&show_imgui_demo);
+    }
 
-#ifndef __EMSCRIPTEN__
-      if (open_file_dialog) {
-        if (ImGuiFileDialog::Instance()->FileDialog(
-                "Open glTF...", ".gltf\0.glb\0.vrm\0.*\0\0")) {
-          if (ImGuiFileDialog::Instance()->IsOk) {
+    if (open_file_dialog) {
+      if (ImGuiFileDialog::Instance()->FileDialog(
+              "Open glTF...", ".gltf\0.glb\0.vrm\0.*\0\0")) {
+        if (ImGuiFileDialog::Instance()->IsOk) {
+          unload();
+          input_filename = ImGuiFileDialog::Instance()->GetFilepathName();
+          try {
+            load();
+          } catch (const std::exception& e) {
+            std::cerr << "error occured during loading of " << input_filename
+                      << ": " << e.what() << '\n';
             unload();
-            input_filename = ImGuiFileDialog::Instance()->GetFilepathName();
-            try {
-              load();
-            } catch (const std::exception& e) {
-              std::cerr << "error occured during loading of " << input_filename
-                        << ": " << e.what() << '\n';
-              unload();
-            }
-          } else {
           }
-          open_file_dialog = false;
+        } else {
         }
+        open_file_dialog = false;
       }
-
-      if (save_file_dialog) {
-        if (!asset_loaded)
-          save_file_dialog = false;
-        else if (ImGuiFileDialog::Instance()->FileDialog(
-                     "Save as...", nullptr, true, ".", input_filename)) {
-          if (ImGuiFileDialog::Instance()->IsOk) {
-            auto save_as_filename =
-                ImGuiFileDialog::Instance()->GetFilepathName();
-            try {
-              // Check file path extension for gltf or glb. Fix it if
-              // necessary.
-
-              // check if file exist, if so PROMPT BEFORE OVERWRITE
-
-              // Serialize to file
-
-              throw std::runtime_error("Not implemented yet!");
-            } catch (const std::exception& e) {
-              std::cerr << e.what() << '\n';
-              // display error here
-            }
-          } else {
-          }
-          save_file_dialog = false;
-        }
-      }
-#endif
-      camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
-
-      if (asset_loaded) {
-        // Draw all windows
-        scene_outline_window(gltf_scene_tree, &show_scene_outline_window);
-        model_info_window(model, &show_model_info_window);
-        asset_images_window(textures, &show_asset_image_window);
-        animation_window(animations, &show_animation_window);
-        // skinning_data_window(weights, joints);
-        mesh_display_window(loaded_meshes, &show_mesh_display_window);
-        morph_target_window(gltf_scene_tree,
-                            loaded_meshes.front().nb_morph_targets,
-                            &show_morph_target_window);
-        shader_selector_window(shader_names, selected_shader, shader_to_use,
-                               reinterpret_cast<int&>(current_display_mode),
-                               &show_shader_selector_window);
-
-        material_info_window(dummy_material, loaded_material,
-                             &show_material_window);
-
-        bone_display_window(&show_bone_display_window);
-
-        editor_light.show_control();
-
-        if (show_bone_selector) {
-          if (ImGui::Begin("Bone selector", &show_bone_selector))
-            ImGui::InputInt("Active joint", &active_joint, 1, 1);
-          ImGui::End();
-        }
-
-        active_joint = glm::clamp(active_joint, 0, loaded_meshes[0].nb_joints);
-      }
-
-      // Animation player advances time and apply animation interpolation.
-      // It also display the sequencer timeline and controls on screen
-      run_animation_timeline(sequence, looping, selectedEntry, firstFrame,
-                             expanded, currentFrame, currentPlayTime,
-                             last_frame_time, playing_state, animations);
     }
 
-    {
-      // 3D rendering
-      gl_new_frame(window, viewport_background_color, display_w, display_h);
-      if (display_h && display_w)  // not zero please
-        projection_matrix = glm::perspective(
-            glm::radians(fovy), float(display_w) / float(display_h), z_near,
-            z_far);
+    if (save_file_dialog) {
+      if (!asset_loaded)
+        save_file_dialog = false;
+      else if (ImGuiFileDialog::Instance()->FileDialog(
+                   "Save as...", nullptr, true, ".", input_filename)) {
+        if (ImGuiFileDialog::Instance()->IsOk) {
+          auto save_as_filename =
+              ImGuiFileDialog::Instance()->GetFilepathName();
+          try {
+            // Check file path extension for gltf or glb. Fix it if
+            // necessary.
 
-      run_3D_gizmo(
-          asset_loaded && (active_joint >= 0) &&
-                  (active_joint < int(loaded_meshes[0].flat_joint_list.size()))
-              ? loaded_meshes[0].flat_joint_list[size_t(active_joint)]
-              : nullptr);
+            // check if file exist, if so PROMPT BEFORE OVERWRITE
 
-      update_mesh_skeleton_graph_transforms(gltf_scene_tree);
+            // Serialize to file
 
-      const glm::quat camera_rotation(
-          glm::vec3(glm::radians(gui_parameters.rot_pitch),
-                    glm::radians(gui_parameters.rot_yaw), 0.f));
-      const auto world_camera_position = camera_rotation * camera_position;
-
-      view_matrix = glm::lookAt(world_camera_position, glm::vec3(0.f),
-                                camera_rotation * glm::vec3(0, 1.f, 0));
-
-      if (asset_loaded) {
-        int active_bone_gltf_node = -1;
-        for (auto& a_mesh : loaded_meshes) {
-          if (!a_mesh.displayed) continue;
-
-          if ((active_joint >= 0) &&
-              (active_joint < int(a_mesh.flat_joint_list.size())))
-            active_bone_gltf_node =
-                a_mesh.flat_joint_list[size_t(active_joint)]->gltf_node_index;
-
-          // Calculate all the needed matrices to render the frame, this
-          // includes the "model view projection" that transform the geometry to
-          // the screen space, the normal matrix, and the joint matrix array
-          // that is used to deform the skin with the bones
-          precompute_hardware_skinning_data(
-              gltf_scene_tree, root_node_model_matrix, a_mesh.joint_matrices,
-              a_mesh.flat_joint_list, a_mesh.inverse_bind_matrices);
-
-          // glm::mat4 mvp =
-          //    projection_matrix * view_matrix * root_node_model_matrix;
-          // glm::mat3 normal_matrix =
-          //    glm::transpose(glm::inverse(root_node_model_matrix));
-
-          // glm::mat4 draw_model_matrix = root_node_model_matrix;
-
-          // Draw all of the submeshes of the object
-          for (size_t submesh = 0;
-               submesh < a_mesh.draw_call_descriptors.size(); ++submesh) {
-            perform_software_morphing(gltf_scene_tree, submesh,
-                                      a_mesh.morph_targets, a_mesh.positions,
-                                      a_mesh.normals, a_mesh.display_position,
-                                      a_mesh.display_normals, a_mesh.VBOs);
+            throw std::runtime_error("Not implemented yet!");
+          } catch (const std::exception& e) {
+            std::cerr << e.what() << '\n';
+            // display error here
           }
+        } else {
         }
-
-        draw_scene(world_camera_position);
-
-        for (auto& mesh : loaded_meshes)
-          draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
-                            projection_matrix, *loaded_meshes[0].shader_list,
-                            mesh);
+        save_file_dialog = false;
       }
     }
-    // Render all ImGui, then swap buffers
-    gl_gui_end_frame(window);
-    return !glfwWindowShouldClose(window);
+    camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
+
+    if (asset_loaded) {
+      // Draw all windows
+      scene_outline_window(gltf_scene_tree, &show_scene_outline_window);
+      model_info_window(model, &show_model_info_window);
+      asset_images_window(textures, &show_asset_image_window);
+      animation_window(animations, &show_animation_window);
+      // skinning_data_window(weights, joints);
+      mesh_display_window(loaded_meshes, &show_mesh_display_window);
+      morph_target_window(gltf_scene_tree,
+                          loaded_meshes.front().nb_morph_targets,
+                          &show_morph_target_window);
+      shader_selector_window(shader_names, selected_shader, shader_to_use,
+                             reinterpret_cast<int&>(current_display_mode),
+                             &show_shader_selector_window);
+
+      material_info_window(dummy_material, loaded_material,
+                           &show_material_window);
+
+      bone_display_window(&show_bone_display_window);
+
+      editor_light.show_control();
+
+      if (show_bone_selector) {
+        if (ImGui::Begin("Bone selector", &show_bone_selector))
+          ImGui::InputInt("Active joint", &active_joint, 1, 1);
+        ImGui::End();
+      }
+
+      active_joint = glm::clamp(active_joint, 0, loaded_meshes[0].nb_joints);
+    }
+
+    // Animation player advances time and apply animation interpolation.
+    // It also display the sequencer timeline and controls on screen
+    run_animation_timeline(sequence, looping, selectedEntry, firstFrame,
+                           expanded, currentFrame, currentPlayTime,
+                           last_frame_time, playing_state, animations);
+  }
+
+  {
+    // 3D rendering
+    gl_new_frame(window, viewport_background_color, display_w, display_h);
+    if (display_h && display_w)  // not zero please
+      projection_matrix =
+          glm::perspective(glm::radians(fovy),
+                           float(display_w) / float(display_h), z_near, z_far);
+
+    run_3D_gizmo(
+        asset_loaded && (active_joint >= 0) &&
+                (active_joint < int(loaded_meshes[0].flat_joint_list.size()))
+            ? loaded_meshes[0].flat_joint_list[size_t(active_joint)]
+            : nullptr);
+
+    update_mesh_skeleton_graph_transforms(gltf_scene_tree);
+
+    const glm::quat camera_rotation(
+        glm::vec3(glm::radians(gui_parameters.rot_pitch),
+                  glm::radians(gui_parameters.rot_yaw), 0.f));
+    const auto world_camera_position = camera_rotation * camera_position;
+
+    view_matrix = glm::lookAt(world_camera_position, glm::vec3(0.f),
+                              camera_rotation * glm::vec3(0, 1.f, 0));
+
+    if (asset_loaded) {
+      int active_bone_gltf_node = -1;
+      for (auto& a_mesh : loaded_meshes) {
+        if (!a_mesh.displayed) continue;
+
+        if ((active_joint >= 0) &&
+            (active_joint < int(a_mesh.flat_joint_list.size())))
+          active_bone_gltf_node =
+              a_mesh.flat_joint_list[size_t(active_joint)]->gltf_node_index;
+
+        // Calculate all the needed matrices to render the frame, this
+        // includes the "model view projection" that transform the geometry to
+        // the screen space, the normal matrix, and the joint matrix array
+        // that is used to deform the skin with the bones
+        precompute_hardware_skinning_data(
+            gltf_scene_tree, root_node_model_matrix, a_mesh.joint_matrices,
+            a_mesh.flat_joint_list, a_mesh.inverse_bind_matrices);
+
+        // glm::mat4 mvp =
+        //    projection_matrix * view_matrix * root_node_model_matrix;
+        // glm::mat3 normal_matrix =
+        //    glm::transpose(glm::inverse(root_node_model_matrix));
+
+        // glm::mat4 draw_model_matrix = root_node_model_matrix;
+
+        // Draw all of the submeshes of the object
+        for (size_t submesh = 0; submesh < a_mesh.draw_call_descriptors.size();
+             ++submesh) {
+          perform_software_morphing(gltf_scene_tree, submesh,
+                                    a_mesh.morph_targets, a_mesh.positions,
+                                    a_mesh.normals, a_mesh.display_position,
+                                    a_mesh.display_normals, a_mesh.VBOs);
+        }
+      }
+
+      draw_scene(world_camera_position);
+
+      for (auto& mesh : loaded_meshes)
+        draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
+                          projection_matrix, *loaded_meshes[0].shader_list,
+                          mesh);
+    }
+  }
+  // Render all ImGui, then swap buffers
+  gl_gui_end_frame(window);
+  return !glfwWindowShouldClose(window);
 }
 
 // Private methods here :
