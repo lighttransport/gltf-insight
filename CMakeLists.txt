@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.5)
 
 if(EMSCRIPTEN)
-	message(STATUS "emscriptem platform detected")
+  message(STATUS "Emscripte platform detected. Should use the GLES 3.0 codepath with WebGL")
 endif()
+
+#TODO print similar messsages for other platforms
 
 set(BUILD_TARGET "gltf-insight")
 
@@ -174,7 +176,7 @@ endif()
 # Only apply source files of `gltf-insght`
 # https://stackoverflow.com/questions/13638408/override-compile-flags-for-single-files
 # TODO(LTE): GLOB is not recommended so do not use GLOB to list up source files at `SOURCES`
-IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT EMSCRIPTEN)
   # Assume C++ sources
   set_source_files_properties(${SOURCES} PROPERTIES COMPILE_FLAGS "-Weverything -Wno-system-headers -Werror -Wno-padded -Wno-c++98-compat-pedantic -Wno-documentation -Wno-documentation-unknown-command -Wno-reserved-id-macro")
 ENDIF ()
@@ -232,8 +234,9 @@ if(APPLE)
 endif()
 if(EMSCRIPTEN)
   message(STATUS "configuring ${BUILD_TARGET} for emscripten GLFW3 port")
+  set_target_properties(${BUILD_TARGET} PROPERTIES SUFFIX ".html")
   target_compile_definitions(${BUILD_TARGET} PUBLIC -DEMSCRIPTEN=1)
-  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "-s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1")
+  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "-s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1 -s ERROR_ON_MISSING_LIBRARIES=0")
 endif()
 
 target_link_libraries(
