@@ -120,40 +120,46 @@ void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
 
 void draw_space_origin_point(float point_size, GLuint shader,
                              const glm::vec4& color) {
-  glUniform4f(glGetUniformLocation(shader, "debug_color"), color.r, color.g,
-              color.b, color.a);
+  (void)shader;
+  (void)point_size;
+  (void)color;
+  // glUniform4f(glGetUniformLocation(shader, "debug_color"), color.r, color.g,
+  //            color.b, color.a);
+
   // set the size
 
   // Since we're not even drawing a polygon, it's probably simpler to do
   // it with old-style opengl
-  /* 
-  glPointSize(point_size);
-  glBegin(GL_POINTS);
-  glVertex4f(0, 0, 0, 1);
-  glEnd();
-  */
+
+  // glPointSize(point_size);
+  // glBegin(GL_POINTS);
+  // glVertex4f(0, 0, 0, 1);
+  // glEnd();
 }
 
 void draw_space_base(GLuint shader, const float line_width,
                      const float axis_scale) {
-  glLineWidth(line_width);
-  glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
-  glBegin(GL_LINES);
-  glVertex4f(0, 0, 0, 1);
-  glVertex4f(axis_scale, 0, 0, 1);
-  glEnd();
+  (void)shader;
+  (void)line_width;
+  (void)axis_scale;
+  // glLineWidth(line_width);
+  // glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
+  // glBegin(GL_LINES);
+  // glVertex4f(0, 0, 0, 1);
+  // glVertex4f(axis_scale, 0, 0, 1);
+  // glEnd();
 
-  glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 1, 0, 1);
-  glBegin(GL_LINES);
-  glVertex4f(0, 0, 0, 1);
-  glVertex4f(0, axis_scale, 0, 1);
-  glEnd();
+  // glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 1, 0, 1);
+  // glBegin(GL_LINES);
+  // glVertex4f(0, 0, 0, 1);
+  // glVertex4f(0, axis_scale, 0, 1);
+  // glEnd();
 
-  glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 0, 1, 1);
-  glBegin(GL_LINES);
-  glVertex4f(0, 0, 0, 1);
-  glVertex4f(0, 0, axis_scale, 1);
-  glEnd();
+  // glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 0, 1, 1);
+  // glBegin(GL_LINES);
+  // glVertex4f(0, 0, 0, 1);
+  // glVertex4f(0, 0, axis_scale, 1);
+  // glEnd();
 }
 
 void load_shaders(const size_t nb_joints,

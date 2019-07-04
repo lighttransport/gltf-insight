@@ -222,14 +222,19 @@ std::vector<gltf_mesh_instance> get_list_of_mesh_instances(
 static void draw_line(GLuint shader, const glm::vec3 origin,
                       const glm::vec3 end, const glm::vec4 draw_color,
                       const float line_width) {
-  glUseProgram(shader);
-  glLineWidth(line_width);
-  glUniform4f(glGetUniformLocation(shader, "debug_color"), draw_color.r,
-              draw_color.g, draw_color.b, draw_color.a);
-  glBegin(GL_LINES);
-  glVertex4f(end.x, end.y, end.z, 1);
-  glVertex4f(origin.x, origin.y, origin.z, 1);
-  glEnd();
+  (void)shader;
+  (void)origin;
+  (void)end;
+  (void)draw_color;
+  (void)line_width;
+  // glUseProgram(shader);
+  // glLineWidth(line_width);
+  // glUniform4f(glGetUniformLocation(shader, "debug_color"), draw_color.r,
+  //            draw_color.g, draw_color.b, draw_color.a);
+  // glBegin(GL_LINES);
+  // glVertex4f(end.x, end.y, end.z, 1);
+  // glVertex4f(origin.x, origin.y, origin.z, 1);
+  // glEnd();
 }
 
 #include "insight-app.hh"
