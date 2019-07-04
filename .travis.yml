@@ -22,6 +22,7 @@ matrix:
         - libxinerama-dev 
         - libxcursor-dev 
         - libxi-dev
+        - python
     compiler: clang
     env: COMPILER_VERSION=-3.9 BUILD_TYPE=Release UPLOAD=true APPIMAGE=true
 
@@ -39,6 +40,12 @@ matrix:
 #    compiler: clang
 #    env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
 
+  - os: linux
+    dist: xenial
+    addons: *1
+    env: UPLOAD=false EMSCRIPTEN=true
+    
+    
   - os: osx
     osx_image: xcode10.2
     compiler: clang
@@ -56,7 +63,18 @@ script:
   - ${CC} -v
   - mkdir build
   - cd build
-  - cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+  - if [ "$EMSCRIPTEN" = false ]; then cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ; fi
+  - |
+    if [ "$EMSCRIPTEN" = true ]; then
+      cd ../../
+      git clone https://github.com/emscripten-core/emsdk
+      cd emsdk
+      emsdk install latest
+      emsdk activate latest
+      source ./emsdk_env.sh
+      cd ../gltf-insight/build
+      emcmake cmake ..
+    fi
   - make -j 2
   - |
     if [ "$APPIMAGE" = true ]; then
