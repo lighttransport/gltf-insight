@@ -24,13 +24,13 @@ matrix:
         - libxi-dev
         - python
     compiler: clang
-    env: COMPILER_VERSION=-3.9 BUILD_TYPE=Release UPLOAD=true APPIMAGE=true
+    env: COMPILER_VERSION=-3.9 BUILD_TYPE=Release UPLOAD=true APPIMAGE=true EMSCRIPTEN=false
 
   - os: linux
     dist: xenial
     addons: *1
     compiler: gcc
-    env: COMPILER_VERSION=-4.9 BUILD_TYPE=Release UPLOAD=false
+    env: COMPILER_VERSION=-4.9 BUILD_TYPE=Release UPLOAD=false APPIMAGE=true EMSCRIPTEN=false
 
 # TODO sanitizer builds
 #  - addons: *1
@@ -49,6 +49,7 @@ matrix:
   - os: osx
     osx_image: xcode10.2
     compiler: clang
+    env: UPLOAD=false APPIMAGE=false EMSCRIPTEN=false
 
   
 
