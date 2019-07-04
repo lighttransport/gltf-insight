@@ -23,7 +23,7 @@ matrix:
         - libxcursor-dev 
         - libxi-dev
     compiler: clang
-    env: COMPILER_VERSION=-3.9 BUILD_TYPE=Release UPLOAD=true
+    env: COMPILER_VERSION=-3.9 BUILD_TYPE=Release UPLOAD=true APPIMAGE=true
 
   - os: linux
     dist: xenial
@@ -59,7 +59,7 @@ script:
   - cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
   - make -j 2
   - |
-    if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+    if [ "$APPIMAGE" = true ]; then
      make install DESTDIR=AppDir
      wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
      chmod +x linuxdeploy-x86_64.AppImage
@@ -69,7 +69,7 @@ script:
 after_success:
   - |
     if [ "$TRAVIS_BRANCH" = "devel" ]; then
-     if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+     if [ "$APPIMAGE" = true ]; then
       ls -lh *.AppImage # Assuming you have some files in out/ that you would like to upload
       if [ "$UPLOAD" = true ]; then
        wget -c https://github.com/probonopd/uploadtool/raw/master/upload.sh
