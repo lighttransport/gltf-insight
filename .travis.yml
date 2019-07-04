@@ -69,8 +69,8 @@ script:
       cd ../../
       git clone https://github.com/emscripten-core/emsdk
       cd emsdk
-      emsdk install latest
-      emsdk activate latest
+      ./emsdk install latest
+      ./emsdk activate latest
       source ./emsdk_env.sh
       cd ../gltf-insight/build
       emcmake cmake ..
