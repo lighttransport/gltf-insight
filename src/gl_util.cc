@@ -25,11 +25,10 @@ SOFTWARE.
 #ifdef __EMSCRIPTEN__
 #include <GLES3/gl3.h>
 #endif
-#include "gl_util.hh"
-
-
 #include <cstring>
 #include <iostream>
+
+#include "gl_util.hh"
 
 void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
                    GLsizei length, const GLchar* message, void* userParam) {

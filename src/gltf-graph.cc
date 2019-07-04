@@ -355,8 +355,13 @@ void bone_display_window(bool* open) {
   if (open && !*open) return;
 
   if (ImGui::Begin("Skeleton drawing options", open)) {
+    // TODO (Ybalrid) Fix your draw_point and draw_line routines!
     ImGui::TextColored(ImVec4(1, 0, 0, 1),
                        "TODO: rewrite bone display in modern opengl!!!!");
+
+    // for now, deactivate ALL the bone display modes
+    draw_joint_point = draw_bone_segment = draw_bone_axes =
+        draw_childless_bone_extension = draw_mesh_anchor_point = false;
 #if 0
     ImGui::Checkbox("Draw joint points", &draw_joint_point);
     ImGui::Checkbox("Draw Bone as segments", &draw_bone_segment);
