@@ -780,13 +780,18 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
           shader_to_use = "pbr_metal_rough";
           break;
         case shading_type::pbr_specular_glossy:
-          // TODO(LTE): Implement
-          shader_to_use = "unlit";
-          std::cout << "Warn: unimplemented material shader mode.\n";
+          shader_to_use = "pbr_metal_rough";
+          {
+            static bool first_print = true;
+            if (first_print) {
+              std::cout << "Warn: unimplemented specular_blossy shader mode "
+                           "required.\n";
+              first_print = false;
+            }
+          }
           break;
         case shading_type::unlit:
           shader_to_use = "unlit";
-          std::cout << "Warn: unimplemented material shader mode.\n";
           break;
       }
     }

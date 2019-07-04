@@ -59,7 +59,7 @@ vec4 weight_color()
   if(input_joints.w == float(active_joint))
     color += float_to_rgb(input_weights.w);
 
-  return vec4(color, 1);
+  return vec4(color, 1.0f);
 }
 
 void main()

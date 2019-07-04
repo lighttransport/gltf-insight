@@ -558,6 +558,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
   // glfwWindowHint(GLFW_CONTEXT_CREATION_API , GLFW_EGL_CONTEXT_API);
+  glfwWindowHint(GLFW_SAMPLES, 16);
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
 
 #else
