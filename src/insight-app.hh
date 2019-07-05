@@ -58,12 +58,19 @@ SOFTWARE.
 #pragma clang diagnostic pop
 #endif
 
+#include <fstream>
+#include <iostream>
+#include <sstream>
+
 #include "gltf-graph.hh"
 #include "gltf-loader.hh"
 #include "gui_util.hh"
 #include "shader.hh"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
+
+// last
+#include "tiny_obj_loader.h"
 
 /// Main application class
 namespace gltf_insight {

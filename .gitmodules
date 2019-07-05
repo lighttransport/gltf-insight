@@ -16,3 +16,6 @@
 [submodule "third_party/ImGuiFileDialog"]
 	path = third_party/ImGuiFileDialog
 	url = https://github.com/Ybalrid/ImGuiFileDialog.git
+[submodule "third_party/tinyobjloader"]
+	path = third_party/tinyobjloader
+	url = https://github.com/Ybalrid/tinyobjloader.git
