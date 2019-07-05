@@ -1,18 +1,14 @@
-#version 130
-
 #define ALPHA_OPAQUE 0
 #define ALPHA_MASK 1
 #define ALPHA_BLEND 2
 
 out vec4 output_color;
 
-in vec4 interpolated_colors;
-in vec2 interpolated_uv;
 in vec3 interpolated_normal;
-in vec3 interpolated_tangent;
-in vec3 interpolated_bitangent;
 in vec3 fragment_world_position;
-in mat3 tbn;
+in vec2 interpolated_uv;
+in vec4 interpolated_weights;
+in vec4 interpolated_colors;
 
 //texture maps
 uniform sampler2D normal_texture;
@@ -181,6 +177,7 @@ vec3 get_IBL_contribution(pbr_info pbr_inputs, vec3 n, vec3 reflection)
 
 void main()
 {
+	
 	//sample the base_color texture. //TODO SRGB color space.
 	vec4 base_color = interpolated_colors * base_color_factor * texture(base_color_texture, interpolated_uv);
 
@@ -199,15 +196,16 @@ void main()
 	perceptual_roughness = clamp(roughness_factor * physics_sample.g, min_roughness, 1.0);
 	float alpha_roughness = perceptual_roughness * perceptual_roughness;
 
-	vec3 f0 = vec3(0.04); //frenel factor
-	vec3 diffuse_color = base_color.rgb * (vec3(1.0) - f0); 
-	diffuse_color *= 1.0 - metallic;
+	vec3 f0 = vec3(0.04f); //frenel factor
+	vec3 diffuse_color = base_color.rgb * (vec3(1.0f) - f0); 
+	diffuse_color *= 1.0f - metallic;
 	vec3 specular_color = mix(f0, base_color.rgb, metallic);
+
 
 	//surface reflectance
 	float reflectance = max(max(specular_color.r, specular_color.g), specular_color.b);
 
-	float reflectance90 = clamp(reflectance * 25, 0.0, 1.0);
+	float reflectance90 = clamp(reflectance * 25.0f, 0.0f, 1.f);
 	vec3 specular_env_r0 = specular_color.rgb;
 	vec3 specular_env_r90 =  vec3(1.0f, 1.0f, 1.0f) * reflectance90;
 
@@ -245,15 +243,18 @@ void main()
 	float G = geometric_occlusion(pbr_inputs);
 	float D = microfaced_distribution(pbr_inputs);
 
-	vec3 diffuse_contribution = (1.0 - F) * diffuse(pbr_inputs);
+	vec3 diffuse_contribution = (1.0f - F) * diffuse(pbr_inputs);
 	vec3 sepcular_contribution = F * G * D / (4.0f * n_dot_l * n_dot_v);
 	vec3 color = n_dot_l * light_color * (diffuse_contribution + sepcular_contribution);
 
-	if(use_ibl)
+    /* 
+	//TODO add uniform bool use_ibl;
+	if(use_ibl == true)
 	{
 		color += get_IBL_contribution(pbr_inputs, n, reflection);
 	}
-
+	*/ 
+	
 	//TODO make these tweakable?
 	//Occlusion remove light is small features of the geometry
 	const float occlusion_strength = 1.0f;
@@ -266,5 +267,5 @@ void main()
 		* texture(emissive_texture, interpolated_uv)).rgb;
 	color += emissive;
 
-	output_color = vec4(color, base_color.a);
+	output_color = vec4(color, float(base_color.a));
 }

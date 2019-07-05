@@ -27,7 +27,13 @@ SOFTWARE.
 #include <map>
 #include <string>
 
-#include "glad/glad.h"
+#ifndef __EMSCRIPTEN__
+#include <glad/glad.h>
+#else
+#include "GLFW/glfw3.h"
+#endif
+
+
 #include "material.hh"
 #include "shader.hh"
 

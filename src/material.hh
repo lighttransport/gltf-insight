@@ -29,8 +29,12 @@ SOFTWARE.
 #endif
 
 // include glad first
+#
+#ifndef __EMSCRIPTEN__
 #include <glad/glad.h>
-
+#else
+#include "GLFW/glfw3.h"
+#endif
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 

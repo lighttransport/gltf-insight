@@ -37,7 +37,11 @@ SOFTWARE.
 #include <glm/gtx/quaternion.hpp>
 #include <glm/matrix.hpp>
 
-#include "glad/include/glad/glad.h"
+#ifndef __EMSCRIPTEN__
+#include <glad/glad.h>
+#else
+#include <GLES3/gl3.h>
+#endif
 
 #ifdef __clang__
 #pragma clang diagnostic pop

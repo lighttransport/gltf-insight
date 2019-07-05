@@ -66,6 +66,10 @@ SOFTWARE.
 
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 void gui_new_frame() {
   glfwPollEvents();
   ImGui_ImplOpenGL3_NewFrame();
@@ -103,7 +107,8 @@ void gl_gui_end_frame(GLFWwindow* window) {
 
   frameCount++;
   currentTime = glfwGetTime();
-  if (currentTime - previousTime >= 1.0) {
+  const auto deltaTime = currentTime - previousTime;
+  if (deltaTime >= 1.0) {
     sprintf(title, "glTF Insight GUI [%dFPS]", frameCount);
     glfwSetWindowTitle(window, title);
     frameCount = 0;
@@ -259,6 +264,7 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
         case animation::channel::path::not_assigned:
           return "ERROR";
       }
+      return "ERROR";
     }());
 
     switch (channel.mode) {
@@ -395,6 +401,7 @@ void animation_window(const std::vector<animation>& animations, bool* open) {
         case animation::sampler::interpolation::not_assigned:
           return "ERROR";
       }
+      return "ERROR";
     }());
 
     ImGui::Text("Keyframe range : %f, %f [secs]", double(sampler.min_v),
@@ -545,21 +552,30 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
 #endif
 
-#ifdef __APPLE__
-  // create GL3 context. At least 3.2 should be supported on recent mac
-  // machines(2009~) https://support.apple.com/en-us/HT202823
+#ifdef __EMSCRIPTEN__
+  // Create a GLES 3.0 context
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
-                 GL_TRUE);  // It looks this is important on macOS.
-#else
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+  // glfwWindowHint(GLFW_CONTEXT_CREATION_API , GLFW_EGL_CONTEXT_API);
   glfwWindowHint(GLFW_SAMPLES, 16);
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
-#endif
 
+#else
+  // Create GL 3.3 context
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_SAMPLES, 16);
+  glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
+
+  // still want compatibility with old OpenGL
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
+                 GL_FALSE);  // It looks this is important on macOS.
+#endif
   window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
   glfwMakeContextCurrent(window);
+
 #ifdef __APPLE__
   glfwSwapInterval(1);  // Enable vsync
 #else
@@ -567,21 +583,22 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 #endif
   glfwSetKeyCallback(window, key_callback);
 
-  // glad must be called after glfwMakeContextCurrent()
-  if (!gladLoadGL()) {
-    std::cerr << "Failed to initialize OpenGL context." << std::endl;
+// glad must be called after glfwMakeContextCurrent()
+#ifndef __EMSCRIPTEN__
+  if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(glfwGetProcAddress))) {
+    std::cerr << "Failed to load OpenGL functions with gladLoadGL\n";
     exit(EXIT_FAILURE);
   }
-
-  if (((GLVersion.major == 2) && (GLVersion.minor >= 1)) ||
-      (GLVersion.major >= 3)) {
-    // ok
-  } else {
-    std::cerr << "OpenGL 2.1 is not available." << std::endl;
+  if (!((GLVersion.major >= 3) && (GLVersion.minor >= 3))) {
+    std::cerr << "OpenGL 3.3 is not available." << std::endl;
     exit(EXIT_FAILURE);
   }
-
   std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
+#endif
+
+  std::cout << "GL_VENDOR : " << glGetString(GL_VENDOR) << "\n";
+  std::cout << "GL_RENDERER : " << glGetString(GL_RENDERER) << "\n";
+  std::cout << "GL_VERSION : " << glGetString(GL_VERSION) << "\n";
 
 #ifdef _DEBUG
   glEnable(GL_DEBUG_OUTPUT);
@@ -590,6 +607,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr,
                         GL_TRUE);
 #endif
+
   glEnable(GL_MULTISAMPLE);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -642,7 +660,11 @@ void initialize_imgui(GLFWwindow* window) {
 
   // Setup Platform/Renderer bindings
   ImGui_ImplGlfw_InitForOpenGL(window, true);
-  ImGui_ImplOpenGL3_Init("#version 140");
+#ifndef __EMSCRIPTEN__
+  ImGui_ImplOpenGL3_Init("#version 330");
+#else
+  ImGui_ImplOpenGL3_Init("#version 300 es");
+#endif
 
 #ifndef FORCE_DEFAULT_STYLE
   // Setup Style

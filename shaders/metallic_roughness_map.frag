@@ -1,5 +1,3 @@
-#version 130
-
 in vec2 interpolated_uv;
 uniform sampler2D metallic_roughness_texture;
 uniform float metallic_factor;

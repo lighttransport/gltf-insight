@@ -1,6 +1,3 @@
-#version 130
-#extension GL_ARB_explicit_attrib_location : require
-
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
 layout (location = 2) in vec2 input_uv;
@@ -21,10 +18,10 @@ out vec4 interpolated_weights;
 
 void main()
 {
-  gl_Position = mvp * vec4(input_position, 1.0);
+  gl_Position = mvp * vec4(input_position, 1.0f);
 
   interpolated_normal = normal * input_normal;
-  fragment_world_position = vec3(model * vec4(input_position, 1.0));
+  fragment_world_position = vec3(model * vec4(input_position, 1.0f));
   
   interpolated_uv = input_uv;
   interpolated_weights = input_weights;

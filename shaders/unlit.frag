@@ -1,5 +1,3 @@
-#version 130
-
 in vec2 interpolated_uv;
 in vec3 interpolated_normal;
 in vec4 interpolated_colors;

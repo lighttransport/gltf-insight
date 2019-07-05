@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.5)
 
+if(EMSCRIPTEN)
+  message(STATUS "Emscripten platform detected. Should use the GLES 3.0 codepath with WebGL")
+endif()
+
+#TODO print similar messsages for other platforms
+
 set(BUILD_TARGET "gltf-insight")
 
 set(BUILD_VERSION_MAJOR 0)
@@ -31,9 +37,11 @@ if(MSVC)
   set(CMAKE_C_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
 endif(MSVC)
 
+
 find_package(OpenGL REQUIRED)
 # OpenGL
 include_directories(${OPENGL_INCLUDE_DIR})
+
 
 # [ccache]
 if (GLTF_INSIGHT_USE_CCACHE)
@@ -62,18 +70,24 @@ if (GLTF_INSIGHT_USE_CCACHE)
 endif()
 
 
+
+
+# [glfw]
+if(NOT EMSCRIPTEN) #TODO any GLES 3.0 system, we can include GLES3 directly
 # local glad
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} "${CMAKE_CURRENT_SOURCE_DIR}/deps")
 list(APPEND UI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad.c)
+ set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "" FORCE)
+ set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "" FORCE)
+ set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "" FORCE)
+ set(GLFW_INSTALL OFF CACHE INTERNAL "" FORCE)
+ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw)
+ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include)
+ list(APPEND EXT_LIBRARIES glfw)
+else()
+ message(STATUS "skipping includion of GLFW subdir. Will ask emcc to USE_GLFW=3")
+endif()
 
-# [glfw]
-set(GLFW_BUILD_EXAMPLES OFF CACHE INTERNAL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE INTERNAL "" FORCE)
-set(GLFW_BUILD_DOCS OFF CACHE INTERNAL "" FORCE)
-set(GLFW_INSTALL OFF CACHE INTERNAL "" FORCE)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include)
-list(APPEND EXT_LIBRARIES glfw)
 
 # [glm]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glm)
@@ -92,14 +106,23 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImCurveEdit.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGradient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.h
     )
+
+
 include_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
 	${CMAKE_CURRENT_SOURCE_DIR}/fonts/
 	${CMAKE_CURRENT_SOURCE_DIR}/icons/
 	${CMAKE_CURRENT_SOURCE_DIR}/config/
+)
+
+
+include_directories(
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
+)
+  
+list(APPEND UI_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.h
 )
 
 set(CI_BUILD -1)
@@ -163,17 +186,13 @@ endif()
 # Only apply source files of `gltf-insght`
 # https://stackoverflow.com/questions/13638408/override-compile-flags-for-single-files
 # TODO(LTE): GLOB is not recommended so do not use GLOB to list up source files at `SOURCES`
-IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT EMSCRIPTEN)
   # Assume C++ sources
   set_source_files_properties(${SOURCES} PROPERTIES COMPILE_FLAGS "-Weverything -Wno-system-headers -Werror -Wno-padded -Wno-c++98-compat-pedantic -Wno-documentation -Wno-documentation-unknown-command -Wno-reserved-id-macro")
 ENDIF ()
 
 #find xxd's executable
-if(WIN32)
-  set(SHADER_PACKER ${CMAKE_CURRENT_SOURCE_DIR}/bin/xxd.exe)
-else()
-  set(SHADER_PACKER xxd) #this should be installed on any decent
-endif()
+find_program(SHADER_PACKER xxd /usr/bin /usr/local/bin /bin ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 #Iterate over every shader file
 foreach(INPUT_FILE ${SHADER})
@@ -208,9 +227,17 @@ add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
 )
 
+target_include_directories(
+${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ 
+)
 
+if(NOT EMSCRIPTEN)
 add_definitions( -DIMGUI_IMPL_OPENGL_LOADER_GLAD)
-target_include_directories(${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
+target_include_directories(${BUILD_TARGET} PRIVATE 
+	${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include
+  )
+endif()
+
 add_sanitizers(${BUILD_TARGET})
 
 
@@ -218,6 +245,14 @@ if(APPLE)
   list(APPEND EXT_LIBRARIES "-framework Cocoa")
   list(APPEND EXT_LIBRARIES	"-framework CoreFoundation" )
   list(APPEND EXT_LIBRARIES	"-framework ApplicationServices")
+endif()
+if(EMSCRIPTEN)
+  message(STATUS "configuring ${BUILD_TARGET} for emscripten GLFW3 port")
+  #add_definitions("-DGLFW_INCLUDE_ES3")
+  set_target_properties(${BUILD_TARGET} PROPERTIES SUFFIX ".html")
+  target_compile_definitions(${BUILD_TARGET} PUBLIC -DEMSCRIPTEN=1)
+  file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/gltf-samples DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/)
+  set_target_properties(${BUILD_TARGET} PROPERTIES LINK_FLAGS "--emrun --no-heap-copy -s ALLOW_MEMORY_GROWTH=1 -s USE_GLFW=3 -s USE_WEBGL2=1 -s FULL_ES3=1 -s ERROR_ON_MISSING_LIBRARIES=0 -s ERROR_ON_UNDEFINED_SYMBOLS=0 --preload-file gltf-samples")
 endif()
 
 target_link_libraries(

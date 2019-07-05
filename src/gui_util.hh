@@ -29,8 +29,11 @@ SOFTWARE.
 #endif
 
 // include glad first
-#include "glad/include/glad/glad.h"
-
+#ifndef __EMSCRIPTEN__ //we directly have GLES3
+#include <glad/glad.h>
+#else
+#include <GLES3/gl3.h>
+#endif
 // All head that permit to describe the gui and the data structure used by the
 // program
 

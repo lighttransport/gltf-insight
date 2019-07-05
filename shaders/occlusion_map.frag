@@ -1,5 +1,3 @@
-#version 130
-
 in vec2 interpolated_uv;
 uniform sampler2D occlusion_texture;
 

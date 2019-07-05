@@ -1,5 +1,3 @@
-#version 130
-
 in vec3 fragment_world_position;
 out vec4 output_color;
 

@@ -1,4 +1,3 @@
-#version 130
 
 in vec4 interpolated_weights;
 out vec4 output_color;

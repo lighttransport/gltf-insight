@@ -1,5 +1,3 @@
-#version 130
-
 in vec3 interpolated_normal;
 out vec4 output_color;
 
