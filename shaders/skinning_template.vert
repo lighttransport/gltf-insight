@@ -1,3 +1,5 @@
+//#version 330
+
 layout (location = 0) in vec3 input_position;
 layout (location = 1) in vec3 input_normal;
 layout (location = 2) in vec2 input_uv;
@@ -13,6 +15,7 @@ uniform int active_joint;
 //TODO this array of matrices can represent too much uniform data for some rigging schemes.
 //Should replace this with another skinning method (dual quaternion skinning?) to prevent that.
 uniform mat4 joint_matrix[$nb_joints];
+//uniform mat4 joint_matrix[4];
 
 out vec3 interpolated_normal;
 out vec3 fragment_world_position;
@@ -73,10 +76,11 @@ void main()
   + input_weights.z * joint_matrix[int(input_joints.z)]
   + input_weights.w * joint_matrix[int(input_joints.w)];
 
-  mat4 normal_skin_matrix = transpose(inverse(skin_matrix));
+  mat3 normal_skin_matrix = mat3(transpose(inverse(skin_matrix)));
   gl_Position = mvp * skin_matrix * vec4(input_position, 1.0f);
+  vec3 skinned_normal = normal_skin_matrix * input_normal;
 
-  interpolated_normal = normal * vec3(normal_skin_matrix * vec4(input_normal, 1.0f));
+  interpolated_normal = normal * normalize(skinned_normal);
   fragment_world_position = vec3(model * vec4(input_position, 1.0f));
 
   interpolated_uv = input_uv;

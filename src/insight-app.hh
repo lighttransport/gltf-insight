@@ -107,6 +107,7 @@ struct mesh {
   // load_shader function take templated shader code and substitues values. This
   // is required for the GPU skinning implementation.
   std::unique_ptr<std::map<std::string, shader>> shader_list;
+  std::unique_ptr<std::map<std::string, shader>> soft_skin_shader_list;
 
   // is this mesh displayed on screen
   bool displayed = true;
@@ -148,6 +149,7 @@ class app {
   void run_debug_menu();
   void run_help_menu(bool& about_open);
   void run_menubar(bool& about_open);
+
   void create_transparent_docking_area(ImVec2 pos, ImVec2 size,
                                        std::string name);
 
@@ -155,8 +157,8 @@ class app {
   void load_as_metal_roughness(size_t i, material& currently_loading,
                                tinygltf::Material gltf_material);
   void load();
-  void main_loop();
 
+  void main_loop();
   bool main_loop_frame();
 
   static void open_url(std::string url);
@@ -200,6 +202,7 @@ class app {
   bool show_material_window = true;
   bool show_bone_display_window = true;
   bool show_scene_outline_window = true;
+  bool do_soft_skinning = false;
 
   std::vector<mesh> loaded_meshes;
   std::vector<material> loaded_material;
@@ -261,10 +264,6 @@ class app {
 
   void parse_command_line(int argc, char** argv);
 
-  // void load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,
-  //                     const std::string& input_filename,
-  //                     tinygltf::Model& model);
-
   // Load glTF asset. Initial input filename is given at `parse_command_line`
   void load_glTF_asset();
 
@@ -292,11 +291,21 @@ class app {
   void perform_software_morphing(
       gltf_node mesh_skeleton_graph, size_t submesh_id,
       const std::vector<std::vector<morph_target>>& morph_targets,
-      const std::vector<std::vector<float>>& vertex_coord,
+      const std::vector<std::vector<float>>& positions,
       const std::vector<std::vector<float>>& normals,
       std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
-      std::vector<std::array<GLuint, VBO_count>>& VBOs);
+      std::vector<std::array<GLuint, VBO_count>>& VBOs,
+      bool upload_to_gpu = true);
+
+  void perform_software_skinning(
+      size_t submesh_id, const std::vector<glm::mat4>& joint_matrices,
+      const std::vector<std::vector<float>>& positions,
+      const std::vector<std::vector<float>>& normals,
+      const std::vector<std::vector<unsigned short>>& joints,
+      const std::vector<std::vector<float>>& weights,
+      std::vector<std::vector<float>>& display_position,
+      std::vector<std::vector<float>>& display_normal);
 
   void draw_bone_overlay(gltf_node& mesh_skeleton_graph, int active_joint_node,
                          const glm::mat4& view_matrix,

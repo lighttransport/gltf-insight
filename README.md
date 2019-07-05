@@ -62,7 +62,7 @@ Latest coninious build are available for [**Linux** (AppImage)](https://github.c
 This program can play the animations defined in a glTF asset by the following mean
   * [x] morph - Software blending between any number of morph targets
   * [x] skin - Hardware blending with max **4 joints** attributes per vertex
-  * [ ] skin - Software blending between an arbitrary number of joints per vertex
+  * [x] skin - Software blending (**TODO** in software we could do it between an arbitrary number of joints per vertex)
   * [ ] **TODO** animation editing features
 
 * Data visualization
@@ -150,6 +150,7 @@ cmake --build .
 * [ ] Draco compressed mesh support. https://github.com/google/draco
   * NOTE that Draco fails to compile with gcc4.8(CentOS7 default)
 * [ ] basis_universal texture compression support. https://github.com/binomialLLC/basis_universal
+* [ ] export of morphed/skinned mesh as a simple OBJ file (and as a sequence of OBJs for animations)
 
 ## License
 

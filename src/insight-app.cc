@@ -24,6 +24,7 @@ SOFTWARE.
 #include "insight-app.hh"
 
 // need matrix decomposition for 3D gizmo
+#include "animation.hh"
 #include "glm/gtx/matrix_decompose.hpp"
 
 using namespace gltf_insight;
@@ -365,6 +366,10 @@ void app::load() {
     current_mesh.shader_list = std::unique_ptr<std::map<std::string, shader>>(
         new std::map<std::string, shader>);
 
+    current_mesh.soft_skin_shader_list =
+        std::unique_ptr<std::map<std::string, shader>>(
+            new std::map<std::string, shader>);
+
     current_mesh.morph_targets.resize(nb_submeshes);
     current_mesh.materials.resize(nb_submeshes);
     std::cerr << "loading primitive data:\n";
@@ -452,6 +457,8 @@ void app::load() {
     gltf_scene_tree.pose.target_names = target_names;
 
     load_shaders(size_t(current_mesh.nb_joints), *current_mesh.shader_list);
+    if (current_mesh.skinned)
+      load_shaders(0, *current_mesh.soft_skin_shader_list);
   }
 
   const auto nb_animations = model.animations.size();
@@ -800,10 +807,17 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
     }
 
     material_to_use.bind_textures();
-    material_to_use.set_shader_uniform((*mesh.shader_list)[shader_to_use]);
 
-    update_uniforms(*mesh.shader_list, editor_light.use_ibl,
-                    world_camera_position, editor_light.color,
+    auto& shader_list =
+        (mesh.skinned ? (do_soft_skinning ? *mesh.soft_skin_shader_list
+                                          : *mesh.shader_list)
+                      : *mesh.shader_list);
+
+    const auto& active_shader = shader_list[shader_to_use];
+    active_shader.use();
+    material_to_use.set_shader_uniform(active_shader);
+    update_uniforms(shader_list, editor_light.use_ibl, world_camera_position,
+                    editor_light.color,
                     editor_light.get_directional_light_direction(),
                     active_joint, shader_to_use,
                     projection_matrix * view_matrix * model_matrix,
@@ -851,7 +865,8 @@ void app::draw_scene_recur(const glm::vec3& world_camera_position,
       }
 
     if (!defer) {
-      const auto normal_matrix = glm::transpose(glm::inverse(node.world_xform));
+      const glm::mat3 normal_matrix =
+          glm::transpose(glm::inverse(node.world_xform));
       draw_mesh(world_camera_position, mesh, normal_matrix, node.world_xform);
     } else {
       alpha_models.push_back(node.get_ptr());
@@ -880,7 +895,7 @@ void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
       for (const auto& to_draw : alpha) {
         auto node = to_draw.node;
         const auto& mesh = loaded_meshes[size_t(node->gltf_mesh_id)];
-        const auto normal_matrix =
+        const glm::mat3 normal_matrix =
             glm::transpose(glm::inverse(node->world_xform));
         draw_mesh(world_camera_position, mesh, normal_matrix,
                   node->world_xform);
@@ -1030,6 +1045,15 @@ bool app::main_loop_frame() {
     view_matrix = glm::lookAt(world_camera_position, glm::vec3(0.f),
                               camera_rotation * glm::vec3(0, 1.f, 0));
 
+    bool gpu_dirty = false;
+    if (ImGui::Checkbox("Software skinning", &do_soft_skinning)) {
+      if (!do_soft_skinning)  // if we clicked on this, and we are not doing
+                              // soft skinning anymore, gpu buffer contains
+                              // pre-skinned garbage
+      {
+        gpu_dirty = true;
+      }
+    }
     if (asset_loaded) {
       int active_bone_gltf_node = -1;
       for (auto& a_mesh : loaded_meshes) {
@@ -1056,12 +1080,32 @@ bool app::main_loop_frame() {
         // glm::mat4 draw_model_matrix = root_node_model_matrix;
 
         // Draw all of the submeshes of the object
+
         for (size_t submesh = 0; submesh < a_mesh.draw_call_descriptors.size();
              ++submesh) {
-          perform_software_morphing(gltf_scene_tree, submesh,
-                                    a_mesh.morph_targets, a_mesh.positions,
-                                    a_mesh.normals, a_mesh.display_position,
-                                    a_mesh.display_normals, a_mesh.VBOs);
+          perform_software_morphing(
+              gltf_scene_tree, submesh, a_mesh.morph_targets, a_mesh.positions,
+              a_mesh.normals, a_mesh.display_position, a_mesh.display_normals,
+              a_mesh.VBOs,
+              a_mesh.skinned
+                  ? !do_soft_skinning
+                  : true);  // do not upload to GPU if soft skin is on
+
+          if (a_mesh.skinned) {
+            if (do_soft_skinning) {
+              perform_software_skinning(
+                  submesh, a_mesh.joint_matrices, a_mesh.display_position,
+                  a_mesh.display_normals, a_mesh.joints, a_mesh.weights,
+                  a_mesh.soft_skinned_position, a_mesh.soft_skinned_normals);
+              // now, upload new mesh to GPU
+              gpu_update_morphed_submesh(submesh, a_mesh.soft_skinned_position,
+                                         a_mesh.soft_skinned_normals,
+                                         a_mesh.VBOs);
+            } else if (gpu_dirty) {
+              gpu_update_morphed_submesh(submesh, a_mesh.display_position,
+                                         a_mesh.display_normals, a_mesh.VBOs);
+            }
+          }
         }
       }
 
@@ -1219,7 +1263,7 @@ void app::perform_software_morphing(
     const std::vector<std::vector<float>>& normals,
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<std::array<GLuint, VBO_count>>& VBOs) {
+    std::vector<std::array<GLuint, VBO_count>>& VBOs, bool upload_to_gpu) {
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wexit-time-destructors"
@@ -1281,9 +1325,69 @@ void app::perform_software_morphing(
       }
 
       // Upload the new mesh data to the GPU
-      gpu_update_morphed_submesh(submesh_id, display_position, display_normal,
-                                 VBOs);
+      if (upload_to_gpu)
+        gpu_update_morphed_submesh(submesh_id, display_position, display_normal,
+                                   VBOs);
     }
+  }
+}
+
+void app::perform_software_skinning(
+    size_t submesh_id, const std::vector<glm::mat4>& joint_matrix,
+    const std::vector<std::vector<float>>& positions,
+    const std::vector<std::vector<float>>& normals,
+    const std::vector<std::vector<unsigned short>>& joints,
+    const std::vector<std::vector<float>>& weights,
+    std::vector<std::vector<float>>& display_position,
+    std::vector<std::vector<float>>& display_normal) {
+  // Fetch the arrays for this primitive
+  const auto& prim_positions = positions[submesh_id];
+  const auto& prim_normals = normals[submesh_id];
+  const auto& prim_joints = joints[submesh_id];
+  const auto& prim_weights = weights[submesh_id];
+
+  // We need the data sizes to match for what we do to work
+  const auto vertex_count = prim_joints.size() / 4;
+  assert(prim_positions.size() / 3 == vertex_count &&
+         prim_normals.size() / 3 == vertex_count &&
+         prim_joints.size() / 4 == vertex_count &&
+         prim_weights.size() / 4 == vertex_count);
+
+  for (size_t vertex = 0; vertex < vertex_count; ++vertex) {
+    using namespace glm;
+
+    vec3 output_position, output_normal;
+    auto input_positions =
+        vec3(prim_positions[3 * vertex + 0], prim_positions[3 * vertex + 1],
+             prim_positions[3 * vertex + 2]);
+    auto input_normals =
+        vec3(prim_normals[3 * vertex + 0], prim_normals[3 * vertex + 1],
+             prim_normals[3 * vertex + 2]);
+    auto input_joints =
+        vec4(prim_joints[4 * vertex + 0], prim_joints[4 * vertex + 1],
+             prim_joints[4 * vertex + 2], prim_joints[4 * vertex + 3]);
+    auto input_weights =
+        vec4(prim_weights[4 * vertex + 0], prim_weights[4 * vertex + 1],
+             prim_weights[4 * vertex + 2], prim_weights[4 * vertex + 3]);
+
+    // TODO it is possible to support more than 4 joints per vertex, but not
+    // required by glTF spec
+    const mat4 skin_matrix =
+        input_weights.x * joint_matrix[size_t(input_joints.x)] +
+        input_weights.y * joint_matrix[size_t(input_joints.y)] +
+        input_weights.z * joint_matrix[size_t(input_joints.z)] +
+        input_weights.w * joint_matrix[size_t(input_joints.w)];
+
+    auto skinned_position = skin_matrix * vec4(input_positions, 1.f);
+    auto normal_skin_matrix = mat3(transpose(inverse(skin_matrix)));
+
+    output_position = vec3(skinned_position) / skinned_position.w;
+    output_normal = normal_skin_matrix * input_normals;
+
+    memcpy(&display_position[submesh_id][3 * vertex],
+           value_ptr(output_position), 3 * sizeof(float));
+    memcpy(&display_normal[submesh_id][3 * vertex], value_ptr(output_normal),
+           3 * sizeof(float));
   }
 }
 
