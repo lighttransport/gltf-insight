@@ -16,9 +16,11 @@ uniform mat4 joint_matrix[$nb_joints];
 
 out vec3 interpolated_normal;
 out vec3 fragment_world_position;
+out vec4 interpolated_colors;
+
 out vec2 interpolated_uv;
 out vec4 interpolated_weights;
-out vec4 interpolated_colors;
+
 
 vec3 float_to_rgb(float value)
 {
