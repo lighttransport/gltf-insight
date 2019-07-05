@@ -355,6 +355,9 @@ void app::load() {
     current_mesh.display_position = current_mesh.positions;
     current_mesh.display_normals = current_mesh.normals;
 
+    current_mesh.soft_skinned_position = current_mesh.positions;
+    current_mesh.soft_skinned_normals = current_mesh.normals;
+
     // cleanup opengl state
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

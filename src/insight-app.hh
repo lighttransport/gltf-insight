@@ -92,6 +92,8 @@ struct mesh {
   std::vector<std::vector<float>> weights;
   std::vector<std::vector<float>> display_position;
   std::vector<std::vector<float>> display_normals;
+  std::vector<std::vector<float>> soft_skinned_position;
+  std::vector<std::vector<float>> soft_skinned_normals;
   std::vector<std::vector<float>> colors;
   std::vector<int> materials;
 
