@@ -595,6 +595,85 @@ void editor_lighting::show_control() {
   }
 }
 
+void app::async_worker::ui() {
+  if (!running) return;
+
+  ImGui::OpenPopup("obj_export");
+  if (ImGui::BeginPopup("obj_export")) {
+    ImGui::Text(task_name.c_str());
+    ImGui::ProgressBar(completion_percent);
+    ImGui::EndPopup();
+  }
+}
+
+void app::async_worker::work_for_one_frame() {
+  if (!running) return;
+
+  if (!sequence_to_export) {
+    running = false;
+    return;
+  }
+
+  the_app->playing_state = false;
+  the_app->currentFrame = 0;
+  the_app->currentPlayTime = 0;
+
+  // compute time
+  const auto max_frame = sequence_to_export->GetFrameMax();
+  const auto min_frame = sequence_to_export->GetFrameMin();
+  if (current_export_frame < min_frame) current_export_frame = min_frame;
+  if (current_export_frame > max_frame) {
+    running = false;
+    sequence_to_export = nullptr;
+  }
+  completion_percent =
+      float(current_export_frame - min_frame) / float(max_frame - min_frame);
+  the_app->currentFrame = current_export_frame;
+  auto current_animation_time =
+      double(current_export_frame) / double(ANIMATION_FPS);
+
+  // morph and skin
+  for (auto& anim : the_app->animations) {
+    anim.set_time(current_animation_time);
+    anim.apply_pose();
+  }
+  update_mesh_skeleton_graph_transforms(the_app->gltf_scene_tree);
+  for (auto& mesh : the_app->loaded_meshes) {
+    the_app->compute_joint_matrices(
+        the_app->gltf_scene_tree, the_app->root_node_model_matrix,
+        mesh.joint_matrices, mesh.flat_joint_list, mesh.inverse_bind_matrices);
+    for (size_t sm = 0; sm < mesh.indices.size(); ++sm) {
+      the_app->perform_software_morphing(
+          the_app->gltf_scene_tree, sm, mesh.morph_targets, mesh.positions,
+          mesh.normals, mesh.display_position, mesh.display_normals, mesh.VBOs,
+          false);
+      the_app->perform_software_skinning(
+          sm, mesh.joint_matrices, mesh.display_position, mesh.display_normals,
+          mesh.joints, mesh.weights, mesh.soft_skinned_position,
+          mesh.soft_skinned_normals);
+    }
+  }
+
+  // increment for next call
+  current_export_frame++;
+
+  // export morphed skinned mesh
+  char frame_number_str_with_leading_zeroes[6] = "";
+  sprintf(frame_number_str_with_leading_zeroes, "%05d", current_export_frame);
+  std::string file_name =
+      "./export_obj/" + std::string(frame_number_str_with_leading_zeroes);
+  the_app->write_deformed_meshes_to_obj(file_name);
+}
+
+app::async_worker::async_worker(app* a) : current_export_frame(0), the_app(a) {}
+
+void app::async_worker::setup_new_sequence(AnimSequence* s) {
+  current_export_frame = 0;
+  sequence_to_export = s;
+}
+
+void app::async_worker::start_work() { running = true; }
+
 void app::load_sensible_default_material(material& material) {
   material.name = "dummy_fallback_material";
   material.normal_texture = fallback_textures::pure_flat_normal_map;
@@ -715,6 +794,85 @@ void app::run_view_menu() {
   }
 }
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <string>
+
+#if defined(_WIN32)
+#include <direct.h>
+#endif
+
+void app::write_deformed_meshes_to_obj(const std::string filename) {
+  tinyobj::ObjWriter writer;
+  // just one mesh and one shape for now
+
+  // const auto nb_ws = loaded_meshes[0].uvs[0].size() / 2;
+  // std::vector<float> ws(nb_ws);
+  // std::generate(ws.begin(), ws.end(), [] { return 0; });
+
+  tinyobj::shape_t shape;
+  for (size_t mesh_idx = 0; mesh_idx < loaded_meshes.size(); ++mesh_idx) {
+    shape.name = loaded_meshes[mesh_idx].name;
+
+    int offset = 0;
+    for (size_t submesh_idx = 0;
+         submesh_idx < loaded_meshes[mesh_idx].indices.size(); ++submesh_idx) {
+      writer.attrib_.vertices =
+          loaded_meshes[mesh_idx].soft_skinned_position[submesh_idx];
+      writer.attrib_.normals =
+          loaded_meshes[mesh_idx].soft_skinned_normals[submesh_idx];
+      writer.attrib_.texcoords = loaded_meshes[mesh_idx].uvs[submesh_idx];
+
+      const auto nb_triangles =
+          loaded_meshes[mesh_idx].indices[submesh_idx].size() / 3;
+      shape.mesh.num_face_vertices.resize(nb_triangles);
+      std::generate(shape.mesh.num_face_vertices.begin(),
+                    shape.mesh.num_face_vertices.end(), [] { return 3; });
+
+      for (size_t i = 0;
+           i < loaded_meshes[mesh_idx].indices[submesh_idx].size(); ++i) {
+        tinyobj::index_t index;
+        index.vertex_index =
+            1 + int(loaded_meshes[mesh_idx].indices[submesh_idx][i]) + offset;
+        index.normal_index =
+            1 + int(loaded_meshes[mesh_idx].indices[submesh_idx][i]) + offset;
+        index.texcoord_index =
+            1 + int(loaded_meshes[mesh_idx].indices[submesh_idx][i]) + offset;
+        shape.mesh.indices.push_back(index);
+      }
+
+      offset += loaded_meshes[mesh_idx].indices[submesh_idx].size();
+    }
+    writer.shapes_.push_back(shape);
+  }
+
+  const std::string path_to_last_dir =
+      filename.substr(0, filename.find_last_of("/\\"));
+
+  int nError = 0;
+#if defined(_WIN32)
+  nError = _mkdir(path_to_last_dir.c_str());  // can be used on Windows
+#else
+  mode_t nMode = 0733;  // UNIX style permissions
+  nError =
+      mkdir(path_to_last_dir.c_str(), nMode);  // can be used on non-Windows
+#endif
+  if (nError != 0 && nError != EEXIST) {
+    (void)nError;
+    // handle your error here
+    // std::cerr << "We attempted to create directory " << path_to_last_dir
+    //          << " And there's an error that is not EEXIST\n";
+  }
+
+  if (writer.SaveTofile(filename)) {
+    std::cout << "wrote " << filename << ".obj to disk\n";
+  } else {
+    std::cerr << "ERROR while writing " << filename << "\n";
+    std::cerr << writer.Error() << "\n";
+  }
+}
+
 void app::run_debug_menu() {
   static bool wait_next_frame = false;
   bool write = false;
@@ -731,37 +889,9 @@ void app::run_debug_menu() {
     ImGui::EndMenu();
   }
 
+  const std::string filename = "test";
   if (write) {
-    tinyobj::ObjWriter writer;
-
-    // just one mesh and one shape for now
-
-    writer.attrib_.vertices = loaded_meshes[0].soft_skinned_position[0];
-    writer.attrib_.normals = loaded_meshes[0].soft_skinned_normals[0];
-    writer.attrib_.texcoords = loaded_meshes[0].uvs[0];
-    // const auto nb_ws = loaded_meshes[0].uvs[0].size() / 2;
-    // std::vector<float> ws(nb_ws);
-    // std::generate(ws.begin(), ws.end(), [] { return 0; });
-
-    tinyobj::shape_t shape;
-    shape.name = loaded_meshes[0].name;
-
-    const auto nb_triangles = loaded_meshes[0].indices[0].size() / 3;
-    shape.mesh.num_face_vertices.resize(nb_triangles);
-    std::generate(shape.mesh.num_face_vertices.begin(),
-                  shape.mesh.num_face_vertices.end(), [] { return 3; });
-
-    for (size_t i = 0; i < loaded_meshes[0].indices[0].size(); ++i) {
-      tinyobj::index_t index;
-      index.vertex_index = 1 + loaded_meshes[0].indices[0][i];
-      index.normal_index = 1 + loaded_meshes[0].indices[0][i];
-      index.texcoord_index = 1 + loaded_meshes[0].indices[0][i];
-      shape.mesh.indices.push_back(index);
-    }
-
-    writer.shapes_.push_back(shape);
-
-    writer.SaveTofile("./out");
+    write_deformed_meshes_to_obj(filename);
   }
 }
 
@@ -1059,6 +1189,7 @@ bool app::main_loop_frame() {
 
     // Animation player advances time and apply animation interpolation.
     // It also display the sequencer timeline and controls on screen
+
     run_animation_timeline(sequence, looping, selectedEntry, firstFrame,
                            expanded, currentFrame, currentPlayTime,
                            last_frame_time, playing_state, animations);
@@ -1150,6 +1281,37 @@ bool app::main_loop_frame() {
         draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
                           projection_matrix, *loaded_meshes[0].shader_list,
                           mesh);
+    }
+
+    {
+      ImGui::Begin("OBJ export animation sequence");
+      ImGui::Text("Select an aimation sequence, then hit the RUN button");
+      static int animation_sequence_item = 0;
+      std::vector<std::string> names;
+      for (auto& s : sequence.myItems) names.push_back(s.name);
+      ImGuiCombo("sequence", &animation_sequence_item, names);
+      if (ImGui::Button("RUN")) {
+        // setup the exporter
+        obj_export_worker.setup_new_sequence(&sequence);
+
+        // make sure only the selected animation will play
+        for (int i = 0; i < animations.size(); ++i) {
+          if (animation_sequence_item == i) {
+            animations[i].playing = true;
+          } else {
+            animations[i].playing = false;
+          }
+        }
+
+        // Start the work
+        obj_export_worker.start_work();
+      }
+      ImGui::End();
+
+      // We decouple the work from the render loop (or more true : we spread it
+      // on multiple frames to keep the
+      obj_export_worker.work_for_one_frame();
+      obj_export_worker.ui();
     }
   }
   // Render all ImGui, then swap buffers

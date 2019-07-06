@@ -153,6 +153,7 @@ class app {
   void run_file_menu();
   void run_edit_menu();
   void run_view_menu();
+  void write_deformed_meshes_to_obj(std::string filename);
   void run_debug_menu();
   void run_help_menu(bool& about_open);
   void run_menubar(bool& about_open);
@@ -257,6 +258,24 @@ class app {
   double currentPlayTime = 0;
   double last_frame_time = 0;
   bool playing_state = false;
+
+  struct async_worker {
+    bool running = false;
+    std::string task_name = "exporting sequence to disk...";
+    void ui();
+    void work_for_one_frame();
+    float completion_percent = 0.f;
+
+    AnimSequence* sequence_to_export = nullptr;
+    int current_export_frame;
+
+    void setup_new_sequence(AnimSequence* s);
+    void start_work();
+    app* the_app = nullptr;
+
+    async_worker(app* a);
+
+  } obj_export_worker = this;
 
   GLuint logo = 0;
 
