@@ -320,11 +320,11 @@ class app {
                          std::map<std::string, shader>& shaders,
                          const mesh& a_mesh);
 
-  void precompute_hardware_skinning_data(
-      gltf_node& mesh_skeleton_graph, glm::mat4& model_matrix,
-      std::vector<glm::mat4>& joint_matrices,
-      std::vector<gltf_node*>& flat_joint_list,
-      std::vector<glm::mat4>& inverse_bind_matrices);
+  void compute_joint_matrices(gltf_node& mesh_skeleton_graph,
+                              glm::mat4& model_matrix,
+                              std::vector<glm::mat4>& joint_matrices,
+                              std::vector<gltf_node*>& flat_joint_list,
+                              std::vector<glm::mat4>& inverse_bind_matrices);
 
   void run_animation_timeline(gltf_insight::AnimSequence& sequence,
                               bool& looping, int& selectedEntry,

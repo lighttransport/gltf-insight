@@ -716,9 +716,52 @@ void app::run_view_menu() {
 }
 
 void app::run_debug_menu() {
+  static bool wait_next_frame = false;
+  bool write = false;
   if (ImGui::BeginMenu("DEBUG")) {
     if (ImGui::MenuItem("call unload()")) unload();
+    if (ImGui::MenuItem("save test.obj NOW") || wait_next_frame) {
+      if (!do_soft_skinning) {
+        wait_next_frame = true;
+      } else {
+        wait_next_frame = false;
+        write = true;
+      }
+    }
     ImGui::EndMenu();
+  }
+
+  if (write) {
+    tinyobj::ObjWriter writer;
+
+    // just one mesh and one shape for now
+
+    writer.attrib_.vertices = loaded_meshes[0].soft_skinned_position[0];
+    writer.attrib_.normals = loaded_meshes[0].soft_skinned_normals[0];
+    writer.attrib_.texcoords = loaded_meshes[0].uvs[0];
+    // const auto nb_ws = loaded_meshes[0].uvs[0].size() / 2;
+    // std::vector<float> ws(nb_ws);
+    // std::generate(ws.begin(), ws.end(), [] { return 0; });
+
+    tinyobj::shape_t shape;
+    shape.name = loaded_meshes[0].name;
+
+    const auto nb_triangles = loaded_meshes[0].indices[0].size() / 3;
+    shape.mesh.num_face_vertices.resize(nb_triangles);
+    std::generate(shape.mesh.num_face_vertices.begin(),
+                  shape.mesh.num_face_vertices.end(), [] { return 3; });
+
+    for (size_t i = 0; i < loaded_meshes[0].indices[0].size(); ++i) {
+      tinyobj::index_t index;
+      index.vertex_index = loaded_meshes[0].indices[0][i];
+      index.normal_index = loaded_meshes[0].indices[0][i];
+      index.texcoord_index = loaded_meshes[0].indices[0][i];
+      shape.mesh.indices.push_back(index);
+    }
+
+    writer.shapes_.push_back(shape);
+
+    writer.SaveTofile("./out");
   }
 }
 
@@ -808,12 +851,12 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
 
     material_to_use.bind_textures();
 
-    auto& shader_list =
-        (mesh.skinned ? (do_soft_skinning ? *mesh.soft_skin_shader_list
-                                          : *mesh.shader_list)
-                      : *mesh.shader_list);
+    auto& shader_list = mesh.skinned && do_soft_skinning
+                            ? *mesh.soft_skin_shader_list
+                            : *mesh.shader_list;
 
     const auto& active_shader = shader_list[shader_to_use];
+
     active_shader.use();
     material_to_use.set_shader_uniform(active_shader);
     update_uniforms(shader_list, editor_light.use_ibl, world_camera_position,
@@ -1068,28 +1111,20 @@ bool app::main_loop_frame() {
         // includes the "model view projection" that transform the geometry to
         // the screen space, the normal matrix, and the joint matrix array
         // that is used to deform the skin with the bones
-        precompute_hardware_skinning_data(
-            gltf_scene_tree, root_node_model_matrix, a_mesh.joint_matrices,
-            a_mesh.flat_joint_list, a_mesh.inverse_bind_matrices);
-
-        // glm::mat4 mvp =
-        //    projection_matrix * view_matrix * root_node_model_matrix;
-        // glm::mat3 normal_matrix =
-        //    glm::transpose(glm::inverse(root_node_model_matrix));
-
-        // glm::mat4 draw_model_matrix = root_node_model_matrix;
-
-        // Draw all of the submeshes of the object
+        compute_joint_matrices(gltf_scene_tree, root_node_model_matrix,
+                               a_mesh.joint_matrices, a_mesh.flat_joint_list,
+                               a_mesh.inverse_bind_matrices);
 
         for (size_t submesh = 0; submesh < a_mesh.draw_call_descriptors.size();
              ++submesh) {
-          perform_software_morphing(
-              gltf_scene_tree, submesh, a_mesh.morph_targets, a_mesh.positions,
-              a_mesh.normals, a_mesh.display_position, a_mesh.display_normals,
-              a_mesh.VBOs,
-              a_mesh.skinned
-                  ? !do_soft_skinning
-                  : true);  // do not upload to GPU if soft skin is on
+          if (gltf_scene_tree.pose.blend_weights.size() > 0)
+            perform_software_morphing(
+                gltf_scene_tree, submesh, a_mesh.morph_targets,
+                a_mesh.positions, a_mesh.normals, a_mesh.display_position,
+                a_mesh.display_normals, a_mesh.VBOs,
+                a_mesh.skinned ? !do_soft_skinning : true);
+
+          // do not upload to GPU if soft skin is on
 
           if (a_mesh.skinned) {
             if (do_soft_skinning) {
@@ -1409,7 +1444,7 @@ void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
              _projection_matrix, a_mesh);
 }
 
-void app::precompute_hardware_skinning_data(
+void app::compute_joint_matrices(
     gltf_node& mesh_skeleton_graph, glm::mat4& model_matrix,
     std::vector<glm::mat4>& joint_matrices,
     std::vector<gltf_node*>& flat_joint_list,
