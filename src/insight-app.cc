@@ -753,9 +753,9 @@ void app::run_debug_menu() {
 
     for (size_t i = 0; i < loaded_meshes[0].indices[0].size(); ++i) {
       tinyobj::index_t index;
-      index.vertex_index = loaded_meshes[0].indices[0][i];
-      index.normal_index = loaded_meshes[0].indices[0][i];
-      index.texcoord_index = loaded_meshes[0].indices[0][i];
+      index.vertex_index = 1 + loaded_meshes[0].indices[0][i];
+      index.normal_index = 1 + loaded_meshes[0].indices[0][i];
+      index.texcoord_index = 1 + loaded_meshes[0].indices[0][i];
       shape.mesh.indices.push_back(index);
     }
 
