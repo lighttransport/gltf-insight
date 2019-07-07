@@ -699,13 +699,44 @@ void app::load_sensible_default_material(material& material) {
   material.fill_material_texture_slots();
 }
 
+static void drop_callabck(GLFWwindow *window, int nums, const char **paths)
+{
+  if (nums > 0) {
+    // TODO(LTE): Do we need a lock?
+    gltf_insight::app *app = reinterpret_cast<gltf_insight::app *>(glfwGetWindowUserPointer(window));
+
+    // Use the first one.
+    // TODO(LTE): Search .gltf file from paths.
+
+
+    app->unload();
+    app->set_input_filename(paths[0]);
+
+    std::cout << "D&D filename : " << app->get_input_filename() << "\n";
+
+    try {
+      app->load();
+    } catch (const std::exception& e) {
+      std::cerr << "error occured during loading of " << app->get_input_filename()
+                << ": " << e.what() << '\n';
+      app->unload();
+    }
+  }
+}
+
 app::app(int argc, char** argv) {
   parse_command_line(argc, argv);
 
   initialize_glfw_opengl_window(window);
-  glfwSetWindowUserPointer(window, &gui_parameters);
+  //glfwSetWindowUserPointer(window, &gui_parameters);
+  glfwSetWindowUserPointer(window, this);
   glfwSetMouseButtonCallback(window, mouse_button_callback);
   glfwSetCursorPosCallback(window, cursor_pos_callback);
+
+  // NOTE: We cannot use lambda function with [this] capture, so pass `this` pointer through glfwSetWindowUserPointer.
+  // https://stackoverflow.com/questions/39731561/use-lambda-as-glfwkeyfun
+  glfwSetDropCallback(window, drop_callabck);
+
   initialize_imgui(window);
   (void)ImGui::GetIO();
 

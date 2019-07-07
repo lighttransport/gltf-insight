@@ -171,6 +171,17 @@ class app {
 
   static void open_url(std::string url);
 
+  void set_input_filename(const std::string &filename) {
+    input_filename = filename;
+  }
+
+  std::string get_input_filename() const {
+    return input_filename;
+  }
+
+  // user interface state(changed by glfw callbacks)
+  application_parameters gui_parameters{camera_position};
+
  private:
   void draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
                  glm::mat3 normal_matrix, glm::mat4 model_matrix);
@@ -246,7 +257,6 @@ class app {
   bool show_imgui_demo = false;
   std::string input_filename;
   GLFWwindow* window{nullptr};
-  application_parameters gui_parameters{camera_position};
 
   // Animation sequencer state
   gltf_insight::AnimSequence sequence;
