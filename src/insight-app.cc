@@ -902,11 +902,10 @@ void app::write_deformed_meshes_to_obj(const std::string filename) {
   nError =
       mkdir(path_to_last_dir.c_str(), nMode);  // can be used on non-Windows
 #endif
-  if (nError != 0 && nError != EEXIST) {
+  if (nError != 0 && errno != EEXIST) {
     (void)nError;
-    // handle your error here
-    // std::cerr << "We attempted to create directory " << path_to_last_dir
-    //          << " And there's an error that is not EEXIST\n";
+    std::cerr << "We attempted to create directory " << path_to_last_dir
+              << " And there's an error that is not EEXIST\n";
   }
 
   if (writer.SaveTofile(filename)) {
