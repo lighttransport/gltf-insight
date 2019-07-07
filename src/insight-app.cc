@@ -1406,11 +1406,7 @@ bool app::main_loop_frame() {
 
         // make sure only the selected animation will play
         for (size_t i = 0; i < animations.size(); ++i) {
-          if (animation_sequence_item == size_t(i)) {
-            animations[i].playing = true;
-          } else {
-            animations[i].playing = false;
-          }
+          animations[i].playing = size_t(animation_sequence_item) == i;
         }
 
         // Start the work
