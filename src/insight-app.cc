@@ -642,7 +642,7 @@ void app::async_worker::work_for_one_frame() {
   completion_percent =
       float(current_export_frame - min_frame) / float(max_frame - min_frame);
   the_app->currentFrame = current_export_frame;
-  auto current_animation_time =
+  const float current_animation_time =
       double(current_export_frame) / double(ANIMATION_FPS);
 
   // morph and skin
@@ -1405,7 +1405,7 @@ bool app::main_loop_frame() {
         obj_export_worker.setup_new_sequence(&sequence);
 
         // make sure only the selected animation will play
-        for (int i = 0; i < animations.size(); ++i) {
+        for (size_t i = 0; i < animations.size(); ++i) {
           if (animation_sequence_item == i) {
             animations[i].playing = true;
           } else {
