@@ -643,7 +643,7 @@ void app::async_worker::work_for_one_frame() {
       float(current_export_frame - min_frame) / float(max_frame - min_frame);
   the_app->currentFrame = current_export_frame;
   const float current_animation_time =
-      double(current_export_frame) / double(ANIMATION_FPS);
+      float(double(current_export_frame) / double(ANIMATION_FPS));
 
   // morph and skin
   for (auto& anim : the_app->animations) {
@@ -1395,7 +1395,7 @@ bool app::main_loop_frame() {
 
     {
       ImGui::Begin("OBJ export animation sequence");
-      ImGui::Text("Select an aimation sequence, then hit the RUN button");
+      ImGui::Text("Select an animation sequence, then hit the RUN button");
       static int animation_sequence_item = 0;
       std::vector<std::string> names;
       for (auto& s : sequence.myItems) names.push_back(s.name);
@@ -1406,7 +1406,7 @@ bool app::main_loop_frame() {
 
         // make sure only the selected animation will play
         for (size_t i = 0; i < animations.size(); ++i) {
-          if (animation_sequence_item == i) {
+          if (animation_sequence_item == size_t(i)) {
             animations[i].playing = true;
           } else {
             animations[i].playing = false;
