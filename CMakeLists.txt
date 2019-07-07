@@ -124,6 +124,7 @@ include_directories(
 list(APPEND UI_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.h
+
 )
 
 if (GLTF_INSIGHT_USE_NATIVEFILEDIALOG)
@@ -261,6 +262,7 @@ endif()
 
 add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER} ${SHADER_GEN}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinyobjloader/tiny_obj_loader.h
 )
 
 target_include_directories(
