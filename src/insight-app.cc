@@ -23,9 +23,22 @@ SOFTWARE.
 */
 #include "insight-app.hh"
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
+#if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
+#include "nfd.h"
+#endif
+
 // need matrix decomposition for 3D gizmo
 #include "animation.hh"
 #include "glm/gtx/matrix_decompose.hpp"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 using namespace gltf_insight;
 
@@ -600,7 +613,7 @@ void app::async_worker::ui() {
 
   ImGui::OpenPopup("obj_export");
   if (ImGui::BeginPopup("obj_export")) {
-    ImGui::Text(task_name.c_str());
+    ImGui::Text("%s", task_name.c_str());
     ImGui::ProgressBar(completion_percent);
     ImGui::EndPopup();
   }
@@ -1077,6 +1090,34 @@ void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
   }
 }
 
+#if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
+static bool show_file_dialog(const std::string& title,
+                             const std::string& file_filter,
+                             std::string* filename)  // selected single filename
+{
+  (void)title;
+  if (!filename) {
+    return false;
+  }
+
+  nfdchar_t* outPath = nullptr;
+  // TODO(LTE): Handle default file path
+  nfdresult_t result =
+      NFD_OpenDialog(file_filter.c_str(), /* default path */ nullptr, &outPath);
+
+  if (result == NFD_OKAY) {
+    (*filename) = std::string(outPath);
+    free(outPath);
+  } else if (result == NFD_CANCEL) {
+    std::cout << "User pressed cancel\n";
+  } else {
+    std::cerr << "Error: " << NFD_GetError() << "\n";
+  }
+
+  return true;
+}
+#endif
+
 void app::main_loop() {
   bool status = true;
   while (status) {
@@ -1110,6 +1151,26 @@ bool app::main_loop_frame() {
     }
 
     if (open_file_dialog) {
+#if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
+      // TODO(LTE): Run into modal mode in ImGui while opening NFD window.
+      std::string _filename;
+      if (show_file_dialog("Open glTF...", "gltf,glb;vrm", &_filename)) {
+        std::cout << "Input filename = " << _filename << "\n";
+
+        unload();
+        input_filename = _filename;
+
+        try {
+          load();
+        } catch (const std::exception& e) {
+          std::cerr << "error occured during loading of " << input_filename
+                    << ": " << e.what() << '\n';
+          unload();
+        }
+
+      }
+      open_file_dialog = false;
+#else
       if (ImGuiFileDialog::Instance()->FileDialog(
               "Open glTF...", ".gltf\0.glb\0.vrm\0.*\0\0")) {
         if (ImGuiFileDialog::Instance()->IsOk) {
@@ -1126,13 +1187,27 @@ bool app::main_loop_frame() {
         }
         open_file_dialog = false;
       }
+#endif
     }
 
     if (save_file_dialog) {
-      if (!asset_loaded)
+#if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
+      if (!asset_loaded) {
         save_file_dialog = false;
-      else if (ImGuiFileDialog::Instance()->FileDialog(
-                   "Save as...", nullptr, true, ".", input_filename)) {
+      } else {
+        // TODO(LTE): Run into modal mode in ImGui while opening NFD window.
+        std::string _filename;
+        if (show_file_dialog("Save glTF data as ...", "", &_filename)) {
+          std::cout << "Save filename = " << _filename << "\n";
+          std::cout << "TODO(LTE): Implement glTF save feature\n";
+        }
+        save_file_dialog = false;
+      }
+#else
+      if (!asset_loaded) {
+        save_file_dialog = false;
+      } else if (ImGuiFileDialog::Instance()->FileDialog(
+                     "Save as...", nullptr, true, ".", input_filename)) {
         if (ImGuiFileDialog::Instance()->IsOk) {
           auto save_as_filename =
               ImGuiFileDialog::Instance()->GetFilepathName();
@@ -1153,7 +1228,9 @@ bool app::main_loop_frame() {
         }
         save_file_dialog = false;
       }
+#endif
     }
+
     camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
 
     if (asset_loaded) {
