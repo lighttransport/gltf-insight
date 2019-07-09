@@ -323,6 +323,8 @@ void app::load() {
           current_mesh.joint_inverse_bind_matrix_map);
       std::cerr << " This is a skinned mesh with " << current_mesh.nb_joints
                 << "joints \n";
+    } else {
+      current_mesh.skinned = false;
     }
 
     const auto& gltf_mesh = model.meshes[size_t(current_mesh.instance.mesh)];
@@ -652,9 +654,9 @@ void app::async_worker::work_for_one_frame() {
   }
   update_mesh_skeleton_graph_transforms(the_app->gltf_scene_tree);
   for (auto& mesh : the_app->loaded_meshes) {
-    the_app->compute_joint_matrices(
-        the_app->gltf_scene_tree, the_app->root_node_model_matrix,
-        mesh.joint_matrices, mesh.flat_joint_list, mesh.inverse_bind_matrices);
+    the_app->compute_joint_matrices(the_app->root_node_model_matrix,
+                                    mesh.joint_matrices, mesh.flat_joint_list,
+                                    mesh.inverse_bind_matrices);
     for (size_t sm = 0; sm < mesh.indices.size(); ++sm) {
       the_app->perform_software_morphing(
           the_app->gltf_scene_tree, sm, mesh.morph_targets, mesh.positions,
@@ -886,7 +888,7 @@ void app::write_deformed_meshes_to_obj(const std::string filename) {
         shape.mesh.indices.push_back(index);
       }
 
-      offset += loaded_meshes[mesh_idx].indices[submesh_idx].size();
+      offset += int(loaded_meshes[mesh_idx].indices[submesh_idx].size());
     }
     writer.shapes_.push_back(shape);
   }
@@ -1028,16 +1030,15 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
 
     material_to_use.bind_textures();
 
-    auto& shader_list = mesh.skinned && do_soft_skinning
-                            ? *mesh.soft_skin_shader_list
-                            : *mesh.shader_list;
+    auto& active_shader_list = (mesh.skinned && do_soft_skinning)
+                                   ? *mesh.soft_skin_shader_list
+                                   : *mesh.shader_list;
 
-    const auto& active_shader = shader_list[shader_to_use];
+    const auto& active_shader = active_shader_list[shader_to_use];
 
-    active_shader.use();
     material_to_use.set_shader_uniform(active_shader);
-    update_uniforms(shader_list, editor_light.use_ibl, world_camera_position,
-                    editor_light.color,
+    update_uniforms(active_shader_list, editor_light.use_ibl,
+                    world_camera_position, editor_light.color,
                     editor_light.get_directional_light_direction(),
                     active_joint, shader_to_use,
                     projection_matrix * view_matrix * model_matrix,
@@ -1094,7 +1095,7 @@ void app::draw_scene_recur(const glm::vec3& world_camera_position,
   }
 }
 
-void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
+void app::draw_scene(const glm::vec3& world_camera_position) {
   std::vector<defered_draw> alpha;
   draw_scene_recur(world_camera_position, gltf_scene_tree, alpha);
 
@@ -1113,10 +1114,11 @@ void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
                   });
 
       for (const auto& to_draw : alpha) {
-        auto node = to_draw.node;
+        const auto node = to_draw.node;
         const auto& mesh = loaded_meshes[size_t(node->gltf_mesh_id)];
         const glm::mat3 normal_matrix =
             glm::transpose(glm::inverse(node->world_xform));
+
         draw_mesh(world_camera_position, mesh, normal_matrix,
                   node->world_xform);
       }
@@ -1341,8 +1343,6 @@ bool app::main_loop_frame() {
     if (asset_loaded) {
       int active_bone_gltf_node = -1;
       for (auto& a_mesh : loaded_meshes) {
-        if (!a_mesh.displayed) continue;
-
         if ((active_joint >= 0) &&
             (active_joint < int(a_mesh.flat_joint_list.size())))
           active_bone_gltf_node =
@@ -1352,9 +1352,10 @@ bool app::main_loop_frame() {
         // includes the "model view projection" that transform the geometry to
         // the screen space, the normal matrix, and the joint matrix array
         // that is used to deform the skin with the bones
-        compute_joint_matrices(gltf_scene_tree, root_node_model_matrix,
-                               a_mesh.joint_matrices, a_mesh.flat_joint_list,
-                               a_mesh.inverse_bind_matrices);
+        if (a_mesh.skinned)
+          compute_joint_matrices(root_node_model_matrix, a_mesh.joint_matrices,
+                                 a_mesh.flat_joint_list,
+                                 a_mesh.inverse_bind_matrices);
 
         for (size_t submesh = 0; submesh < a_mesh.draw_call_descriptors.size();
              ++submesh) {
@@ -1374,11 +1375,11 @@ bool app::main_loop_frame() {
                   a_mesh.display_normals, a_mesh.joints, a_mesh.weights,
                   a_mesh.soft_skinned_position, a_mesh.soft_skinned_normals);
               // now, upload new mesh to GPU
-              gpu_update_morphed_submesh(submesh, a_mesh.soft_skinned_position,
+              gpu_update_submesh_buffers(submesh, a_mesh.soft_skinned_position,
                                          a_mesh.soft_skinned_normals,
                                          a_mesh.VBOs);
             } else if (gpu_dirty) {
-              gpu_update_morphed_submesh(submesh, a_mesh.display_position,
+              gpu_update_submesh_buffers(submesh, a_mesh.display_position,
                                          a_mesh.display_normals, a_mesh.VBOs);
             }
           }
@@ -1401,16 +1402,18 @@ bool app::main_loop_frame() {
       for (auto& s : sequence.myItems) names.push_back(s.name);
       ImGuiCombo("sequence", &animation_sequence_item, names);
       if (ImGui::Button("RUN")) {
-        // setup the exporter
-        obj_export_worker.setup_new_sequence(&sequence);
+        if (!animations.empty()) {
+          // setup the exporter
+          obj_export_worker.setup_new_sequence(&sequence);
 
-        // make sure only the selected animation will play
-        for (size_t i = 0; i < animations.size(); ++i) {
-          animations[i].playing = size_t(animation_sequence_item) == i;
+          // make sure only the selected animation will play
+          for (size_t i = 0; i < animations.size(); ++i) {
+            animations[i].playing = size_t(animation_sequence_item) == i;
+          }
+
+          // Start the work
+          obj_export_worker.start_work();
         }
-
-        // Start the work
-        obj_export_worker.start_work();
       }
       ImGui::End();
 
@@ -1535,7 +1538,7 @@ void app::cpu_compute_morphed_display_mesh(
   }
 }
 
-void app::gpu_update_morphed_submesh(
+void app::gpu_update_submesh_buffers(
     size_t submesh_id, std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
     std::vector<std::array<GLuint, VBO_count>>& VBOs) {
@@ -1556,6 +1559,7 @@ void app::gpu_update_morphed_submesh(
   //             display_tangent[submesh_id].size() * sizeof(float),
   //             display_tangent[submesh_id].data(), GL_DYNAMIC_DRAW);
 
+  // keep state clean
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -1585,15 +1589,18 @@ void app::perform_software_morphing(
 
     // We are dynamically keeping a cache of the morph targets weights. CPU-side
     // evaluation of morphing is expensive, if the blending weights did not
-    // change, we don't want to re-evaluate the mesh. We are keeping a cache of
-    // the weights, and sending a dirty flags if we need to recompute and
-    // re-upload the mesh to the GPU
+    // change, we don't want to re-evaluate the mesh.
+
+    // We are keeping a cache of the weights, and setting a dirty flags if we
+    // need to recompute it.
 
     // To transparently handle the loading of a different file, we resize these
     // arrays here
     if (cached_weights.size() != display_position.size()) {
       cached_weights.resize(display_position.size());
       clean.resize(display_position.size());
+
+      // This sets all the dirty flags to "dirty"
       std::generate(clean.begin(), clean.end(), [] { return false; });
     }
 
@@ -1604,22 +1611,23 @@ void app::perform_software_morphing(
       cached_weights[submesh_id] = mesh_skeleton_graph.pose.blend_weights;
     }
 
-    // If the size matches, we are comparing all the elements, if they match, it
-    // means that mesh doesn't need to be evaluated
+    // ElseIf the size matches, we are comparing all the elements (using
+    // std::vector<> operator==()), if they match, it means that mesh doesn't
+    // need to be evaluated
     else if (cached_weights[submesh_id] ==
              mesh_skeleton_graph.pose.blend_weights) {
       clean[submesh_id] = true;
     }
 
-    // In that case, we are updating the cache, and setting the flag dirty
+    // Else, In that case, we are updating the cache, and setting the flag dirty
     else {
       clean[submesh_id] = false;
       cached_weights[submesh_id] = mesh_skeleton_graph.pose.blend_weights;
     }
 
-    // If flag is dirty
+    // If flag is found to be dirty
     if (!clean[submesh_id]) {
-      // Blend between morph targets on the CPU:
+      // Blend each vertex between morph targets on the CPU:
       for (size_t vertex = 0; vertex < display_position[submesh_id].size();
            ++vertex) {
         cpu_compute_morphed_display_mesh(
@@ -1627,9 +1635,9 @@ void app::perform_software_morphing(
             normals, display_position, display_normal, vertex);
       }
 
-      // Upload the new mesh data to the GPU
+      // If it is necessary to upload the new mesh data to the GPU, do it:
       if (upload_to_gpu)
-        gpu_update_morphed_submesh(submesh_id, display_position, display_normal,
+        gpu_update_submesh_buffers(submesh_id, display_position, display_normal,
                                    VBOs);
     }
   }
@@ -1643,14 +1651,16 @@ void app::perform_software_skinning(
     const std::vector<std::vector<float>>& weights,
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal) {
-  // Fetch the arrays for this primitive
+  // TODO only perform this computation if the joints have moved
+
+  // Fetch the arrays for the current primitive
   const auto& prim_positions = positions[submesh_id];
   const auto& prim_normals = normals[submesh_id];
   const auto& prim_joints = joints[submesh_id];
   const auto& prim_weights = weights[submesh_id];
+  const auto vertex_count = prim_joints.size() / 4;
 
   // We need the data sizes to match for what we do to work
-  const auto vertex_count = prim_joints.size() / 4;
   assert(prim_positions.size() / 3 == vertex_count &&
          prim_normals.size() / 3 == vertex_count &&
          prim_joints.size() / 4 == vertex_count &&
@@ -1713,21 +1723,9 @@ void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
 }
 
 void app::compute_joint_matrices(
-    gltf_node& mesh_skeleton_graph, glm::mat4& model_matrix,
-    std::vector<glm::mat4>& joint_matrices,
+    glm::mat4& model_matrix, std::vector<glm::mat4>& joint_matrices,
     std::vector<gltf_node*>& flat_joint_list,
     std::vector<glm::mat4>& inverse_bind_matrices) {
-  (void)mesh_skeleton_graph;
-
-  if (flat_joint_list.size() ==
-      0) {  // TODO temp bodge trying to load a VRM file
-    return;
-  }
-
-  // This goes through the skeleton hierarchy, and compute the global
-  // transform of each joint
-  // update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
-
   // This compute the individual joint matrices that are uploaded to the
   // GPU. Detailed explanations about skinning can be found in this tutorial
   // https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_020_Skins.md#vertex-skinning-implementation
@@ -1737,7 +1735,7 @@ void app::compute_joint_matrices(
   // Sascha Willems's "vulkan-glTF-PBR" code...
   // https://github.com/SaschaWillems/Vulkan-glTF-PBR/blob/master/base/VulkanglTFModel.hpp
 
-  glm::mat4 inverse_model = glm::inverse(model_matrix);
+  const glm::mat4 inverse_model = glm::inverse(model_matrix);
   for (size_t i = 0; i < joint_matrices.size(); ++i) {
     joint_matrices[i] = inverse_model * flat_joint_list[i]->world_xform *
                         inverse_bind_matrices[i];

@@ -41,18 +41,18 @@ struct morph_target {
 void load_animations(const tinygltf::Model& model,
                      std::vector<animation>& animations);
 
-void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
-                   const std::vector<tinygltf::Primitive>& primitives,
-                   std::vector<draw_call_submesh>& draw_call_descriptor,
-                   std::vector<GLuint>& VAOs,
-                   std::vector<std::array<GLuint, VBO_count>>& VBOs,
-                   std::vector<std::vector<unsigned>>& indices,
-                   std::vector<std::vector<float>>& vertex_coord,
-                   std::vector<std::vector<float>>& texture_coord,
-                   std::vector<std::vector<float>>& colors,
-                   std::vector<std::vector<float>>& normals,
-                   std::vector<std::vector<float>>& weights,
-                   std::vector<std::vector<unsigned short>>& joints);
+void load_geometry(
+    const tinygltf::Model& model, std::vector<GLuint>& textures,
+    const std::vector<tinygltf::Primitive>& primitives,
+    std::vector<draw_call_submesh_descriptor>& draw_call_descriptor,
+    std::vector<GLuint>& VAOs, std::vector<std::array<GLuint, VBO_count>>& VBOs,
+    std::vector<std::vector<unsigned>>& indices,
+    std::vector<std::vector<float>>& vertex_coord,
+    std::vector<std::vector<float>>& texture_coord,
+    std::vector<std::vector<float>>& colors,
+    std::vector<std::vector<float>>& normals,
+    std::vector<std::vector<float>>& weights,
+    std::vector<std::vector<unsigned short>>& joints);
 
 void load_morph_targets(const tinygltf::Model& model,
                         const tinygltf::Primitive& primitive,

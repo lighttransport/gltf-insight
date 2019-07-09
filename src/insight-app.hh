@@ -107,7 +107,7 @@ struct mesh {
   // Rendering
   std::vector<GLuint> VAOs;
   std::vector<std::array<GLuint, VBO_count>> VBOs;
-  std::vector<draw_call_submesh> draw_call_descriptors;
+  std::vector<draw_call_submesh_descriptor> draw_call_descriptors;
 
   // Each mesh comes with a set of shader objects to be used. They need to be
   // created after we known some info about the mesh Because gl_util's
@@ -171,13 +171,11 @@ class app {
 
   static void open_url(std::string url);
 
-  void set_input_filename(const std::string &filename) {
+  void set_input_filename(const std::string& filename) {
     input_filename = filename;
   }
 
-  std::string get_input_filename() const {
-    return input_filename;
-  }
+  std::string get_input_filename() const { return input_filename; }
 
   // user interface state(changed by glfw callbacks)
   application_parameters gui_parameters{camera_position};
@@ -319,7 +317,7 @@ class app {
       std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal, size_t vertex);
 
-  void gpu_update_morphed_submesh(
+  void gpu_update_submesh_buffers(
       size_t submesh_id, std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
       std::vector<std::array<GLuint, VBO_count>>& VBOs);
@@ -349,8 +347,7 @@ class app {
                          std::map<std::string, shader>& shaders,
                          const mesh& a_mesh);
 
-  void compute_joint_matrices(gltf_node& mesh_skeleton_graph,
-                              glm::mat4& model_matrix,
+  void compute_joint_matrices(glm::mat4& model_matrix,
                               std::vector<glm::mat4>& joint_matrices,
                               std::vector<gltf_node*>& flat_joint_list,
                               std::vector<glm::mat4>& inverse_bind_matrices);
