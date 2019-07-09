@@ -58,12 +58,19 @@ SOFTWARE.
 #pragma clang diagnostic pop
 #endif
 
+#include <fstream>
+#include <iostream>
+#include <sstream>
+
 #include "gltf-graph.hh"
 #include "gltf-loader.hh"
 #include "gui_util.hh"
 #include "shader.hh"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
+
+// last
+#include "tiny_obj_loader.h"
 
 /// Main application class
 namespace gltf_insight {
@@ -92,19 +99,22 @@ struct mesh {
   std::vector<std::vector<float>> weights;
   std::vector<std::vector<float>> display_position;
   std::vector<std::vector<float>> display_normals;
+  std::vector<std::vector<float>> soft_skinned_position;
+  std::vector<std::vector<float>> soft_skinned_normals;
   std::vector<std::vector<float>> colors;
   std::vector<int> materials;
 
   // Rendering
   std::vector<GLuint> VAOs;
   std::vector<std::array<GLuint, VBO_count>> VBOs;
-  std::vector<draw_call_submesh> draw_call_descriptors;
+  std::vector<draw_call_submesh_descriptor> draw_call_descriptors;
 
   // Each mesh comes with a set of shader objects to be used. They need to be
   // created after we known some info about the mesh Because gl_util's
   // load_shader function take templated shader code and substitues values. This
   // is required for the GPU skinning implementation.
   std::unique_ptr<std::map<std::string, shader>> shader_list;
+  std::unique_ptr<std::map<std::string, shader>> soft_skin_shader_list;
 
   // is this mesh displayed on screen
   bool displayed = true;
@@ -143,9 +153,11 @@ class app {
   void run_file_menu();
   void run_edit_menu();
   void run_view_menu();
+  void write_deformed_meshes_to_obj(std::string filename);
   void run_debug_menu();
   void run_help_menu(bool& about_open);
   void run_menubar(bool& about_open);
+
   void create_transparent_docking_area(ImVec2 pos, ImVec2 size,
                                        std::string name);
 
@@ -153,11 +165,20 @@ class app {
   void load_as_metal_roughness(size_t i, material& currently_loading,
                                tinygltf::Material gltf_material);
   void load();
-  void main_loop();
 
+  void main_loop();
   bool main_loop_frame();
 
   static void open_url(std::string url);
+
+  void set_input_filename(const std::string& filename) {
+    input_filename = filename;
+  }
+
+  std::string get_input_filename() const { return input_filename; }
+
+  // user interface state(changed by glfw callbacks)
+  application_parameters gui_parameters{camera_position};
 
  private:
   void draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
@@ -198,6 +219,7 @@ class app {
   bool show_material_window = true;
   bool show_bone_display_window = true;
   bool show_scene_outline_window = true;
+  bool do_soft_skinning = false;
 
   std::vector<mesh> loaded_meshes;
   std::vector<material> loaded_material;
@@ -233,7 +255,6 @@ class app {
   bool show_imgui_demo = false;
   std::string input_filename;
   GLFWwindow* window{nullptr};
-  application_parameters gui_parameters{camera_position};
 
   // Animation sequencer state
   gltf_insight::AnimSequence sequence;
@@ -245,6 +266,24 @@ class app {
   double currentPlayTime = 0;
   double last_frame_time = 0;
   bool playing_state = false;
+
+  struct async_worker {
+    bool running = false;
+    std::string task_name = "exporting sequence to disk...";
+    void ui();
+    void work_for_one_frame();
+    float completion_percent = 0.f;
+
+    AnimSequence* sequence_to_export = nullptr;
+    int current_export_frame;
+
+    void setup_new_sequence(AnimSequence* s);
+    void start_work();
+    app* the_app = nullptr;
+
+    async_worker(app* a);
+
+  } obj_export_worker = this;
 
   GLuint logo = 0;
 
@@ -258,10 +297,6 @@ class app {
   static std::string GetFilePathExtension(const std::string& FileName);
 
   void parse_command_line(int argc, char** argv);
-
-  // void load_glTF_asset(tinygltf::TinyGLTF& gltf_ctx,
-  //                     const std::string& input_filename,
-  //                     tinygltf::Model& model);
 
   // Load glTF asset. Initial input filename is given at `parse_command_line`
   void load_glTF_asset();
@@ -282,7 +317,7 @@ class app {
       std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal, size_t vertex);
 
-  void gpu_update_morphed_submesh(
+  void gpu_update_submesh_buffers(
       size_t submesh_id, std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
       std::vector<std::array<GLuint, VBO_count>>& VBOs);
@@ -290,11 +325,21 @@ class app {
   void perform_software_morphing(
       gltf_node mesh_skeleton_graph, size_t submesh_id,
       const std::vector<std::vector<morph_target>>& morph_targets,
-      const std::vector<std::vector<float>>& vertex_coord,
+      const std::vector<std::vector<float>>& positions,
       const std::vector<std::vector<float>>& normals,
       std::vector<std::vector<float>>& display_position,
       std::vector<std::vector<float>>& display_normal,
-      std::vector<std::array<GLuint, VBO_count>>& VBOs);
+      std::vector<std::array<GLuint, VBO_count>>& VBOs,
+      bool upload_to_gpu = true);
+
+  void perform_software_skinning(
+      size_t submesh_id, const std::vector<glm::mat4>& joint_matrices,
+      const std::vector<std::vector<float>>& positions,
+      const std::vector<std::vector<float>>& normals,
+      const std::vector<std::vector<unsigned short>>& joints,
+      const std::vector<std::vector<float>>& weights,
+      std::vector<std::vector<float>>& display_position,
+      std::vector<std::vector<float>>& display_normal);
 
   void draw_bone_overlay(gltf_node& mesh_skeleton_graph, int active_joint_node,
                          const glm::mat4& view_matrix,
@@ -302,11 +347,10 @@ class app {
                          std::map<std::string, shader>& shaders,
                          const mesh& a_mesh);
 
-  void precompute_hardware_skinning_data(
-      gltf_node& mesh_skeleton_graph, glm::mat4& model_matrix,
-      std::vector<glm::mat4>& joint_matrices,
-      std::vector<gltf_node*>& flat_joint_list,
-      std::vector<glm::mat4>& inverse_bind_matrices);
+  void compute_joint_matrices(glm::mat4& model_matrix,
+                              std::vector<glm::mat4>& joint_matrices,
+                              std::vector<gltf_node*>& flat_joint_list,
+                              std::vector<glm::mat4>& inverse_bind_matrices);
 
   void run_animation_timeline(gltf_insight::AnimSequence& sequence,
                               bool& looping, int& selectedEntry,

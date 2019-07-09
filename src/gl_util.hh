@@ -33,7 +33,6 @@ SOFTWARE.
 #include "GLFW/glfw3.h"
 #endif
 
-
 #include "material.hh"
 #include "shader.hh"
 
@@ -76,11 +75,12 @@ void update_uniforms(std::map<std::string, shader>& shaders, bool use_ibl,
                      const std::vector<glm::mat4>& joint_matrices);
 
 /// Info needed to actually submit drawcall for a submesh
-struct draw_call_submesh {
+struct draw_call_submesh_descriptor {
   GLenum draw_mode;
   size_t count;
   GLuint VAO;
 };
 
 /// Perform the specified drawcall
-void perform_draw_call(const draw_call_submesh& draw_call_to_perform);
+void perform_draw_call(
+    const draw_call_submesh_descriptor& draw_call_to_perform);

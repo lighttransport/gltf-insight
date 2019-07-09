@@ -15,6 +15,7 @@ set(BUILD_VERSION_PATCH 0)
 project(${BUILD_TARGET})
 
 option(GLTF_INSIGHT_USE_CCACHE "Compile with ccache(if available. Linux only)" OFF)
+option(GLTF_INSIGHT_USE_NATIVEFILEDIALOG "Use NativeFileDialog instead of ImGuiFileDialog for file browser(requires GTK3 on Linux)" OFF)
 
 if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include")
   message(FATAL_ERROR "The glfw submodule directory is missing! "
@@ -93,6 +94,7 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/glm)
 
 # [ImGUI], [ImGuizmo] and [ImGuiFileDialog]
+# TODO(LTE): Disable ImGuiFileDialog when using NativeFileDialog.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo)
 list(APPEND UI_SOURCES
@@ -105,8 +107,7 @@ list(APPEND UI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImSequencer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImCurveEdit.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGradient.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp
-    )
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuizmo/ImGuizmo.cpp)
 
 
 include_directories(
@@ -115,15 +116,51 @@ include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/config/
 )
 
-
 include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinyobjloader
 )
-  
+
 list(APPEND UI_SOURCES
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ImGuiFileDialog/file_dialog/ImGuiFileDialog.h
+
 )
+
+if (GLTF_INSIGHT_USE_NATIVEFILEDIALOG)
+  add_definitions(-DGLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/nativefiledialog/src/include)
+  if (WIN32)
+    list(APPEND UI_SOURCES
+         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nativefiledialog/src/nfd_common.c
+         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nativefiledialog/src/nfd_win.cpp)
+  elseif (APPLE)
+    list(APPEND UI_SOURCES
+         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nativefiledialog/src/nfd_common.c
+         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nativefiledialog/src/nfd_cocoa.m)
+  else() # Assume linux
+    # https://gist.github.com/fracek/3323924
+    # Use the package PkgConfig to detect GTK+ headers/library files
+    FIND_PACKAGE(PkgConfig REQUIRED)
+    PKG_CHECK_MODULES(GTK3 REQUIRED gtk+-3.0)
+
+    # Setup CMake to use GTK+, tell the compiler where to look for headers
+    # and to the linker where to look for libraries
+    INCLUDE_DIRECTORIES(${GTK3_INCLUDE_DIRS})
+    LINK_DIRECTORIES(${GTK3_LIBRARY_DIRS})
+
+    # Add other flags to the compiler
+    ADD_DEFINITIONS(${GTK3_CFLAGS_OTHER})
+
+    list(APPEND EXT_LIBRARIES ${GTK3_LIBRARIES})
+
+    list(APPEND UI_SOURCES
+         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nativefiledialog/src/nfd_common.c
+         ${CMAKE_CURRENT_SOURCE_DIR}/third_party/nativefiledialog/src/nfd_gtk.c)
+
+  endif()
+
+endif (GLTF_INSIGHT_USE_NATIVEFILEDIALOG)
 
 set(CI_BUILD -1)
 if(DEFINED ENV{TRAVIS_COMMIT})
@@ -225,15 +262,16 @@ endif()
 
 add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER} ${SHADER_GEN}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
+	${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinyobjloader/tiny_obj_loader.h
 )
 
 target_include_directories(
-${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ 
+${BUILD_TARGET} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/
 )
 
 if(NOT EMSCRIPTEN)
 add_definitions( -DIMGUI_IMPL_OPENGL_LOADER_GLAD)
-target_include_directories(${BUILD_TARGET} PRIVATE 
+target_include_directories(${BUILD_TARGET} PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include
   )
 endif()
@@ -243,8 +281,8 @@ add_sanitizers(${BUILD_TARGET})
 
 if(APPLE)
   list(APPEND EXT_LIBRARIES "-framework Cocoa")
-  list(APPEND EXT_LIBRARIES	"-framework CoreFoundation" )
-  list(APPEND EXT_LIBRARIES	"-framework ApplicationServices")
+  list(APPEND EXT_LIBRARIES "-framework CoreFoundation" )
+  list(APPEND EXT_LIBRARIES "-framework ApplicationServices")
 endif()
 if(EMSCRIPTEN)
   message(STATUS "configuring ${BUILD_TARGET} for emscripten GLFW3 port")

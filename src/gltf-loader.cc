@@ -201,18 +201,20 @@ glm::vec3 generate_flat_normal_for_triangle(std::vector<float>& position,
   return glm::normalize(glm::cross(v0 - v1, v1 - v2));
 }
 
-void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
-                   const std::vector<tinygltf::Primitive>& primitives,
-                   std::vector<draw_call_submesh>& draw_call_descriptor,
-                   std::vector<GLuint>& VAOs,
-                   std::vector<std::array<GLuint, VBO_count>>& VBOs,
-                   std::vector<std::vector<unsigned>>& indices,
-                   std::vector<std::vector<float>>& vertex_coord,
-                   std::vector<std::vector<float>>& texture_coord,
-                   std::vector<std::vector<float>>& colors,
-                   std::vector<std::vector<float>>& normals,
-                   std::vector<std::vector<float>>& weights,
-                   std::vector<std::vector<unsigned short>>& joints) {
+void load_geometry(
+    const tinygltf::Model& model, std::vector<GLuint>& textures,
+    const std::vector<tinygltf::Primitive>& primitives,
+    std::vector<draw_call_submesh_descriptor>& draw_call_descriptor,
+    std::vector<GLuint>& VAOs, std::vector<std::array<GLuint, VBO_count>>& VBOs,
+    std::vector<std::vector<unsigned>>& indices,
+    std::vector<std::vector<float>>& vertex_coord,
+    std::vector<std::vector<float>>& texture_coord,
+    std::vector<std::vector<float>>& colors,
+    std::vector<std::vector<float>>& normals,
+    std::vector<std::vector<float>>& weights,
+    std::vector<std::vector<unsigned short>>& joints) {
+  std::cout << "loading mesh geometry...\n";
+
   const auto nb_submeshes = primitives.size();
 
   for (size_t submesh = 0; submesh < nb_submeshes; ++submesh) {
@@ -359,9 +361,11 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       }
     }
 
+    bool has_joints = false;
     // VERTEX JOINTS ASSIGNMENT
     if (primitive.attributes.find("JOINTS_0") !=
         std::end(primitive.attributes)) {
+      has_joints = true;
       const auto joint = primitive.attributes.at("JOINTS_0");
       const auto& joints_accessor = model.accessors[joint];
       const auto& joints_buffer_view =
@@ -386,8 +390,10 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
     }
 
     // VERTEX BONE WEIGHTS
+    bool has_weights = false;
     if (primitive.attributes.find("WEIGHTS_0") !=
         std::end(primitive.attributes)) {
+      has_weights = true;
       const auto weight = primitive.attributes.at("WEIGHTS_0");
       const auto& weights_accessor = model.accessors[weight];
       const auto& weights_buffer_view =
@@ -551,22 +557,26 @@ void load_geometry(const tinygltf::Model& model, std::vector<GLuint>& textures,
       glEnableVertexAttribArray(VBO_layout_color);
 
       // Layout "4" joints assignment vector
-      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_joints]);
-      glBufferData(GL_ARRAY_BUFFER,
-                   joints[submesh].size() * sizeof(unsigned short),
-                   joints[submesh].data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(VBO_layout_joints, 4, GL_UNSIGNED_SHORT, GL_FALSE,
-                            VBO_layout_joints * sizeof(unsigned short),
-                            nullptr);
-      glEnableVertexAttribArray(4);
+      if (has_joints) {
+        glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_joints]);
+        glBufferData(GL_ARRAY_BUFFER,
+                     joints[submesh].size() * sizeof(unsigned short),
+                     joints[submesh].data(), GL_STATIC_DRAW);
+        glVertexAttribPointer(VBO_layout_joints, 4, GL_UNSIGNED_SHORT, GL_FALSE,
+                              VBO_layout_joints * sizeof(unsigned short),
+                              nullptr);
+        glEnableVertexAttribArray(4);
+      }
 
-      // Layout "5" joints weights
-      glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_weights]);
-      glBufferData(GL_ARRAY_BUFFER, weights[submesh].size() * sizeof(float),
-                   weights[submesh].data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(VBO_layout_weights, 4, GL_FLOAT, GL_FALSE,
-                            4 * sizeof(float), nullptr);
-      glEnableVertexAttribArray(VBO_layout_weights);
+      if (has_weights) {
+        // Layout "5" joints weights
+        glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh][VBO_layout_weights]);
+        glBufferData(GL_ARRAY_BUFFER, weights[submesh].size() * sizeof(float),
+                     weights[submesh].data(), GL_STATIC_DRAW);
+        glVertexAttribPointer(VBO_layout_weights, 4, GL_FLOAT, GL_FALSE,
+                              4 * sizeof(float), nullptr);
+        glEnableVertexAttribArray(VBO_layout_weights);
+      }
 
       // EBO
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, VBOs[submesh][VBO_layout_EBO]);

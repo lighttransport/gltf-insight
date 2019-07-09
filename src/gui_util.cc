@@ -1123,8 +1123,8 @@ void mouse_button_callback(GLFWwindow* window, int button, int action,
                            int mods) {
   (void)mods;
 
-  auto* param = reinterpret_cast<application_parameters*>(
-      glfwGetWindowUserPointer(window));
+  auto* param = &(reinterpret_cast<gltf_insight::app*>(
+      glfwGetWindowUserPointer(window))->gui_parameters);
 
   if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     param->button_states[0] = true;
@@ -1141,8 +1141,8 @@ void mouse_button_callback(GLFWwindow* window, int button, int action,
 }
 
 void cursor_pos_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
-  auto* param = reinterpret_cast<application_parameters*>(
-      glfwGetWindowUserPointer(window));
+  auto* param = &(reinterpret_cast<gltf_insight::app*>(
+      glfwGetWindowUserPointer(window))->gui_parameters);
 
   // mouse left pressed
   if (param->button_states[0] && !ImGui::GetIO().WantCaptureMouse &&

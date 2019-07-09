@@ -274,8 +274,7 @@ void load_shaders(const size_t nb_joints,
       shader("debug_frag_pos", vert_src, world_frag_src);
   shaders["pbr_metal_rough"] =
       shader("pbr_metal_rough", vert_src, pbr_metallic_roughness_frag_src);
-  if (nb_joints > 0)
-    shaders["weights"] = shader("weights", vert_src, weights_frag_src);
+  shaders["weights"] = shader("weights", vert_src, weights_frag_src);
 }
 
 void update_uniforms(std::map<std::string, shader>& shaders, bool use_ibl,
@@ -300,7 +299,8 @@ void update_uniforms(std::map<std::string, shader>& shaders, bool use_ibl,
                                      int(use_ibl ? GL_TRUE : GL_FALSE));
 }
 
-void perform_draw_call(const draw_call_submesh& draw_call_to_perform) {
+void perform_draw_call(
+    const draw_call_submesh_descriptor& draw_call_to_perform) {
   glBindVertexArray(draw_call_to_perform.VAO);
   glDrawElements(draw_call_to_perform.draw_mode,
                  GLsizei(draw_call_to_perform.count), GL_UNSIGNED_INT, nullptr);

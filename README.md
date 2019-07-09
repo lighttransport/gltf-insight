@@ -62,7 +62,7 @@ Latest coninious build are available for [**Linux** (AppImage)](https://github.c
 This program can play the animations defined in a glTF asset by the following mean
   * [x] morph - Software blending between any number of morph targets
   * [x] skin - Hardware blending with max **4 joints** attributes per vertex
-  * [ ] skin - Software blending between an arbitrary number of joints per vertex
+  * [x] skin - Software blending (**TODO** in software we could do it between an arbitrary number of joints per vertex)
   * [ ] **TODO** animation editing features
 
 * Data visualization
@@ -120,7 +120,7 @@ You can use cmake3 package and You may need to install a few dependencies :
 sudo yum install git cmake3 libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel
 ```
 
-## Emscripten (WebGL version)
+#### Emscripten (WebGL version)
 
 This program is buildable as a WebAssembly WebGL 2.0 application using Emscripten.
 
@@ -140,6 +140,10 @@ emcmake cmake ..
 cmake --build .
 ```
 
+### Build options
+
+* `GLTF_INSIGHT_USE_NATIVEFILEDIALOG` : Use NativeFileDialog https://github.com/mlabbe/nativefiledialog instead of ImGuiFileDialog for file browser. Requires GTK3(and pkg-config) on Linux.
+
 ## TODO
 
 * [ ] PBR shading(in CPU)
@@ -150,6 +154,7 @@ cmake --build .
 * [ ] Draco compressed mesh support. https://github.com/google/draco
   * NOTE that Draco fails to compile with gcc4.8(CentOS7 default)
 * [ ] basis_universal texture compression support. https://github.com/binomialLLC/basis_universal
+* [ ] export of morphed/skinned mesh as a simple OBJ file (and as a sequence of OBJs for animations)
 
 ## License
 
@@ -171,5 +176,6 @@ gltf-insight is built upon the following open-source projects:
 * ionicons icon helper header : zlib licence
 * ionic framework icon font : MIT
 * Roboto icons : Apache 2
+* nativefiledialog : ZLIB license.
 
 *“glTF and the glTF logo are trademarks of the Khronos Group Inc.”*

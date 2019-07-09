@@ -23,8 +23,22 @@ SOFTWARE.
 */
 #include "insight-app.hh"
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
+#if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
+#include "nfd.h"
+#endif
+
 // need matrix decomposition for 3D gizmo
+#include "animation.hh"
 #include "glm/gtx/matrix_decompose.hpp"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 using namespace gltf_insight;
 
@@ -309,6 +323,8 @@ void app::load() {
           current_mesh.joint_inverse_bind_matrix_map);
       std::cerr << " This is a skinned mesh with " << current_mesh.nb_joints
                 << "joints \n";
+    } else {
+      current_mesh.skinned = false;
     }
 
     const auto& gltf_mesh = model.meshes[size_t(current_mesh.instance.mesh)];
@@ -355,12 +371,19 @@ void app::load() {
     current_mesh.display_position = current_mesh.positions;
     current_mesh.display_normals = current_mesh.normals;
 
+    current_mesh.soft_skinned_position = current_mesh.positions;
+    current_mesh.soft_skinned_normals = current_mesh.normals;
+
     // cleanup opengl state
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     current_mesh.shader_list = std::unique_ptr<std::map<std::string, shader>>(
         new std::map<std::string, shader>);
+
+    current_mesh.soft_skin_shader_list =
+        std::unique_ptr<std::map<std::string, shader>>(
+            new std::map<std::string, shader>);
 
     current_mesh.morph_targets.resize(nb_submeshes);
     current_mesh.materials.resize(nb_submeshes);
@@ -449,6 +472,8 @@ void app::load() {
     gltf_scene_tree.pose.target_names = target_names;
 
     load_shaders(size_t(current_mesh.nb_joints), *current_mesh.shader_list);
+    if (current_mesh.skinned)
+      load_shaders(0, *current_mesh.soft_skin_shader_list);
   }
 
   const auto nb_animations = model.animations.size();
@@ -585,6 +610,85 @@ void editor_lighting::show_control() {
   }
 }
 
+void app::async_worker::ui() {
+  if (!running) return;
+
+  ImGui::OpenPopup("obj_export");
+  if (ImGui::BeginPopup("obj_export")) {
+    ImGui::Text("%s", task_name.c_str());
+    ImGui::ProgressBar(completion_percent);
+    ImGui::EndPopup();
+  }
+}
+
+void app::async_worker::work_for_one_frame() {
+  if (!running) return;
+
+  if (!sequence_to_export) {
+    running = false;
+    return;
+  }
+
+  the_app->playing_state = false;
+  the_app->currentFrame = 0;
+  the_app->currentPlayTime = 0;
+
+  // compute time
+  const auto max_frame = sequence_to_export->GetFrameMax();
+  const auto min_frame = sequence_to_export->GetFrameMin();
+  if (current_export_frame < min_frame) current_export_frame = min_frame;
+  if (current_export_frame > max_frame) {
+    running = false;
+    sequence_to_export = nullptr;
+  }
+  completion_percent =
+      float(current_export_frame - min_frame) / float(max_frame - min_frame);
+  the_app->currentFrame = current_export_frame;
+  const float current_animation_time =
+      float(double(current_export_frame) / double(ANIMATION_FPS));
+
+  // morph and skin
+  for (auto& anim : the_app->animations) {
+    anim.set_time(current_animation_time);
+    anim.apply_pose();
+  }
+  update_mesh_skeleton_graph_transforms(the_app->gltf_scene_tree);
+  for (auto& mesh : the_app->loaded_meshes) {
+    the_app->compute_joint_matrices(the_app->root_node_model_matrix,
+                                    mesh.joint_matrices, mesh.flat_joint_list,
+                                    mesh.inverse_bind_matrices);
+    for (size_t sm = 0; sm < mesh.indices.size(); ++sm) {
+      the_app->perform_software_morphing(
+          the_app->gltf_scene_tree, sm, mesh.morph_targets, mesh.positions,
+          mesh.normals, mesh.display_position, mesh.display_normals, mesh.VBOs,
+          false);
+      the_app->perform_software_skinning(
+          sm, mesh.joint_matrices, mesh.display_position, mesh.display_normals,
+          mesh.joints, mesh.weights, mesh.soft_skinned_position,
+          mesh.soft_skinned_normals);
+    }
+  }
+
+  // increment for next call
+  current_export_frame++;
+
+  // export morphed skinned mesh
+  char frame_number_str_with_leading_zeroes[6] = "";
+  sprintf(frame_number_str_with_leading_zeroes, "%05d", current_export_frame);
+  std::string file_name =
+      "./export_obj/" + std::string(frame_number_str_with_leading_zeroes);
+  the_app->write_deformed_meshes_to_obj(file_name);
+}
+
+app::async_worker::async_worker(app* a) : current_export_frame(0), the_app(a) {}
+
+void app::async_worker::setup_new_sequence(AnimSequence* s) {
+  current_export_frame = 0;
+  sequence_to_export = s;
+}
+
+void app::async_worker::start_work() { running = true; }
+
 void app::load_sensible_default_material(material& material) {
   material.name = "dummy_fallback_material";
   material.normal_texture = fallback_textures::pure_flat_normal_map;
@@ -597,13 +701,44 @@ void app::load_sensible_default_material(material& material) {
   material.fill_material_texture_slots();
 }
 
+static void drop_callabck(GLFWwindow* window, int nums, const char** paths) {
+  if (nums > 0) {
+    // TODO(LTE): Do we need a lock?
+    gltf_insight::app* app =
+        reinterpret_cast<gltf_insight::app*>(glfwGetWindowUserPointer(window));
+
+    // Use the first one.
+    // TODO(LTE): Search .gltf file from paths.
+
+    app->unload();
+    app->set_input_filename(paths[0]);
+
+    std::cout << "D&D filename : " << app->get_input_filename() << "\n";
+
+    try {
+      app->load();
+    } catch (const std::exception& e) {
+      std::cerr << "error occured during loading of "
+                << app->get_input_filename() << ": " << e.what() << '\n';
+      app->unload();
+    }
+  }
+}
+
 app::app(int argc, char** argv) {
   parse_command_line(argc, argv);
 
   initialize_glfw_opengl_window(window);
-  glfwSetWindowUserPointer(window, &gui_parameters);
+  // glfwSetWindowUserPointer(window, &gui_parameters);
+  glfwSetWindowUserPointer(window, this);
   glfwSetMouseButtonCallback(window, mouse_button_callback);
   glfwSetCursorPosCallback(window, cursor_pos_callback);
+
+  // NOTE: We cannot use lambda function with [this] capture, so pass `this`
+  // pointer through glfwSetWindowUserPointer.
+  // https://stackoverflow.com/questions/39731561/use-lambda-as-glfwkeyfun
+  glfwSetDropCallback(window, drop_callabck);
+
   initialize_imgui(window);
   (void)ImGui::GetIO();
 
@@ -705,10 +840,107 @@ void app::run_view_menu() {
   }
 }
 
+#include <sys/stat.h>
+#include <sys/types.h>
+
+#include <string>
+
+#if defined(_WIN32)
+#include <direct.h>
+#endif
+
+void app::write_deformed_meshes_to_obj(const std::string filename) {
+  tinyobj::ObjWriter writer;
+  // just one mesh and one shape for now
+
+  // const auto nb_ws = loaded_meshes[0].uvs[0].size() / 2;
+  // std::vector<float> ws(nb_ws);
+  // std::generate(ws.begin(), ws.end(), [] { return 0; });
+
+  tinyobj::shape_t shape;
+  for (size_t mesh_idx = 0; mesh_idx < loaded_meshes.size(); ++mesh_idx) {
+    shape.name = loaded_meshes[mesh_idx].name;
+
+    int offset = 0;
+    for (size_t submesh_idx = 0;
+         submesh_idx < loaded_meshes[mesh_idx].indices.size(); ++submesh_idx) {
+      writer.attrib_.vertices =
+          loaded_meshes[mesh_idx].soft_skinned_position[submesh_idx];
+      writer.attrib_.normals =
+          loaded_meshes[mesh_idx].soft_skinned_normals[submesh_idx];
+      writer.attrib_.texcoords = loaded_meshes[mesh_idx].uvs[submesh_idx];
+
+      const auto nb_triangles =
+          loaded_meshes[mesh_idx].indices[submesh_idx].size() / 3;
+      shape.mesh.num_face_vertices.resize(nb_triangles);
+      std::generate(shape.mesh.num_face_vertices.begin(),
+                    shape.mesh.num_face_vertices.end(), [] { return 3; });
+
+      for (size_t i = 0;
+           i < loaded_meshes[mesh_idx].indices[submesh_idx].size(); ++i) {
+        tinyobj::index_t index;
+        index.vertex_index =
+            1 + int(loaded_meshes[mesh_idx].indices[submesh_idx][i]) + offset;
+        index.normal_index =
+            1 + int(loaded_meshes[mesh_idx].indices[submesh_idx][i]) + offset;
+        index.texcoord_index =
+            1 + int(loaded_meshes[mesh_idx].indices[submesh_idx][i]) + offset;
+        shape.mesh.indices.push_back(index);
+      }
+
+      offset += int(loaded_meshes[mesh_idx].indices[submesh_idx].size());
+    }
+    writer.shapes_.push_back(shape);
+  }
+
+  const std::string path_to_last_dir =
+      filename.substr(0, filename.find_last_of("/\\"));
+
+  int nError = 0;
+#if defined(_WIN32)
+  nError = _mkdir(path_to_last_dir.c_str());  // can be used on Windows
+#else
+  mode_t nMode = 0733;  // UNIX style permissions
+  nError =
+      mkdir(path_to_last_dir.c_str(), nMode);  // can be used on non-Windows
+#endif
+  if (nError != 0 && errno != EEXIST) {
+    (void)nError;
+    std::cerr << "We attempted to create directory " << path_to_last_dir
+              << " And there's an error that is not EEXIST\n";
+  }
+
+  const auto status = writer.SaveTofile(filename);
+  if (!writer.Warning().empty())
+    std::cout << "Warning :" << writer.Warning() << "\n";
+
+  if (!status) {
+    std::cout << "wrote " << filename << ".obj to disk\n";
+  } else {
+    std::cerr << "ERROR while writing " << filename << "\n";
+    std::cerr << writer.error() << "\n";
+  }
+}
+
 void app::run_debug_menu() {
+  static bool wait_next_frame = false;
+  bool write = false;
   if (ImGui::BeginMenu("DEBUG")) {
     if (ImGui::MenuItem("call unload()")) unload();
+    if (ImGui::MenuItem("save test.obj NOW") || wait_next_frame) {
+      if (!do_soft_skinning) {
+        wait_next_frame = true;
+      } else {
+        wait_next_frame = false;
+        write = true;
+      }
+    }
     ImGui::EndMenu();
+  }
+
+  const std::string filename = "test";
+  if (write) {
+    write_deformed_meshes_to_obj(filename);
   }
 }
 
@@ -797,9 +1029,15 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
     }
 
     material_to_use.bind_textures();
-    material_to_use.set_shader_uniform((*mesh.shader_list)[shader_to_use]);
 
-    update_uniforms(*mesh.shader_list, editor_light.use_ibl,
+    auto& active_shader_list = (mesh.skinned && do_soft_skinning)
+                                   ? *mesh.soft_skin_shader_list
+                                   : *mesh.shader_list;
+
+    const auto& active_shader = active_shader_list[shader_to_use];
+
+    material_to_use.set_shader_uniform(active_shader);
+    update_uniforms(active_shader_list, editor_light.use_ibl,
                     world_camera_position, editor_light.color,
                     editor_light.get_directional_light_direction(),
                     active_joint, shader_to_use,
@@ -848,7 +1086,8 @@ void app::draw_scene_recur(const glm::vec3& world_camera_position,
       }
 
     if (!defer) {
-      const auto normal_matrix = glm::transpose(glm::inverse(node.world_xform));
+      const glm::mat3 normal_matrix =
+          glm::transpose(glm::inverse(node.world_xform));
       draw_mesh(world_camera_position, mesh, normal_matrix, node.world_xform);
     } else {
       alpha_models.push_back(node.get_ptr());
@@ -856,7 +1095,7 @@ void app::draw_scene_recur(const glm::vec3& world_camera_position,
   }
 }
 
-void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
+void app::draw_scene(const glm::vec3& world_camera_position) {
   std::vector<defered_draw> alpha;
   draw_scene_recur(world_camera_position, gltf_scene_tree, alpha);
 
@@ -875,16 +1114,45 @@ void gltf_insight::app::draw_scene(const glm::vec3& world_camera_position) {
                   });
 
       for (const auto& to_draw : alpha) {
-        auto node = to_draw.node;
+        const auto node = to_draw.node;
         const auto& mesh = loaded_meshes[size_t(node->gltf_mesh_id)];
-        const auto normal_matrix =
+        const glm::mat3 normal_matrix =
             glm::transpose(glm::inverse(node->world_xform));
+
         draw_mesh(world_camera_position, mesh, normal_matrix,
                   node->world_xform);
       }
     }
   }
 }
+
+#if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
+static bool show_file_dialog(const std::string& title,
+                             const std::string& file_filter,
+                             std::string* filename)  // selected single filename
+{
+  (void)title;
+  if (!filename) {
+    return false;
+  }
+
+  nfdchar_t* outPath = nullptr;
+  // TODO(LTE): Handle default file path
+  nfdresult_t result =
+      NFD_OpenDialog(file_filter.c_str(), /* default path */ nullptr, &outPath);
+
+  if (result == NFD_OKAY) {
+    (*filename) = std::string(outPath);
+    free(outPath);
+  } else if (result == NFD_CANCEL) {
+    std::cout << "User pressed cancel\n";
+  } else {
+    std::cerr << "Error: " << NFD_GetError() << "\n";
+  }
+
+  return true;
+}
+#endif
 
 void app::main_loop() {
   bool status = true;
@@ -919,6 +1187,25 @@ bool app::main_loop_frame() {
     }
 
     if (open_file_dialog) {
+#if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
+      // TODO(LTE): Run into modal mode in ImGui while opening NFD window.
+      std::string _filename;
+      if (show_file_dialog("Open glTF...", "gltf,glb;vrm", &_filename)) {
+        std::cout << "Input filename = " << _filename << "\n";
+
+        unload();
+        input_filename = _filename;
+
+        try {
+          load();
+        } catch (const std::exception& e) {
+          std::cerr << "error occured during loading of " << input_filename
+                    << ": " << e.what() << '\n';
+          unload();
+        }
+      }
+      open_file_dialog = false;
+#else
       if (ImGuiFileDialog::Instance()->FileDialog(
               "Open glTF...", ".gltf\0.glb\0.vrm\0.*\0\0")) {
         if (ImGuiFileDialog::Instance()->IsOk) {
@@ -935,13 +1222,27 @@ bool app::main_loop_frame() {
         }
         open_file_dialog = false;
       }
+#endif
     }
 
     if (save_file_dialog) {
-      if (!asset_loaded)
+#if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
+      if (!asset_loaded) {
         save_file_dialog = false;
-      else if (ImGuiFileDialog::Instance()->FileDialog(
-                   "Save as...", nullptr, true, ".", input_filename)) {
+      } else {
+        // TODO(LTE): Run into modal mode in ImGui while opening NFD window.
+        std::string _filename;
+        if (show_file_dialog("Save glTF data as ...", "", &_filename)) {
+          std::cout << "Save filename = " << _filename << "\n";
+          std::cout << "TODO(LTE): Implement glTF save feature\n";
+        }
+        save_file_dialog = false;
+      }
+#else
+      if (!asset_loaded) {
+        save_file_dialog = false;
+      } else if (ImGuiFileDialog::Instance()->FileDialog(
+                     "Save as...", nullptr, true, ".", input_filename)) {
         if (ImGuiFileDialog::Instance()->IsOk) {
           auto save_as_filename =
               ImGuiFileDialog::Instance()->GetFilepathName();
@@ -962,7 +1263,9 @@ bool app::main_loop_frame() {
         }
         save_file_dialog = false;
       }
+#endif
     }
+
     camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
 
     if (asset_loaded) {
@@ -998,6 +1301,7 @@ bool app::main_loop_frame() {
 
     // Animation player advances time and apply animation interpolation.
     // It also display the sequencer timeline and controls on screen
+
     run_animation_timeline(sequence, looping, selectedEntry, firstFrame,
                            expanded, currentFrame, currentPlayTime,
                            last_frame_time, playing_state, animations);
@@ -1027,11 +1331,18 @@ bool app::main_loop_frame() {
     view_matrix = glm::lookAt(world_camera_position, glm::vec3(0.f),
                               camera_rotation * glm::vec3(0, 1.f, 0));
 
+    bool gpu_dirty = false;
+    if (ImGui::Checkbox("Software skinning", &do_soft_skinning)) {
+      if (!do_soft_skinning)  // if we clicked on this, and we are not doing
+                              // soft skinning anymore, gpu buffer contains
+                              // pre-skinned garbage
+      {
+        gpu_dirty = true;
+      }
+    }
     if (asset_loaded) {
       int active_bone_gltf_node = -1;
       for (auto& a_mesh : loaded_meshes) {
-        if (!a_mesh.displayed) continue;
-
         if ((active_joint >= 0) &&
             (active_joint < int(a_mesh.flat_joint_list.size())))
           active_bone_gltf_node =
@@ -1041,24 +1352,37 @@ bool app::main_loop_frame() {
         // includes the "model view projection" that transform the geometry to
         // the screen space, the normal matrix, and the joint matrix array
         // that is used to deform the skin with the bones
-        precompute_hardware_skinning_data(
-            gltf_scene_tree, root_node_model_matrix, a_mesh.joint_matrices,
-            a_mesh.flat_joint_list, a_mesh.inverse_bind_matrices);
+        if (a_mesh.skinned)
+          compute_joint_matrices(root_node_model_matrix, a_mesh.joint_matrices,
+                                 a_mesh.flat_joint_list,
+                                 a_mesh.inverse_bind_matrices);
 
-        // glm::mat4 mvp =
-        //    projection_matrix * view_matrix * root_node_model_matrix;
-        // glm::mat3 normal_matrix =
-        //    glm::transpose(glm::inverse(root_node_model_matrix));
-
-        // glm::mat4 draw_model_matrix = root_node_model_matrix;
-
-        // Draw all of the submeshes of the object
         for (size_t submesh = 0; submesh < a_mesh.draw_call_descriptors.size();
              ++submesh) {
-          perform_software_morphing(gltf_scene_tree, submesh,
-                                    a_mesh.morph_targets, a_mesh.positions,
-                                    a_mesh.normals, a_mesh.display_position,
-                                    a_mesh.display_normals, a_mesh.VBOs);
+          if (gltf_scene_tree.pose.blend_weights.size() > 0)
+            perform_software_morphing(
+                gltf_scene_tree, submesh, a_mesh.morph_targets,
+                a_mesh.positions, a_mesh.normals, a_mesh.display_position,
+                a_mesh.display_normals, a_mesh.VBOs,
+                a_mesh.skinned ? !do_soft_skinning : true);
+
+          // do not upload to GPU if soft skin is on
+
+          if (a_mesh.skinned) {
+            if (do_soft_skinning) {
+              perform_software_skinning(
+                  submesh, a_mesh.joint_matrices, a_mesh.display_position,
+                  a_mesh.display_normals, a_mesh.joints, a_mesh.weights,
+                  a_mesh.soft_skinned_position, a_mesh.soft_skinned_normals);
+              // now, upload new mesh to GPU
+              gpu_update_submesh_buffers(submesh, a_mesh.soft_skinned_position,
+                                         a_mesh.soft_skinned_normals,
+                                         a_mesh.VBOs);
+            } else if (gpu_dirty) {
+              gpu_update_submesh_buffers(submesh, a_mesh.display_position,
+                                         a_mesh.display_normals, a_mesh.VBOs);
+            }
+          }
         }
       }
 
@@ -1068,6 +1392,35 @@ bool app::main_loop_frame() {
         draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
                           projection_matrix, *loaded_meshes[0].shader_list,
                           mesh);
+    }
+
+    {
+      ImGui::Begin("OBJ export animation sequence");
+      ImGui::Text("Select an animation sequence, then hit the RUN button");
+      static int animation_sequence_item = 0;
+      std::vector<std::string> names;
+      for (auto& s : sequence.myItems) names.push_back(s.name);
+      ImGuiCombo("sequence", &animation_sequence_item, names);
+      if (ImGui::Button("RUN")) {
+        if (!animations.empty()) {
+          // setup the exporter
+          obj_export_worker.setup_new_sequence(&sequence);
+
+          // make sure only the selected animation will play
+          for (size_t i = 0; i < animations.size(); ++i) {
+            animations[i].playing = size_t(animation_sequence_item) == i;
+          }
+
+          // Start the work
+          obj_export_worker.start_work();
+        }
+      }
+      ImGui::End();
+
+      // We decouple the work from the render loop (or more true : we spread it
+      // on multiple frames to keep the
+      obj_export_worker.work_for_one_frame();
+      obj_export_worker.ui();
     }
   }
   // Render all ImGui, then swap buffers
@@ -1185,7 +1538,7 @@ void app::cpu_compute_morphed_display_mesh(
   }
 }
 
-void app::gpu_update_morphed_submesh(
+void app::gpu_update_submesh_buffers(
     size_t submesh_id, std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
     std::vector<std::array<GLuint, VBO_count>>& VBOs) {
@@ -1206,6 +1559,7 @@ void app::gpu_update_morphed_submesh(
   //             display_tangent[submesh_id].size() * sizeof(float),
   //             display_tangent[submesh_id].data(), GL_DYNAMIC_DRAW);
 
+  // keep state clean
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -1216,7 +1570,7 @@ void app::perform_software_morphing(
     const std::vector<std::vector<float>>& normals,
     std::vector<std::vector<float>>& display_position,
     std::vector<std::vector<float>>& display_normal,
-    std::vector<std::array<GLuint, VBO_count>>& VBOs) {
+    std::vector<std::array<GLuint, VBO_count>>& VBOs, bool upload_to_gpu) {
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wexit-time-destructors"
@@ -1235,15 +1589,18 @@ void app::perform_software_morphing(
 
     // We are dynamically keeping a cache of the morph targets weights. CPU-side
     // evaluation of morphing is expensive, if the blending weights did not
-    // change, we don't want to re-evaluate the mesh. We are keeping a cache of
-    // the weights, and sending a dirty flags if we need to recompute and
-    // re-upload the mesh to the GPU
+    // change, we don't want to re-evaluate the mesh.
+
+    // We are keeping a cache of the weights, and setting a dirty flags if we
+    // need to recompute it.
 
     // To transparently handle the loading of a different file, we resize these
     // arrays here
     if (cached_weights.size() != display_position.size()) {
       cached_weights.resize(display_position.size());
       clean.resize(display_position.size());
+
+      // This sets all the dirty flags to "dirty"
       std::generate(clean.begin(), clean.end(), [] { return false; });
     }
 
@@ -1254,22 +1611,23 @@ void app::perform_software_morphing(
       cached_weights[submesh_id] = mesh_skeleton_graph.pose.blend_weights;
     }
 
-    // If the size matches, we are comparing all the elements, if they match, it
-    // means that mesh doesn't need to be evaluated
+    // ElseIf the size matches, we are comparing all the elements (using
+    // std::vector<> operator==()), if they match, it means that mesh doesn't
+    // need to be evaluated
     else if (cached_weights[submesh_id] ==
              mesh_skeleton_graph.pose.blend_weights) {
       clean[submesh_id] = true;
     }
 
-    // In that case, we are updating the cache, and setting the flag dirty
+    // Else, In that case, we are updating the cache, and setting the flag dirty
     else {
       clean[submesh_id] = false;
       cached_weights[submesh_id] = mesh_skeleton_graph.pose.blend_weights;
     }
 
-    // If flag is dirty
+    // If flag is found to be dirty
     if (!clean[submesh_id]) {
-      // Blend between morph targets on the CPU:
+      // Blend each vertex between morph targets on the CPU:
       for (size_t vertex = 0; vertex < display_position[submesh_id].size();
            ++vertex) {
         cpu_compute_morphed_display_mesh(
@@ -1277,10 +1635,72 @@ void app::perform_software_morphing(
             normals, display_position, display_normal, vertex);
       }
 
-      // Upload the new mesh data to the GPU
-      gpu_update_morphed_submesh(submesh_id, display_position, display_normal,
-                                 VBOs);
+      // If it is necessary to upload the new mesh data to the GPU, do it:
+      if (upload_to_gpu)
+        gpu_update_submesh_buffers(submesh_id, display_position, display_normal,
+                                   VBOs);
     }
+  }
+}
+
+void app::perform_software_skinning(
+    size_t submesh_id, const std::vector<glm::mat4>& joint_matrix,
+    const std::vector<std::vector<float>>& positions,
+    const std::vector<std::vector<float>>& normals,
+    const std::vector<std::vector<unsigned short>>& joints,
+    const std::vector<std::vector<float>>& weights,
+    std::vector<std::vector<float>>& display_position,
+    std::vector<std::vector<float>>& display_normal) {
+  // TODO only perform this computation if the joints have moved
+
+  // Fetch the arrays for the current primitive
+  const auto& prim_positions = positions[submesh_id];
+  const auto& prim_normals = normals[submesh_id];
+  const auto& prim_joints = joints[submesh_id];
+  const auto& prim_weights = weights[submesh_id];
+  const auto vertex_count = prim_joints.size() / 4;
+
+  // We need the data sizes to match for what we do to work
+  assert(prim_positions.size() / 3 == vertex_count &&
+         prim_normals.size() / 3 == vertex_count &&
+         prim_joints.size() / 4 == vertex_count &&
+         prim_weights.size() / 4 == vertex_count);
+
+  for (size_t vertex = 0; vertex < vertex_count; ++vertex) {
+    using namespace glm;
+
+    vec3 output_position, output_normal;
+    auto input_positions =
+        vec3(prim_positions[3 * vertex + 0], prim_positions[3 * vertex + 1],
+             prim_positions[3 * vertex + 2]);
+    auto input_normals =
+        vec3(prim_normals[3 * vertex + 0], prim_normals[3 * vertex + 1],
+             prim_normals[3 * vertex + 2]);
+    auto input_joints =
+        vec4(prim_joints[4 * vertex + 0], prim_joints[4 * vertex + 1],
+             prim_joints[4 * vertex + 2], prim_joints[4 * vertex + 3]);
+    auto input_weights =
+        vec4(prim_weights[4 * vertex + 0], prim_weights[4 * vertex + 1],
+             prim_weights[4 * vertex + 2], prim_weights[4 * vertex + 3]);
+
+    // TODO it is possible to support more than 4 joints per vertex, but not
+    // required by glTF spec
+    const mat4 skin_matrix =
+        input_weights.x * joint_matrix[size_t(input_joints.x)] +
+        input_weights.y * joint_matrix[size_t(input_joints.y)] +
+        input_weights.z * joint_matrix[size_t(input_joints.z)] +
+        input_weights.w * joint_matrix[size_t(input_joints.w)];
+
+    auto skinned_position = skin_matrix * vec4(input_positions, 1.f);
+    auto normal_skin_matrix = mat3(transpose(inverse(skin_matrix)));
+
+    output_position = vec3(skinned_position) / skinned_position.w;
+    output_normal = normal_skin_matrix * input_normals;
+
+    memcpy(&display_position[submesh_id][3 * vertex],
+           value_ptr(output_position), 3 * sizeof(float));
+    memcpy(&display_normal[submesh_id][3 * vertex], value_ptr(output_normal),
+           3 * sizeof(float));
   }
 }
 
@@ -1302,22 +1722,10 @@ void app::draw_bone_overlay(gltf_node& mesh_skeleton_graph,
              _projection_matrix, a_mesh);
 }
 
-void app::precompute_hardware_skinning_data(
-    gltf_node& mesh_skeleton_graph, glm::mat4& model_matrix,
-    std::vector<glm::mat4>& joint_matrices,
+void app::compute_joint_matrices(
+    glm::mat4& model_matrix, std::vector<glm::mat4>& joint_matrices,
     std::vector<gltf_node*>& flat_joint_list,
     std::vector<glm::mat4>& inverse_bind_matrices) {
-  (void)mesh_skeleton_graph;
-
-  if (flat_joint_list.size() ==
-      0) {  // TODO temp bodge trying to load a VRM file
-    return;
-  }
-
-  // This goes through the skeleton hierarchy, and compute the global
-  // transform of each joint
-  // update_mesh_skeleton_graph_transforms(mesh_skeleton_graph);
-
   // This compute the individual joint matrices that are uploaded to the
   // GPU. Detailed explanations about skinning can be found in this tutorial
   // https://github.com/KhronosGroup/glTF-Tutorials/blob/master/gltfTutorial/gltfTutorial_020_Skins.md#vertex-skinning-implementation
@@ -1327,7 +1735,7 @@ void app::precompute_hardware_skinning_data(
   // Sascha Willems's "vulkan-glTF-PBR" code...
   // https://github.com/SaschaWillems/Vulkan-glTF-PBR/blob/master/base/VulkanglTFModel.hpp
 
-  glm::mat4 inverse_model = glm::inverse(model_matrix);
+  const glm::mat4 inverse_model = glm::inverse(model_matrix);
   for (size_t i = 0; i < joint_matrices.size(); ++i) {
     joint_matrices[i] = inverse_model * flat_joint_list[i]->world_xform *
                         inverse_bind_matrices[i];
