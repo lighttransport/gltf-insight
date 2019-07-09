@@ -570,8 +570,14 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 
   // still want compatibility with old OpenGL
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#ifdef __APPLE__
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
-                 GL_FALSE);  // It looks this is important on macOS.
+                 GL_TRUE);  // It looks this is important on macOS.
+#else
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
+                 GL_FALSE);
+#endif
+
 #endif
   window = glfwCreateWindow(1600, 900, "glTF Insight GUI", nullptr, nullptr);
   glfwMakeContextCurrent(window);
@@ -589,11 +595,20 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
     std::cerr << "Failed to load OpenGL functions with gladLoadGL\n";
     exit(EXIT_FAILURE);
   }
+
+  std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
+
+#if defined(__APPLE__)
+  if (!((GLVersion.major >= 3) && (GLVersion.minor >= 3)) && (GLVersion.major <= 3)) {
+    std::cerr << "OpenGL 3.3 or later is not available." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+#else
   if (!((GLVersion.major >= 3) && (GLVersion.minor >= 3))) {
     std::cerr << "OpenGL 3.3 is not available." << std::endl;
     exit(EXIT_FAILURE);
   }
-  std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
+#endif
 #endif
 
   std::cout << "GL_VENDOR : " << glGetString(GL_VENDOR) << "\n";
@@ -660,7 +675,7 @@ void initialize_imgui(GLFWwindow* window) {
 
   // Setup Platform/Renderer bindings
   ImGui_ImplGlfw_InitForOpenGL(window, true);
-#ifndef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) || defined(__APPLE__)
   ImGui_ImplOpenGL3_Init("#version 330");
 #else
   ImGui_ImplOpenGL3_Init("#version 300 es");
