@@ -574,8 +574,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
                  GL_TRUE);  // It looks this is important on macOS.
 #else
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
-                 GL_FALSE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_FALSE);
 #endif
 
 #endif
@@ -599,7 +598,8 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
 
 #if defined(__APPLE__)
-  if (!((GLVersion.major >= 3) && (GLVersion.minor >= 3)) && (GLVersion.major <= 3)) {
+  if (!((GLVersion.major >= 3) && (GLVersion.minor >= 3)) &&
+      (GLVersion.major <= 3)) {
     std::cerr << "OpenGL 3.3 or later is not available." << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -675,10 +675,12 @@ void initialize_imgui(GLFWwindow* window) {
 
   // Setup Platform/Renderer bindings
   ImGui_ImplGlfw_InitForOpenGL(window, true);
-#if defined(__EMSCRIPTEN__) || defined(__APPLE__)
-  ImGui_ImplOpenGL3_Init("#version 330");
-#else
+#ifdef __EMSCRIPTEN__  // Just Web for now (Android in the future)
+  // ESSL 3.00
   ImGui_ImplOpenGL3_Init("#version 300 es");
+#else  // All destktop platforms
+  // GLSL 3.30
+  ImGui_ImplOpenGL3_Init("#version 330");
 #endif
 
 #ifndef FORCE_DEFAULT_STYLE
@@ -1138,8 +1140,9 @@ void mouse_button_callback(GLFWwindow* window, int button, int action,
                            int mods) {
   (void)mods;
 
-  auto* param = &(reinterpret_cast<gltf_insight::app*>(
-      glfwGetWindowUserPointer(window))->gui_parameters);
+  auto* param =
+      &(reinterpret_cast<gltf_insight::app*>(glfwGetWindowUserPointer(window))
+            ->gui_parameters);
 
   if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
     param->button_states[0] = true;
@@ -1156,8 +1159,9 @@ void mouse_button_callback(GLFWwindow* window, int button, int action,
 }
 
 void cursor_pos_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
-  auto* param = &(reinterpret_cast<gltf_insight::app*>(
-      glfwGetWindowUserPointer(window))->gui_parameters);
+  auto* param =
+      &(reinterpret_cast<gltf_insight::app*>(glfwGetWindowUserPointer(window))
+            ->gui_parameters);
 
   // mouse left pressed
   if (param->button_states[0] && !ImGui::GetIO().WantCaptureMouse &&
