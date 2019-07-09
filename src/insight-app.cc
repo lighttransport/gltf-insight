@@ -757,6 +757,8 @@ app::app(int argc, char** argv) {
   setup_fallback_textures();
 
   load_sensible_default_material(dummy_material);
+
+  utility_buffers::init_static_buffers();
 }
 
 app::~app() {

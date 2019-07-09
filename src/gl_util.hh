@@ -47,6 +47,11 @@ static constexpr auto VBO_layout_color = 3;
 static constexpr auto VBO_layout_joints = 4;
 static constexpr auto VBO_layout_weights = 5;
 
+struct utility_buffers {
+  static GLuint point_vbo, line_vbo, point_vao, line_vao, point_ebo, line_ebo;
+  static void init_static_buffers();
+};
+
 /// Debug output
 void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
                             GLenum severity, GLsizei length,
@@ -60,6 +65,11 @@ void draw_space_origin_point(float point_size, GLuint shader,
 /// matrix set to shader)
 void draw_space_base(GLuint shader, const float line_width,
                      const float axis_scale);
+
+/// Draw a line from origin to end points in the current space
+/// (model/view/projection matrix set to shader)
+void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end,
+               const glm::vec4 draw_color, const float line_width);
 
 /// Load all the shaders. Skinning shader needs t
 void load_shaders(const size_t nb_joints,

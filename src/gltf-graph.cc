@@ -219,24 +219,6 @@ std::vector<gltf_mesh_instance> get_list_of_mesh_instances(
   return meshes;
 }
 
-static void draw_line(GLuint shader, const glm::vec3 origin,
-                      const glm::vec3 end, const glm::vec4 draw_color,
-                      const float line_width) {
-  (void)shader;
-  (void)origin;
-  (void)end;
-  (void)draw_color;
-  (void)line_width;
-  // glUseProgram(shader);
-  // glLineWidth(line_width);
-  // glUniform4f(glGetUniformLocation(shader, "debug_color"), draw_color.r,
-  //            draw_color.g, draw_color.b, draw_color.a);
-  // glBegin(GL_LINES);
-  // glVertex4f(end.x, end.y, end.z, 1);
-  // glVertex4f(origin.x, origin.y, origin.z, 1);
-  // glEnd();
-}
-
 #include "insight-app.hh"
 
 void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
@@ -270,7 +252,7 @@ void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
           draw_line(shader, glm::vec3(0.f), child->local_xform[3],
                     (is_active ? glm::vec4(1.f, .5f, .5f, 1.f)
                                : glm::vec4(0.f, .5f, .5f, 1.f)),
-                    8);
+                    3);
         }
 
     if (draw_childless_bone_extension && joint_node->children.empty()) {
@@ -278,13 +260,21 @@ void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
                 glm::vec3(0.f, .25f, 0.f) /*Y is length*/,
                 is_active ? glm::vec4(.5f, .25f, .5f, 1.f)
                           : glm::vec4(.5f, .75f, .5f, 1.f),
-                6);
+                2);
     }
 
+    if (draw_bone_axes) {
+      glm::vec3 scale, translation, skew;
+      glm::vec4 persp;
+      glm::quat orientation;
+      glm::decompose(gltf_mesh_node->world_xform, scale, orientation,
+                     translation, skew, persp);
+      const float axis_scale = 0.125f * glm::length(scale);
+      draw_space_base(shader, 1.5, axis_scale);
+    }
     if (draw_joint_point)
       draw_space_origin_point(
-          10, shader,
-          is_active ? glm::vec4(0, 1, 1, 1) : glm::vec4(1, 0, 0, 1));
+          3, shader, is_active ? glm::vec4(0, 1, 1, 1) : glm::vec4(1, 0, 0, 1));
   }
 }
 
@@ -355,21 +345,12 @@ void bone_display_window(bool* open) {
   if (open && !*open) return;
 
   if (ImGui::Begin("Skeleton drawing options", open)) {
-    // TODO (Ybalrid) Fix your draw_point and draw_line routines!
-    ImGui::TextColored(ImVec4(1, 0, 0, 1),
-                       "TODO: rewrite bone display in modern opengl!!!!");
-
-    // for now, deactivate ALL the bone display modes
-    draw_joint_point = draw_bone_segment = draw_bone_axes =
-        draw_childless_bone_extension = draw_mesh_anchor_point = false;
-#if 0
     ImGui::Checkbox("Draw joint points", &draw_joint_point);
     ImGui::Checkbox("Draw Bone as segments", &draw_bone_segment);
     ImGui::Checkbox("Draw childless joint extnesion",
                     &draw_childless_bone_extension);
     ImGui::Checkbox("Draw Bone's base axes", &draw_bone_axes);
     ImGui::Checkbox("Draw Skeleton's Mesh base", &draw_mesh_anchor_point);
-#endif
   }
   ImGui::End();
 }

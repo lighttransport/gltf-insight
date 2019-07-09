@@ -30,6 +30,49 @@ SOFTWARE.
 
 #include "gl_util.hh"
 
+GLuint utility_buffers::point_vbo = 0;
+GLuint utility_buffers::line_vbo = 0;
+GLuint utility_buffers::point_vao = 0;
+GLuint utility_buffers::line_vao = 0;
+GLuint utility_buffers::point_ebo = 0;
+GLuint utility_buffers::line_ebo = 0;
+
+void utility_buffers::init_static_buffers() {
+  float buffer[6] = {0.f};
+  unsigned int ebo[2] = {0, 1};
+
+  // Generate objects
+  glGenVertexArrays(1, &point_vao);
+  glGenVertexArrays(1, &line_vao);
+  glGenBuffers(1, &point_vbo);
+  glGenBuffers(1, &line_vbo);
+  glGenBuffers(1, &point_ebo);
+  glGenBuffers(1, &line_ebo);
+
+  // Setup point VAO
+  glBindVertexArray(point_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, point_vbo);
+  glBufferData(GL_ARRAY_BUFFER, 3 * sizeof(float), buffer, GL_STREAM_DRAW);
+  glVertexAttribPointer(VBO_layout_position, 3, GL_FLOAT, GL_FALSE,
+                        3 * sizeof(float), nullptr);
+  glEnableVertexAttribArray(VBO_layout_position);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, point_ebo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, 1 * sizeof(unsigned int), ebo,
+               GL_STATIC_DRAW);
+
+  // Setup Line VAO
+  glBindVertexArray(line_vao);
+  glBindBuffer(GL_ARRAY_BUFFER, line_vbo);
+  glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), buffer, GL_STREAM_DRAW);
+  glVertexAttribPointer(VBO_layout_position, 3, GL_FLOAT, GL_FALSE,
+                        3 * sizeof(float), nullptr);
+  glEnableVertexAttribArray(VBO_layout_position);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, point_ebo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, 2 * sizeof(unsigned int), ebo,
+               GL_STATIC_DRAW);
+  glBindVertexArray(0);
+}
+
 void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
                    GLsizei length, const GLchar* message, void* userParam) {
   (void)length;
@@ -119,46 +162,61 @@ void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
 
 void draw_space_origin_point(float point_size, GLuint shader,
                              const glm::vec4& color) {
-  (void)shader;
-  (void)point_size;
-  (void)color;
-  // glUniform4f(glGetUniformLocation(shader, "debug_color"), color.r, color.g,
-  //            color.b, color.a);
+  glUniform4f(glGetUniformLocation(shader, "debug_color"), color.r, color.g,
+              color.b, color.a);
 
+#ifndef __EMSCRIPTEN__  // TODO add a symbol for GLES 3.0
+
+  // strange observation: This function doesn't exist in GLES 3.0...
   // set the size
+  glPointSize(point_size);
 
-  // Since we're not even drawing a polygon, it's probably simpler to do
-  // it with old-style opengl
+#endif
 
-  // glPointSize(point_size);
-  // glBegin(GL_POINTS);
-  // glVertex4f(0, 0, 0, 1);
-  // glEnd();
+  glUseProgram(shader);
+  glUniform4f(glGetUniformLocation(shader, "debug_color"), color.r, color.g,
+              color.b, color.a);
+
+  glPointSize(point_size);
+
+  static constexpr std::array<float, 3> vertex = {{0, 0, 0}};
+  glBindBuffer(GL_ARRAY_BUFFER, utility_buffers::point_vbo);
+  glBufferData(GL_ARRAY_BUFFER, vertex.size() * sizeof(float), vertex.data(),
+               GL_STREAM_DRAW);
+  glBindVertexArray(utility_buffers::point_vao);
+  glDrawElements(GL_POINTS, 1, GL_UNSIGNED_INT, nullptr);
+}
+
+void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end,
+               const glm::vec4 draw_color, const float line_width) {
+  glUseProgram(shader);
+  glLineWidth(line_width);
+  glUniform4f(glGetUniformLocation(shader, "debug_color"), draw_color.r,
+              draw_color.g, draw_color.b, draw_color.a);
+
+  static std::array<float, 6> buffer;
+  buffer[0] = origin.x;
+  buffer[1] = origin.y;
+  buffer[2] = origin.z;
+  buffer[3] = end.x;
+  buffer[4] = end.y;
+  buffer[5] = end.z;
+
+  glBindBuffer(GL_ARRAY_BUFFER, utility_buffers::line_vbo);
+  glBufferData(GL_ARRAY_BUFFER, buffer.size() * sizeof(float), buffer.data(),
+               GL_STREAM_DRAW);
+  glBindVertexArray(utility_buffers::line_vao);
+  glDrawElements(GL_LINES, 2, GL_UNSIGNED_INT, nullptr);
 }
 
 void draw_space_base(GLuint shader, const float line_width,
                      const float axis_scale) {
-  (void)shader;
-  (void)line_width;
-  (void)axis_scale;
-  // glLineWidth(line_width);
-  // glUniform4f(glGetUniformLocation(shader, "debug_color"), 1, 0, 0, 1);
-  // glBegin(GL_LINES);
-  // glVertex4f(0, 0, 0, 1);
-  // glVertex4f(axis_scale, 0, 0, 1);
-  // glEnd();
-
-  // glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 1, 0, 1);
-  // glBegin(GL_LINES);
-  // glVertex4f(0, 0, 0, 1);
-  // glVertex4f(0, axis_scale, 0, 1);
-  // glEnd();
-
-  // glUniform4f(glGetUniformLocation(shader, "debug_color"), 0, 0, 1, 1);
-  // glBegin(GL_LINES);
-  // glVertex4f(0, 0, 0, 1);
-  // glVertex4f(0, 0, axis_scale, 1);
-  // glEnd();
+  draw_line(shader, glm::vec3(0.f), glm::vec3(axis_scale, 0, 0),
+            glm::vec4(1, 0, 0, 1), line_width);
+  draw_line(shader, glm::vec3(0.f), glm::vec3(0, axis_scale, 0),
+            glm::vec4(0, 1, 0, 1), line_width);
+  draw_line(shader, glm::vec3(0.f), glm::vec3(0, 0, axis_scale),
+            glm::vec4(0, 0, 1, 1), line_width);
 }
 
 void load_shaders(const size_t nb_joints,
