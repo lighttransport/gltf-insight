@@ -574,10 +574,13 @@ mesh& mesh::operator=(mesh&& o) {
   weights = std::move(o.weights);
   display_position = std::move(o.display_position);
   display_normals = std::move(o.display_normals);
+  soft_skinned_position = std::move(o.soft_skinned_position);
+  soft_skinned_normals = std::move(o.soft_skinned_normals);
   joints = std::move(o.joints);
   colors = std::move(o.colors);
 
   shader_list = std::move(o.shader_list);
+  soft_skin_shader_list = std::move(o.soft_skin_shader_list);
   return *this;
 }
 
