@@ -82,7 +82,8 @@ void update_uniforms(std::map<std::string, shader>& shaders, bool use_ibl,
                      const glm::vec3& light_direction, const int active_joint,
                      const std::string& shader_to_use, const glm::mat4& model,
                      const glm::mat4& mvp, const glm::mat3& normal,
-                     const std::vector<glm::mat4>& joint_matrices);
+                     const std::vector<glm::mat4>& joint_matrices,
+                     const glm::vec3& active_vertex);
 
 /// Info needed to actually submit drawcall for a submesh
 struct draw_call_submesh_descriptor {

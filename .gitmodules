@@ -22,3 +22,6 @@
 [submodule "third_party/nativefiledialog"]
 	path = third_party/nativefiledialog
 	url = https://github.com/mlabbe/nativefiledialog
+[submodule "third_party/nanort"]
+	path = third_party/nanort
+	url = https://github.com/lighttransport/nanort.git

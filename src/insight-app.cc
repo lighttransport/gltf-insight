@@ -40,7 +40,11 @@ SOFTWARE.
 #pragma clang diagnostic pop
 #endif
 
+#include <tuple>
 using namespace gltf_insight;
+
+color_identifier mesh::selection_id_counter = 0xFF000000;
+glm::vec3 app::debug_start, app::debug_stop, app::active_poly_indices;
 
 void app::unload() {
   asset_loaded = false;
@@ -352,6 +356,12 @@ void app::load() {
     current_mesh.joints.resize(nb_submeshes);
     current_mesh.VAOs.resize(nb_submeshes);
     current_mesh.VBOs.resize(nb_submeshes);
+    current_mesh.submesh_selection_ids.resize(nb_submeshes);
+    std::generate(current_mesh.submesh_selection_ids.begin(),
+                  current_mesh.submesh_selection_ids.end(), [] {
+                    mesh::selection_id_counter.next();
+                    return mesh::selection_id_counter;
+                  });
 
     // Create OpenGL objects for submehes
     glGenVertexArrays(GLsizei(nb_submeshes), current_mesh.VAOs.data());
@@ -556,6 +566,101 @@ mesh::~mesh() {
   draw_call_descriptors.clear();
 }
 
+void mesh::raytrace_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
+                                         glm::vec3 world_camera_position,
+                                         glm::mat4 vp, float x, float y) const {
+  constexpr size_t stride = 3 * sizeof(float);
+  std::vector<float> world_positions(positions[submesh].size());
+
+  for (size_t v = 0; v < world_positions.size() / 3; ++v) {
+    glm::vec4 projected4D =
+        world_xform *
+        glm::vec4(glm::make_vec3(&(skinned ? soft_skinned_position
+                                           : display_position)[submesh][3 * v]),
+                  1.f);
+    const auto projected = glm::vec3(projected4D / projected4D.w);
+    memcpy(&world_positions[3 * v], glm::value_ptr(projected), stride);
+  }
+
+  auto triangle_mesh = nanort::TriangleMesh<float>(
+      world_positions.data(), indices[submesh].data(), stride);
+  auto triangle_sha_pred = nanort::TriangleSAHPred<float>(
+      world_positions.data(), indices[submesh].data(), stride);
+
+  nanort::BVHBuildOptions<float> build_options;
+  // build_options.cache_bbox = false;
+  nanort::BVHAccel<float> accel;
+  accel.Build(indices[submesh].size() / 3, triangle_mesh, triangle_sha_pred,
+              build_options);
+
+  // std::cout << "Using NanoRT...\n";
+  // printf("  BVH build option:\n");
+  // printf("    # of leaf primitives: %d\n",
+  // build_options.min_leaf_primitives); printf("    SAH binsize         :
+  // %d\n", build_options.bin_size); nanort::BVHBuildStatistics stats =
+  // accel.GetStatistics(); printf("  BVH statistics:\n"); printf("    # of leaf
+  // nodes: %d\n", stats.num_leaf_nodes); printf("    # of branch nodes: %d\n",
+  // stats.num_branch_nodes); printf("  Max tree depth     : %d\n",
+  // stats.max_tree_depth); float bmin[3], bmax[3]; accel.BoundingBox(bmin,
+  // bmax); printf("  Bmin               : %f, %f, %f\n", bmin[0], bmin[1],
+  // bmin[2]); printf("  Bmax               : %f, %f, %f\n", bmax[0], bmax[1],
+  // bmax[2]);
+
+  nanort::Ray<float> camera_ray;
+  camera_ray.org[0] = world_camera_position.x;
+  camera_ray.org[1] = world_camera_position.y;
+  camera_ray.org[2] = world_camera_position.z;
+
+  auto inverse_vp = glm::inverse(vp);
+
+  // gonna flip the Y
+  y = 1.0f - y;
+  glm::vec4 mouse_world_coordiantes =
+      inverse_vp * glm::vec4(2.f * x - 1.f, 2.f * y - 1.f, -100.f, 1.f);
+  mouse_world_coordiantes /= mouse_world_coordiantes.w;
+
+  glm::vec3 mouse_ray_direction = glm::normalize(
+      (glm::vec3(mouse_world_coordiantes) - world_camera_position));
+
+  std::cout << "calculated mouse_ray_direction: " << mouse_ray_direction.x
+            << ", " << mouse_ray_direction.y << ", " << mouse_ray_direction.z
+            << "\n";
+  std::cout << "world camera :\n " << world_camera_position.x << ", "
+            << world_camera_position.y << ", " << world_camera_position.z
+            << "\n";
+
+  const auto debug_direction =
+      world_camera_position + 50.f * mouse_ray_direction;
+
+  app::debug_start = world_camera_position;
+  app::debug_stop = debug_direction;
+
+  std::cout << "debug_end :\n " << debug_direction.x << ", "
+            << debug_direction.y << ", " << debug_direction.z << "\n";
+
+  camera_ray.dir[0] = mouse_ray_direction.x;
+  camera_ray.dir[1] = mouse_ray_direction.y;
+  camera_ray.dir[2] = mouse_ray_direction.z;
+  camera_ray.min_t = 0;
+  camera_ray.max_t = 1000;  // todo max draw distance
+
+  nanort::TriangleIntersector<float, nanort::TriangleIntersection<float>>
+      triangle_intersector(world_positions.data(), indices[submesh].data(),
+                           3 * sizeof(float));
+  nanort::TriangleIntersection<float> intersection;
+
+  if (accel.Traverse(camera_ray, triangle_intersector, &intersection)) {
+    std::cout << "raycast successful!\n";
+
+    std::cout << "primitive id is:" << intersection.prim_id;
+    // app::active_poly_indices.x = indices[submesh][intersection.prim_id / 3];
+    // app::active_poly_indices.y = indices[submesh][intersection.prim_id / 3 +
+    // 1]; app::active_poly_indices.z = indices[submesh][intersection.prim_id /
+    // 3
+    // + 2];
+  }
+}
+
 mesh& mesh::operator=(mesh&& o) {
   nb_joints = o.nb_joints;
   nb_morph_targets = o.nb_morph_targets;
@@ -578,9 +683,10 @@ mesh& mesh::operator=(mesh&& o) {
   soft_skinned_normals = std::move(o.soft_skinned_normals);
   joints = std::move(o.joints);
   colors = std::move(o.colors);
-
+  
   shader_list = std::move(o.shader_list);
   soft_skin_shader_list = std::move(o.soft_skin_shader_list);
+
   return *this;
 }
 
@@ -747,13 +853,14 @@ app::app(int argc, char** argv) {
 
   // load fallback material.
   // This must be called before loading glTF scene since
-  // `setup_fallback_textures` creates GL texture ID for each fallback textures(e.g. white tex).
-  // TODO(LTE): Do not create fallback texture and add enabled/disabled flag to each texture.
+  // `setup_fallback_textures` creates GL texture ID for each fallback
+  // textures(e.g. white tex).
+  // TODO(LTE): Do not create fallback texture and add enabled/disabled flag to
+  // each texture.
   setup_fallback_textures();
   load_sensible_default_material(dummy_material);
   logo = load_gltf_insight_icon();
   utility_buffers::init_static_buffers();
-
 
   if (!input_filename.empty()) {
     try {
@@ -763,6 +870,26 @@ app::app(int argc, char** argv) {
       unload();
     }
   }
+
+  glGenFramebuffers(1, &color_pick_fbo);
+  glGenTextures(1, &color_pick_screen_texture);
+  glGenTextures(1, &color_pick_depth_buffer);
+  glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
+  glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 512, 512, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         color_pick_screen_texture, 0);
+  glBindTexture(GL_TEXTURE_2D, color_pick_depth_buffer);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, 512, 512, 0,
+               GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                         GL_TEXTURE_2D, color_pick_depth_buffer, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 app::~app() {
@@ -1049,7 +1176,7 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
                     active_joint, shader_to_use,
                     projection_matrix * view_matrix * model_matrix,
                     projection_matrix * view_matrix * model_matrix,
-                    normal_matrix, mesh.joint_matrices);
+                    normal_matrix, mesh.joint_matrices, active_poly_indices);
 
     const auto& draw_call = mesh.draw_call_descriptors[submesh];
     glEnable(GL_DEPTH_TEST);
@@ -1130,6 +1257,38 @@ void app::draw_scene(const glm::vec3& world_camera_position) {
       }
     }
   }
+}
+
+void app::draw_color_select_map_recur(gltf_node& node) {
+  for (auto child : node.children) draw_color_select_map_recur(*child);
+
+  if (node.type == gltf_node::node_type::mesh) {
+    auto& mesh = loaded_meshes[size_t(node.gltf_mesh_id)];
+
+    for (size_t i = 0; i < mesh.draw_call_descriptors.size(); ++i) {
+      const glm::vec4 id_color = mesh.submesh_selection_ids[i];
+
+      update_uniforms(*mesh.shader_list, editor_light.use_ibl,
+                      glm::vec3(0, 0, 0), editor_light.color,
+                      editor_light.get_directional_light_direction(),
+                      active_joint, "debug_color",
+                      projection_matrix * view_matrix * node.world_xform,
+                      projection_matrix * view_matrix * node.world_xform,
+                      glm::inverse(glm::transpose(node.world_xform)),
+                      mesh.joint_matrices, active_poly_indices);
+
+      const auto& color_shader = (*mesh.shader_list)["debug_color"];
+      color_shader.use();
+      color_shader.set_uniform(
+          "debug_color", glm::vec4(id_color.r, id_color.g, id_color.b, 1));
+
+      perform_draw_call(mesh.draw_call_descriptors[i]);
+    }
+  }
+}
+
+void app::draw_color_select_map() {
+  draw_color_select_map_recur(gltf_scene_tree);
 }
 
 #if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
@@ -1332,7 +1491,8 @@ bool app::main_loop_frame() {
     const glm::quat camera_rotation(
         glm::vec3(glm::radians(gui_parameters.rot_pitch),
                   glm::radians(gui_parameters.rot_yaw), 0.f));
-    const auto world_camera_position = camera_rotation * camera_position;
+
+    world_camera_position = camera_rotation * camera_position;
 
     view_matrix = glm::lookAt(world_camera_position, glm::vec3(0.f),
                               camera_rotation * glm::vec3(0, 1.f, 0));
@@ -1347,6 +1507,15 @@ bool app::main_loop_frame() {
       }
     }
     if (asset_loaded) {
+      ImGui::InputFloat3("debug_start", glm::value_ptr(debug_start));
+      ImGui::InputFloat3("debug_stop", glm::value_ptr(debug_stop));
+
+      auto& program = loaded_meshes[0].shader_list->operator[]("debug_color");
+      program.use();
+      program.set_uniform("mvp", projection_matrix * view_matrix);
+      draw_line(program.get_program(), debug_start, debug_stop,
+                glm::vec4(1, 0, 0, 1), 5);
+
       int active_bone_gltf_node = -1;
       for (auto& a_mesh : loaded_meshes) {
         if ((active_joint >= 0) &&
@@ -1429,6 +1598,91 @@ bool app::main_loop_frame() {
       obj_export_worker.ui();
     }
   }
+
+  static bool last_frame_click = true;
+  const bool current_frame_click = gui_parameters.button_states[0];
+  const bool clicked = !last_frame_click && current_frame_click;
+  last_frame_click = current_frame_click;
+
+  if (clicked && !ImGui::GetIO().WantCaptureMouse) {
+    std::cout << "click on viewport detected\n";
+
+    glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
+    glClearColor(0, 0, 0, 0);
+    glViewport(0, 0, 512, 512);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    draw_color_select_map();
+
+    // get back to normal render buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // copy data to CPU memory
+    static std::vector<uint32_t> img_data(512 * 512);
+    glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                  reinterpret_cast<void*>(&img_data[0]));
+
+    // check pixel color to find clicked object
+    const float pixel_screen_map_x =
+        (512 * float(gui_parameters.last_mouse_x) / float(display_w));
+    const float pixel_screen_map_y =
+        (512 * float(gui_parameters.last_mouse_y) / float(display_h));
+    size_t pixel_screen_map_x_clamp =
+        size_t(glm::clamp(pixel_screen_map_x, 0.f, 512.f));
+    size_t pixel_screen_map_y_clamp =
+        size_t(glm::clamp(pixel_screen_map_y, 0.f, 512.f));
+    color_identifier id(img_data[(512 - pixel_screen_map_y_clamp) * 512 +
+                                 pixel_screen_map_x_clamp]);
+    std::cout << "color id is : " << (int)id.content.RGBA.R << ":"
+              << (int)id.content.RGBA.B << ":" << (int)id.content.RGBA.G << ":"
+              << (int)id.content.RGBA.A << "\n";
+    bool clicked_on_submesh = false;
+    size_t mesh_id = 0, submesh_id = 0;
+    for (mesh_id = 0; mesh_id < loaded_meshes.size(); mesh_id++) {
+      for (submesh_id = 0;
+           submesh_id < loaded_meshes[mesh_id].submesh_selection_ids.size();
+           submesh_id++) {
+        if (loaded_meshes[mesh_id].submesh_selection_ids[submesh_id] == id) {
+          clicked_on_submesh = true;
+          break;
+        }
+      }
+      if (clicked_on_submesh) break;
+    }
+
+    // If we know who's been clicked :
+    if (clicked_on_submesh) {
+      std::cout << "clicked on " << mesh_id << ":" << submesh_id << "\n";
+      const auto& mesh = loaded_meshes[mesh_id];
+
+      gltf_scene_tree.get_node_with_index(mesh.instance.node);
+      const auto world_xform = gltf_scene_tree.world_xform;
+      std::cout << mesh.name << std::endl;
+
+      mesh.raytrace_submesh_camera_mouse(
+          world_xform, submesh_id, world_camera_position,
+          projection_matrix * view_matrix,
+          float(gui_parameters.last_mouse_x) / float(display_w),
+          float(gui_parameters.last_mouse_y) / float(display_h));
+    }
+  }
+
+  ImGui::Begin("color picker debug");
+  static bool show_color_map_render = false;
+  ImGui::Checkbox("show colormap for picking showed in main buffer",
+                  &show_color_map_render);
+  ImGui::Image((ImTextureID)(size_t)(color_pick_screen_texture),
+               ImVec2(256, 256), ImVec2(0, 1), ImVec2(1, 0), ImVec4(1, 1, 1, 1),
+               ImVec4(0, 0, 0, 1));
+  ImGui::End();
+
+  if (show_color_map_render) {
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glViewport(0, 0, display_w, display_h);
+    draw_color_select_map();
+  }
+
   // Render all ImGui, then swap buffers
   gl_gui_end_frame(window);
   return !glfwWindowShouldClose(window);
@@ -1474,10 +1728,19 @@ void app::parse_command_line(int argc, char** argv) {
   using optparse::OptionParser;
   OptionParser parser = OptionParser().description("glTF data insight tool");
 
-  parser.add_option("-d", "--debug").action("store_true").dest("debug").help("Enable debugging");
+  parser.add_option("-d", "--debug")
+      .action("store_true")
+      .dest("debug")
+      .help("Enable debugging");
 
-  parser.add_option("-i", "--input").dest("input").help("Input glTF filename").metavar("FILE");
-  parser.add_option("-h", "--help").action("store_true").dest("help").help("Show help");
+  parser.add_option("-i", "--input")
+      .dest("input")
+      .help("Input glTF filename")
+      .metavar("FILE");
+  parser.add_option("-h", "--help")
+      .action("store_true")
+      .dest("help")
+      .help("Show help");
 
   optparse::Values options = parser.parse_args(argc, argv);
   std::vector<std::string> args = parser.args();
@@ -1558,9 +1821,7 @@ void app::cpu_compute_morphed_display_mesh(
     const std::vector<std::vector<float>>& vertex_coord,
     const std::vector<std::vector<float>>& normals,
     std::vector<std::vector<float>>& display_position,
-    std::vector<std::vector<float>>& display_normal,
-
-    size_t vertex) {
+    std::vector<std::vector<float>>& display_normal, size_t vertex) {
   // Get the base vector
   display_position[submesh_id][vertex] = vertex_coord[submesh_id][vertex];
   display_normal[submesh_id][vertex] = normals[submesh_id][vertex];

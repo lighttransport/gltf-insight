@@ -341,8 +341,10 @@ void update_uniforms(std::map<std::string, shader>& shaders, bool use_ibl,
                      const glm::vec3& light_direction, const int active_joint,
                      const std::string& shader_to_use, const glm::mat4& model,
                      const glm::mat4& mvp, const glm::mat3& normal,
-                     const std::vector<glm::mat4>& joint_matrices) {
+                     const std::vector<glm::mat4>& joint_matrices,
+                     const glm::vec3& active_vertex) {
   shaders[shader_to_use].use();
+  shaders[shader_to_use].set_uniform("active_vertex", active_vertex);
   shaders[shader_to_use].set_uniform("camera_position", camera_position);
   shaders[shader_to_use].set_uniform("light_direction", light_direction);
   shaders[shader_to_use].set_uniform("light_color", light_color);
