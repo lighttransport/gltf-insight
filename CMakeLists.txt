@@ -209,6 +209,10 @@ endif()
 # [tinygltf]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf)
 
+# [cpp-optparse]
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/)
+set(EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/OptionParser.cpp)
+
 
 #Discover the source code
 if (CMAKE_VERSION VERSION_GREATER 3.12)
@@ -260,7 +264,7 @@ if(WIN32)
   set(ICO_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/icons/icons.rc)
 endif()
 
-add_executable(${BUILD_TARGET} ${SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER} ${SHADER_GEN}
+add_executable(${BUILD_TARGET} ${SOURCES} ${EXTRA_SOURCES} ${UI_SOURCES} ${ICO_SOURCES} ${SHADER} ${SHADER_GEN}
 	${CMAKE_CURRENT_SOURCE_DIR}/config/cmake_config.hh
 	${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinyobjloader/tiny_obj_loader.h
 )

@@ -172,7 +172,7 @@ gltf-insight is built upon the following open-source projects:
 * ImGUI : MIT license
 * ImGuiFileDialog : MIT license
 * dirent for Win32 : MIT license
-* cxxopts : MIT license
+* cppoptparse : Copyright (c) 2010 Johannes Weißl. MIT license.
 * ionicons icon helper header : zlib licence
 * ionic framework icon font : MIT
 * Roboto icons : Apache 2

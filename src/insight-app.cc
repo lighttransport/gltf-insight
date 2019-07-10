@@ -1439,6 +1439,7 @@ std::string app::GetFilePathExtension(const std::string& FileName) {
 }
 
 void app::parse_command_line(int argc, char** argv) {
+#if 0
   cxxopts::Options options("gltf-insignt", "glTF data insight tool");
 
   options.add_options()("d,debug", "Enable debugging",
@@ -1465,6 +1466,36 @@ void app::parse_command_line(int argc, char** argv) {
   } else {
     input_filename.clear();
   }
+#else
+  using optparse::OptionParser;
+  OptionParser parser = OptionParser().description("glTF data insight tool");
+
+  parser.add_option("-d", "--debug").action("store_true").dest("debug").help("Enable debugging");
+
+  parser.add_option("-i", "--input").dest("input").help("Input glTF filename").metavar("FILE");
+  parser.add_option("-h", "--help").action("store_true").dest("help").help("Show help");
+
+  optparse::Values options = parser.parse_args(argc, argv);
+  std::vector<std::string> args = parser.args();
+
+  if (options.get("help")) {
+    parser.print_help();
+  }
+
+  debug_output = false;
+  if (options.get("debug")) {
+    debug_output = true;
+  }
+
+  if (options.is_set("input")) {
+    input_filename = options["input"];
+  } else if (args.size() > 0) {
+    input_filename = args[0];
+  } else {
+    input_filename.clear();
+  }
+
+#endif
 }
 
 void app::load_glTF_asset() {
