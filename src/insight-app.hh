@@ -47,7 +47,6 @@ SOFTWARE.
 #endif
 
 #include "OptionParser.h"
-
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/quaternion.hpp"
@@ -77,6 +76,8 @@ SOFTWARE.
 
 // obj API
 #include "tiny_obj_loader.h"
+
+#define GLTFI_BUFFER_SIZE 512
 
 /// Main application class
 namespace gltf_insight {

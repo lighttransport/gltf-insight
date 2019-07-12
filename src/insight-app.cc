@@ -683,7 +683,7 @@ mesh& mesh::operator=(mesh&& o) {
   soft_skinned_normals = std::move(o.soft_skinned_normals);
   joints = std::move(o.joints);
   colors = std::move(o.colors);
-  
+
   shader_list = std::move(o.shader_list);
   soft_skin_shader_list = std::move(o.soft_skin_shader_list);
 
@@ -876,15 +876,16 @@ app::app(int argc, char** argv) {
   glGenTextures(1, &color_pick_depth_buffer);
   glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
   glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 512, 512, 0, GL_RGBA,
-               GL_UNSIGNED_BYTE, nullptr);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, GLTFI_BUFFER_SIZE, GLTFI_BUFFER_SIZE,
+               0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                          color_pick_screen_texture, 0);
   glBindTexture(GL_TEXTURE_2D, color_pick_depth_buffer);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, 512, 512, 0,
-               GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, GLTFI_BUFFER_SIZE,
+               GLTFI_BUFFER_SIZE, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
+               NULL);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
@@ -1599,55 +1600,69 @@ bool app::main_loop_frame() {
     }
   }
 
+  // TODO move that code elsewhere. Need better way to get the "clicked" event
   static bool last_frame_click = true;
   const bool current_frame_click = gui_parameters.button_states[0];
   const bool clicked = !last_frame_click && current_frame_click;
   last_frame_click = current_frame_click;
 
-  if (clicked && !ImGui::GetIO().WantCaptureMouse) {
+  // if clicked on anything that is not the GUI elements
+  if (clicked && !(ImGui::GetIO().WantCaptureMouse || ImGuizmo::IsOver() ||
+                   ImGuizmo::IsUsing())) {
     std::cout << "click on viewport detected\n";
 
-    glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
-    glClearColor(0, 0, 0, 0);
-    glViewport(0, 0, 512, 512);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    draw_color_select_map();
+    {  // TODO refactor extract me this
+      glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
+      glClearColor(0, 0, 0, 0);
+      glViewport(0, 0, GLTFI_BUFFER_SIZE, GLTFI_BUFFER_SIZE);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      draw_color_select_map();
 
-    // get back to normal render buffer
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      // get back to normal render buffer
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
 
-    // copy data to CPU memory
-    static std::vector<uint32_t> img_data(512 * 512);
-    glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                  reinterpret_cast<void*>(&img_data[0]));
-
-    // check pixel color to find clicked object
-    const float pixel_screen_map_x =
-        (512 * float(gui_parameters.last_mouse_x) / float(display_w));
-    const float pixel_screen_map_y =
-        (512 * float(gui_parameters.last_mouse_y) / float(display_h));
-    size_t pixel_screen_map_x_clamp =
-        size_t(glm::clamp(pixel_screen_map_x, 0.f, 512.f));
-    size_t pixel_screen_map_y_clamp =
-        size_t(glm::clamp(pixel_screen_map_y, 0.f, 512.f));
-    color_identifier id(img_data[(512 - pixel_screen_map_y_clamp) * 512 +
-                                 pixel_screen_map_x_clamp]);
-    std::cout << "color id is : " << (int)id.content.RGBA.R << ":"
-              << (int)id.content.RGBA.B << ":" << (int)id.content.RGBA.G << ":"
-              << (int)id.content.RGBA.A << "\n";
     bool clicked_on_submesh = false;
     size_t mesh_id = 0, submesh_id = 0;
-    for (mesh_id = 0; mesh_id < loaded_meshes.size(); mesh_id++) {
-      for (submesh_id = 0;
-           submesh_id < loaded_meshes[mesh_id].submesh_selection_ids.size();
-           submesh_id++) {
-        if (loaded_meshes[mesh_id].submesh_selection_ids[submesh_id] == id) {
-          clicked_on_submesh = true;
-          break;
+
+    {  // TODO refactor extract this
+      // copy data to CPU memory
+      static std::vector<uint32_t> img_data(GLTFI_BUFFER_SIZE *
+                                            GLTFI_BUFFER_SIZE);
+      glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
+      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                    reinterpret_cast<void*>(&img_data[0]));
+
+      // check pixel color to find clicked object
+      const float pixel_screen_map_x =
+          (512 * float(gui_parameters.last_mouse_x) / float(display_w));
+      const float pixel_screen_map_y =
+          (512 * float(gui_parameters.last_mouse_y) / float(display_h));
+      const size_t pixel_screen_map_x_clamp =
+          size_t(glm::clamp(pixel_screen_map_x, 0.f, float(GLTFI_BUFFER_SIZE)));
+      const size_t pixel_screen_map_y_clamp =
+          size_t(glm::clamp(pixel_screen_map_y, 0.f, float(GLTFI_BUFFER_SIZE)));
+      color_identifier id(
+          img_data[(GLTFI_BUFFER_SIZE - pixel_screen_map_y_clamp) *
+                       GLTFI_BUFFER_SIZE +
+                   pixel_screen_map_x_clamp]);
+      std::cout << "color id is : " << int(id.content.RGBA.R) << ":"
+                << int(id.content.RGBA.B) << ":" << int(id.content.RGBA.G)
+                << ":" << int(id.content.RGBA.A) << "\n";
+
+      // declare identifiers
+
+      for (mesh_id = 0; mesh_id < loaded_meshes.size(); mesh_id++) {
+        for (submesh_id = 0;
+             submesh_id < loaded_meshes[mesh_id].submesh_selection_ids.size();
+             submesh_id++) {
+          if (loaded_meshes[mesh_id].submesh_selection_ids[submesh_id] == id) {
+            clicked_on_submesh = true;
+            break;
+          }
         }
+        if (clicked_on_submesh) break;
       }
-      if (clicked_on_submesh) break;
     }
 
     // If we know who's been clicked :
@@ -1667,20 +1682,23 @@ bool app::main_loop_frame() {
     }
   }
 
-  ImGui::Begin("color picker debug");
-  static bool show_color_map_render = false;
-  ImGui::Checkbox("show colormap for picking showed in main buffer",
-                  &show_color_map_render);
-  ImGui::Image((ImTextureID)(size_t)(color_pick_screen_texture),
-               ImVec2(256, 256), ImVec2(0, 1), ImVec2(1, 0), ImVec4(1, 1, 1, 1),
-               ImVec4(0, 0, 0, 1));
-  ImGui::End();
+  // TODO refactor put this as an hidden debug feature
+  {
+    ImGui::Begin("color picker debug");
+    static bool show_color_map_render = false;
+    ImGui::Checkbox("show colormap for picking showed in main buffer",
+                    &show_color_map_render);
+    ImGui::Image(ImTextureID(size_t(color_pick_screen_texture)),
+                 ImVec2(256, 256), ImVec2(0, 1), ImVec2(1, 0),
+                 ImVec4(1, 1, 1, 1), ImVec4(0, 0, 0, 1));
+    ImGui::End();
 
-  if (show_color_map_render) {
-    glClearColor(0, 0, 0, 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glViewport(0, 0, display_w, display_h);
-    draw_color_select_map();
+    if (show_color_map_render) {
+      glClearColor(0, 0, 0, 0);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glViewport(0, 0, display_w, display_h);
+      draw_color_select_map();
+    }
   }
 
   // Render all ImGui, then swap buffers
