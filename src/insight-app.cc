@@ -745,6 +745,12 @@ app::app(int argc, char** argv) {
   initialize_imgui(window);
   (void)ImGui::GetIO();
 
+  // load fallback material.
+  // This must be called before loading glTF scene since
+  // `setup_fallback_textures` creates GL texture ID for each fallback textures(e.g. white tex).
+  // TODO(LTE): Do not create fallback texture and add enabled/disabled flag to each texture.
+  setup_fallback_textures();
+
   if (!input_filename.empty()) {
     try {
       load();
@@ -756,8 +762,6 @@ app::app(int argc, char** argv) {
 
   logo = load_gltf_insight_icon();
 
-  // load fallback material
-  setup_fallback_textures();
 
   load_sensible_default_material(dummy_material);
 
