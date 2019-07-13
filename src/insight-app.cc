@@ -750,6 +750,10 @@ app::app(int argc, char** argv) {
   // `setup_fallback_textures` creates GL texture ID for each fallback textures(e.g. white tex).
   // TODO(LTE): Do not create fallback texture and add enabled/disabled flag to each texture.
   setup_fallback_textures();
+  load_sensible_default_material(dummy_material);
+  logo = load_gltf_insight_icon();
+  utility_buffers::init_static_buffers();
+
 
   if (!input_filename.empty()) {
     try {
@@ -759,13 +763,6 @@ app::app(int argc, char** argv) {
       unload();
     }
   }
-
-  logo = load_gltf_insight_icon();
-
-
-  load_sensible_default_material(dummy_material);
-
-  utility_buffers::init_static_buffers();
 }
 
 app::~app() {
