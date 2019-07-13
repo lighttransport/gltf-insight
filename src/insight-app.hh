@@ -70,8 +70,8 @@ SOFTWARE.
 #include "tiny_gltf_util.h"
 
 // raytracer
-#define NANORT_USE_CPP11_FEATURE
-#define NANORT_ENABLE_PARALLEL_BUILD
+//#define NANORT_USE_CPP11_FEATURE
+//#define NANORT_ENABLE_PARALLEL_BUILD
 #include "nanort.h"
 
 // obj API
@@ -212,6 +212,7 @@ class app {
   } current_display_mode = display_mode::normal;
 
   void load_sensible_default_material(material& material);
+  void initialize_colorpick_framebuffer();
   app(int argc, char** argv);
   ~app();
   void run_file_menu();

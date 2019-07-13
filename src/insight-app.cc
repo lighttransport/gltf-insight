@@ -573,12 +573,15 @@ void mesh::raytrace_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
   std::vector<float> world_positions(positions[submesh].size());
 
   for (size_t v = 0; v < world_positions.size() / 3; ++v) {
+    const auto& model_vertex_buffer =
+        skinned ? soft_skinned_position : display_position;
+
     glm::vec4 projected4D =
         world_xform *
-        glm::vec4(glm::make_vec3(&(skinned ? soft_skinned_position
-                                           : display_position)[submesh][3 * v]),
-                  1.f);
+        glm::vec4(glm::make_vec3(&model_vertex_buffer[submesh][3 * v]), 1.f);
+
     const auto projected = glm::vec3(projected4D / projected4D.w);
+
     memcpy(&world_positions[3 * v], glm::value_ptr(projected), stride);
   }
 
@@ -592,19 +595,6 @@ void mesh::raytrace_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
   nanort::BVHAccel<float> accel;
   accel.Build(indices[submesh].size() / 3, triangle_mesh, triangle_sha_pred,
               build_options);
-
-  // std::cout << "Using NanoRT...\n";
-  // printf("  BVH build option:\n");
-  // printf("    # of leaf primitives: %d\n",
-  // build_options.min_leaf_primitives); printf("    SAH binsize         :
-  // %d\n", build_options.bin_size); nanort::BVHBuildStatistics stats =
-  // accel.GetStatistics(); printf("  BVH statistics:\n"); printf("    # of leaf
-  // nodes: %d\n", stats.num_leaf_nodes); printf("    # of branch nodes: %d\n",
-  // stats.num_branch_nodes); printf("  Max tree depth     : %d\n",
-  // stats.max_tree_depth); float bmin[3], bmax[3]; accel.BoundingBox(bmin,
-  // bmax); printf("  Bmin               : %f, %f, %f\n", bmin[0], bmin[1],
-  // bmin[2]); printf("  Bmax               : %f, %f, %f\n", bmax[0], bmax[1],
-  // bmax[2]);
 
   nanort::Ray<float> camera_ray;
   camera_ray.org[0] = world_camera_position.x;
@@ -653,11 +643,9 @@ void mesh::raytrace_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
     std::cout << "raycast successful!\n";
 
     std::cout << "primitive id is:" << intersection.prim_id;
-    // app::active_poly_indices.x = indices[submesh][intersection.prim_id / 3];
-    // app::active_poly_indices.y = indices[submesh][intersection.prim_id / 3 +
-    // 1]; app::active_poly_indices.z = indices[submesh][intersection.prim_id /
-    // 3
-    // + 2];
+    app::active_poly_indices.x = indices[submesh][intersection.prim_id / 3];
+    app::active_poly_indices.y = indices[submesh][intersection.prim_id / 3 + 1];
+    app::active_poly_indices.z = indices[submesh][intersection.prim_id / 3 + 2];
   }
 }
 
@@ -705,7 +693,7 @@ void editor_lighting::show_control() {
       ImGui::SliderFloat3("Light Direction Euler",
                           glm::value_ptr(non_normalized_direction), -1, 1);
 
-      // Since what wer are already doing is not ideal to set a light direction
+      // Since what we are already doing is not ideal to set a light direction
       // vector from an UI... Safeguard against null vector normalization
       // causing NANtastic things
       if (glm::length(non_normalized_direction) == 0.f)
@@ -834,6 +822,29 @@ static void drop_callabck(GLFWwindow* window, int nums, const char** paths) {
   }
 }
 
+void app::initialize_colorpick_framebuffer() {
+  glGenFramebuffers(1, &color_pick_fbo);
+  glGenTextures(1, &color_pick_screen_texture);
+  glGenTextures(1, &color_pick_depth_buffer);
+  glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
+  glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, GLTFI_BUFFER_SIZE, GLTFI_BUFFER_SIZE,
+               0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         color_pick_screen_texture, 0);
+  glBindTexture(GL_TEXTURE_2D, color_pick_depth_buffer);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, GLTFI_BUFFER_SIZE,
+               GLTFI_BUFFER_SIZE, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
+               nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                         GL_TEXTURE_2D, color_pick_depth_buffer, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 app::app(int argc, char** argv) {
   parse_command_line(argc, argv);
 
@@ -871,26 +882,7 @@ app::app(int argc, char** argv) {
     }
   }
 
-  glGenFramebuffers(1, &color_pick_fbo);
-  glGenTextures(1, &color_pick_screen_texture);
-  glGenTextures(1, &color_pick_depth_buffer);
-  glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
-  glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, GLTFI_BUFFER_SIZE, GLTFI_BUFFER_SIZE,
-               0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                         color_pick_screen_texture, 0);
-  glBindTexture(GL_TEXTURE_2D, color_pick_depth_buffer);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, GLTFI_BUFFER_SIZE,
-               GLTFI_BUFFER_SIZE, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
-               NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
-                         GL_TEXTURE_2D, color_pick_depth_buffer, 0);
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  initialize_colorpick_framebuffer();
 }
 
 app::~app() {
@@ -1670,15 +1662,17 @@ bool app::main_loop_frame() {
       std::cout << "clicked on " << mesh_id << ":" << submesh_id << "\n";
       const auto& mesh = loaded_meshes[mesh_id];
 
-      gltf_scene_tree.get_node_with_index(mesh.instance.node);
-      const auto world_xform = gltf_scene_tree.world_xform;
-      std::cout << mesh.name << std::endl;
+      auto node = gltf_scene_tree.get_node_with_index(mesh.instance.node);
+      if (node) {
+        const auto world_xform = node->world_xform;
+        std::cout << mesh.name << std::endl;
 
-      mesh.raytrace_submesh_camera_mouse(
-          world_xform, submesh_id, world_camera_position,
-          projection_matrix * view_matrix,
-          float(gui_parameters.last_mouse_x) / float(display_w),
-          float(gui_parameters.last_mouse_y) / float(display_h));
+        mesh.raytrace_submesh_camera_mouse(
+            world_xform, submesh_id, world_camera_position,
+            projection_matrix * view_matrix,
+            float(gui_parameters.last_mouse_x) / float(display_w),
+            float(gui_parameters.last_mouse_y) / float(display_h));
+      }
     }
   }
 
@@ -1814,13 +1808,17 @@ void app::load_all_textures(size_t nb_textures) {
 
   for (size_t i = 0; i < nb_textures; ++i) {
     glBindTexture(GL_TEXTURE_2D, textures[i]);
+
+    // TODO handle SRGB colorspace for accurate shading.
     glTexImage2D(GL_TEXTURE_2D, 0,
                  model.images[i].component == 4 ? GL_RGBA : GL_RGB,
                  model.images[i].width, model.images[i].height, 0,
                  model.images[i].component == 4 ? GL_RGBA : GL_RGB,
                  GL_UNSIGNED_BYTE, model.images[i].image.data());
     glGenerateMipmap(GL_TEXTURE_2D);
-    // TODO set texture sampling and filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   }
   glBindTexture(GL_TEXTURE_2D, 0);
 }
