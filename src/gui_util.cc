@@ -562,7 +562,7 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
 
 #else
-  // Create GL 3.3 context
+  // We need GL 3.3 context since we use `inverse()` in the shader.
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_SAMPLES, 16);
@@ -597,18 +597,11 @@ void initialize_glfw_opengl_window(GLFWwindow*& window) {
 
   std::cout << "OpenGL " << GLVersion.major << '.' << GLVersion.minor << '\n';
 
-#if defined(__APPLE__)
   if (!((GLVersion.major >= 3) && (GLVersion.minor >= 3)) &&
       (GLVersion.major <= 3)) {
     std::cerr << "OpenGL 3.3 or later is not available." << std::endl;
     exit(EXIT_FAILURE);
   }
-#else
-  if (!((GLVersion.major >= 3) && (GLVersion.minor >= 3))) {
-    std::cerr << "OpenGL 3.3 is not available." << std::endl;
-    exit(EXIT_FAILURE);
-  }
-#endif
 #endif
 
   std::cout << "GL_VENDOR : " << glGetString(GL_VENDOR) << "\n";
