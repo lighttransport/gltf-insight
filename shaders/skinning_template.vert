@@ -25,6 +25,7 @@ out vec4 interpolated_colors;
 out vec2 interpolated_uv;
 out vec4 interpolated_weights;
 
+out float selected;
 
 vec3 float_to_rgb(float value)
 {
@@ -92,7 +93,11 @@ void main()
   || gl_VertexID == int(active_vertex.y)
   || gl_VertexID == int(active_vertex.z))
   {
-    interpolated_colors = vec4(1,0,1,1);
+	selected = 1.f;
+  }
+  else
+  {
+   selected = 0.f;
   }
 }
 

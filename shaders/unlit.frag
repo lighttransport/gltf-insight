@@ -3,6 +3,8 @@ in vec3 interpolated_normal;
 in vec4 interpolated_colors;
 out vec4 output_color;
 
+in float selected;
+
 uniform sampler2D base_color_texture;
 uniform sampler2D emissive_texture;
 
@@ -43,4 +45,9 @@ void main()
 
   color = color + emissive;
   output_color = color;
+
+  	if(selected >= 0.999)
+	{
+		output_color = vec4(1, 0.5, 0, 1);
+	}
 }

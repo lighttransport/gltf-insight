@@ -57,6 +57,11 @@ void APIENTRY glDebugOutput(GLenum source, GLenum type, GLuint id,
                             GLenum severity, GLsizei length,
                             const GLchar* message, void* userParam);
 
+/// Draw a point in the current space (model/view/projection matrix set to
+/// shader)
+void draw_point(const glm::vec3& point, float point_size, GLuint shader,
+                const glm::vec4& color);
+
 /// Draw a point as the origin of the current space (model/view/projection
 /// matrix set to shader)
 void draw_space_origin_point(float point_size, GLuint shader,

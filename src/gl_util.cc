@@ -160,8 +160,8 @@ void glDebugOutput(GLenum source, GLenum type, GLuint id, GLenum severity,
   std::cout << "\n\n";
 }
 
-void draw_space_origin_point(float point_size, GLuint shader,
-                             const glm::vec4& color) {
+void draw_point(const glm::vec3& point, float point_size, GLuint shader,
+                const glm::vec4& color) {
   glUniform4f(glGetUniformLocation(shader, "debug_color"), color.r, color.g,
               color.b, color.a);
 
@@ -177,14 +177,17 @@ void draw_space_origin_point(float point_size, GLuint shader,
   glUniform4f(glGetUniformLocation(shader, "debug_color"), color.r, color.g,
               color.b, color.a);
 
-  glPointSize(point_size);
-
-  static constexpr std::array<float, 3> vertex = {{0, 0, 0}};
+  std::array<float, 3> vertex = {{point.x, point.y, point.z}};
   glBindBuffer(GL_ARRAY_BUFFER, utility_buffers::point_vbo);
   glBufferData(GL_ARRAY_BUFFER, vertex.size() * sizeof(float), vertex.data(),
                GL_STREAM_DRAW);
   glBindVertexArray(utility_buffers::point_vao);
   glDrawElements(GL_POINTS, 1, GL_UNSIGNED_INT, nullptr);
+}
+
+void draw_space_origin_point(float point_size, GLuint shader,
+                             const glm::vec4& color) {
+  draw_point(glm::vec3(0, 0, 0), point_size, shader, color);
 }
 
 void draw_line(GLuint shader, const glm::vec3 origin, const glm::vec3 end,

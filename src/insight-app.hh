@@ -69,9 +69,9 @@ SOFTWARE.
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
 
-// raytracer
-//#define NANORT_USE_CPP11_FEATURE
-//#define NANORT_ENABLE_PARALLEL_BUILD
+// NanoRT is used as a general purpose raytracer
+#define NANORT_USE_CPP11_FEATURE
+#define NANORT_ENABLE_PARALLEL_BUILD
 #include "nanort.h"
 
 // obj API
@@ -184,9 +184,9 @@ struct mesh {
   mesh();
   ~mesh();
 
-  void raytrace_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
-                                     glm::vec3 world_camera_position,
-                                     glm::mat4 vp, float x, float y) const;
+  bool raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
+                                    glm::vec3 world_camera_position,
+                                    glm::mat4 vp, float x, float y) const;
 };
 
 struct editor_lighting {
@@ -205,6 +205,11 @@ class app {
  public:
   static glm::vec3 debug_start, debug_stop;
   static glm::vec3 active_poly_indices;
+
+  static int active_mesh_index;
+  static int active_submesh_index;
+  static int active_vertex_index;
+  static int active_joint_index_model;
 
   enum class display_mode : int {
     normal = 0,
@@ -291,7 +296,8 @@ class app {
   bool show_material_window = true;
   bool show_bone_display_window = true;
   bool show_scene_outline_window = true;
-  bool do_soft_skinning = false;
+  bool do_soft_skinning = true;
+  bool show_debug_ray = false;
 
   std::vector<mesh> loaded_meshes;
   std::vector<material> loaded_material;
@@ -300,7 +306,6 @@ class app {
   // Application state
   bool asset_loaded = false;
   bool found_textured_shader = false;
-  int active_joint = 0;
 
   gltf_node gltf_scene_tree{gltf_node::node_type::empty};
 
