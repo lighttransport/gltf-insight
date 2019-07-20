@@ -884,19 +884,19 @@ void timeline_window(gltf_insight::AnimSequence loaded_sequence,
     ImGui::PopItemWidth();
 
     const auto saved_frame = currentFrame;
-    Sequencer(&loaded_sequence, &currentFrame, &expanded, &selectedEntry,
-              &firstFrame, ImSequencer::SEQUENCER_CHANGE_FRAME);
+    Sequencer(
+        &loaded_sequence, &currentFrame, &expanded, &selectedEntry, &firstFrame,
+        ImSequencer::SEQUENCER_CHANGE_FRAME | ImSequencer::SEQUENCER_EDIT_ALL);
     if (saved_frame != currentFrame) {
       adjust_time();
     }
 
-    // add a UI to edit that particular item
+    ImGui::Text("Selected index [%d]", selectedEntry);
+
     if (selectedEntry != -1) {
-      const gltf_insight::AnimSequence::AnimSequenceItem& item =
+      gltf_insight::AnimSequence::AnimSequenceItem& item =
           loaded_sequence.myItems[size_t(selectedEntry)];
-      ImGui::Text("I am a %s, please edit me",
-                  gltf_insight::SequencerItemTypeNames[item.mType]);
-      // switch (type) ....
+      ImGui::Checkbox("Activated for playing", &item.currently_playing);
     }
   }
   ImGui::End();

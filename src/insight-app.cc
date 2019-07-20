@@ -2268,10 +2268,19 @@ void app::run_animation_timeline(gltf_insight::AnimSequence& _sequence,
 
   lower_docked_prop_size = 0.25f;
   lower_docked_max_px_size = 300;
+
+  // for (size_t i = 0; i < _sequence.myItems.size(); ++i) {
+  //  _sequence.myItems[i].currently_playing = animations[i].playing;
+  //}
+
   timeline_window(_sequence, _playing_state, need_to_update_pose, _looping,
                   _selectedEntry, _firstFrame, _expanded, currentFrame,
                   _currentPlayTime, &show_timeline, lower_docked_prop_size,
                   lower_docked_max_px_size);
+
+  for (size_t i = 0; i < _sequence.myItems.size(); ++i) {
+    animations[i].playing = _sequence.myItems[i].currently_playing;
+  }
 
   // loop the sequencer now: TODO replace that true with a "is looping"
   // boolean
@@ -2281,9 +2290,10 @@ void app::run_animation_timeline(gltf_insight::AnimSequence& _sequence,
   }
 
   for (auto& anim : _animations) {
+    if (!anim.playing) continue;
     anim.set_time(float(_currentPlayTime));  // TODO handle timeline position
     // of animaiton sequence
-    anim.playing = _playing_state;
+    // anim.playing = _playing_state;
     if (need_to_update_pose || _playing_state) anim.apply_pose();
   }
 

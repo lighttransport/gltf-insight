@@ -129,6 +129,7 @@ struct AnimSequence : public ImSequencer::SequenceInterface {
     int mFrameStart, mFrameEnd;
     bool mExpanded;
     std::string name;
+    bool currently_playing;
   };
   std::vector<AnimSequenceItem> myItems;
 
