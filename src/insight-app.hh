@@ -206,6 +206,8 @@ class app {
   static glm::vec3 debug_start, debug_stop;
   static glm::vec3 active_poly_indices;
 
+  static float z_near, z_far;
+
   static int active_mesh_index;
   static int active_submesh_index;
   static int active_vertex_index;
@@ -322,8 +324,6 @@ class app {
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 7.f};
   float fovy = 45.f;
-  float z_near = 1.f;
-  float z_far = 100.f;
 
   // user interface state
   bool open_file_dialog = false;

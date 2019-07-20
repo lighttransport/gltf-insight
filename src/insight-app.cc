@@ -56,6 +56,9 @@ int app::active_submesh_index = -1;
 int app::active_vertex_index = -1;
 int app::active_joint_index_model = -1;
 
+float app::z_near = 0.1f;
+float app::z_far = 100.f;
+
 void app::unload() {
   asset_loaded = false;
 
@@ -630,8 +633,8 @@ bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
   mouse_ray.dir[0] = mouse_ray_direction.x;
   mouse_ray.dir[1] = mouse_ray_direction.y;
   mouse_ray.dir[2] = mouse_ray_direction.z;
-  mouse_ray.min_t = 0;
-  mouse_ray.max_t = 1000;  // todo max draw distance
+  mouse_ray.min_t = app::z_near;
+  mouse_ray.max_t = app::z_far;
 
   nanort::TriangleIntersector<float, nanort::TriangleIntersection<float>>
       triangle_intersector(world_positions.data(), indices[submesh].data(),
