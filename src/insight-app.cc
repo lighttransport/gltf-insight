@@ -1798,7 +1798,7 @@ bool app::main_loop_frame() {
                                         .indices[size_t(active_submesh_index)]
                                         .size())) {
         // Get the mesh
-        const auto& mesh = loaded_meshes[size_t(active_mesh_index)];
+        auto& mesh = loaded_meshes[size_t(active_mesh_index)];
 
         // Get the vertex buffer
         const auto& vertex_buffer =
@@ -1821,8 +1821,8 @@ bool app::main_loop_frame() {
 
         int selection = active_vertex_index;
 
-        if (ImGui::Begin("Selection Info")) {
-          ImGui::Text("Active face vertex [%d, %d, %d]",
+        if (ImGui::Begin("Selection Manipulation")) {
+          ImGui::Text("Active face indices [%d, %d, %d]",
                       int(active_poly_indices.x), int(active_poly_indices.y),
                       int(active_poly_indices.z));
 
@@ -1862,6 +1862,10 @@ bool app::main_loop_frame() {
 
           if (mesh.skinned) {
             ImGui::Text("Skinning info");
+            ImGui::Text("Currently active joint [%d]",
+                        active_joint_index_model);
+
+            // Fetch vectors for display
             glm::vec4 weight, joint;
             weight =
                 glm::make_vec4(&mesh.weights[size_t(active_submesh_index)]
@@ -1877,14 +1881,45 @@ bool app::main_loop_frame() {
             ImGui::NextColumn();
             ImGui::Separator();
 
+            bool changed = false;
+
             for (glm::vec4::length_type i = 0; i < 4; ++i) {
-              ImGui::Text("%f", float(weight[i]));
+              std::string weight_name = "###w[" + std::to_string(i) + "]";
+              std::string joint_name = "###j[" + std::to_string(i) + "]";
+              float w = weight[i];
+              int j = int(joint[i]);
+              if (ImGui::SliderFloat(weight_name.c_str(), &w, 0, 1)) {
+                changed = true;
+              }
               ImGui::NextColumn();
-              ImGui::Text("%d", int(joint[i]));
+              if (ImGui::InputInt(joint_name.c_str(), &j)) {
+                changed = true;
+              }
               ImGui::NextColumn();
               ImGui::Separator();
+
+              w = glm::clamp(w, 0.f, 1.f);
+              j = glm::clamp(j, 0, mesh.nb_joints - 1);
+
+              mesh.weights[size_t(active_submesh_index)]
+                          [4 * size_t(active_vertex_index) + size_t(i)] = w;
+              mesh.joints[size_t(active_submesh_index)]
+                         [4 * size_t(active_vertex_index) + size_t(i)] = j;
             }
             ImGui::Columns();
+            if (ImGui::Button("Re-normalize weight vector")) {
+              weight = glm::normalize(weight);
+              memcpy(&mesh.weights[size_t(active_submesh_index)]
+                                  [4 * size_t(active_vertex_index)],
+                     glm::value_ptr(weight), 4 * sizeof(float));
+              changed = true;
+            }
+
+            if (changed) {
+              gpu_update_submesh_skinning_data(size_t(active_submesh_index),
+                                               mesh.weights, mesh.joints,
+                                               mesh.VBOs);
+            }
           }
         }
         ImGui::End();
@@ -2070,6 +2105,21 @@ void app::gpu_update_submesh_buffers(
 
   // keep state clean
   glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void app::gpu_update_submesh_skinning_data(
+    size_t submesh_id, std::vector<std::vector<float>>& weight,
+    std::vector<std::vector<unsigned short>>& joint,
+    std::vector<std::array<GLuint, VBO_count>>& VBOs) {
+  glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][VBO_layout_weights]);
+  glBufferData(GL_ARRAY_BUFFER,
+               GLsizeiptr(weight[submesh_id].size() * sizeof(float)),
+               weight[submesh_id].data(), GL_DYNAMIC_DRAW);
+
+  glBindBuffer(GL_ARRAY_BUFFER, VBOs[submesh_id][VBO_layout_joints]);
+  glBufferData(GL_ARRAY_BUFFER,
+               GLsizeiptr(joint[submesh_id].size() * sizeof(float)),
+               joint[submesh_id].data(), GL_DYNAMIC_DRAW);
 }
 
 void app::perform_software_morphing(

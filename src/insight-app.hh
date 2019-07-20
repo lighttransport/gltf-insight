@@ -399,6 +399,11 @@ class app {
       std::vector<std::vector<float>>& display_normal,
       std::vector<std::array<GLuint, VBO_count>>& VBOs);
 
+  void gpu_update_submesh_skinning_data(
+      size_t submesh_id, std::vector<std::vector<float>>& weight,
+      std::vector<std::vector<unsigned short>>& joint,
+      std::vector<std::array<GLuint, VBO_count>>& VBOs);
+
   void perform_software_morphing(
       gltf_node mesh_skeleton_graph, size_t submesh_id,
       const std::vector<std::vector<morph_target>>& morph_targets,
@@ -440,4 +445,5 @@ class app {
 
   void fill_sequencer();
 };
+
 }  // namespace gltf_insight
