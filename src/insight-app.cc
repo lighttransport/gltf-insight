@@ -574,15 +574,43 @@ mesh::~mesh() {
 bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
                                         glm::vec3 world_camera_position,
                                         glm::mat4 vp, float x, float y) const {
-  if (draw_call_descriptors[submesh].draw_mode != GL_TRIANGLES) {
-    std::cerr << "Warn: Mouse selection of triangle assume vertex buffer is a "
-                 "triangle list.";
-    return false;
-  }
-
   constexpr size_t stride = 3 * sizeof(float);
   std::vector<float> world_positions(positions[submesh].size());
-  const auto nb_triangles = indices[submesh].size() / 3;
+  auto* index_buffer = &indices[submesh];
+  std::vector<unsigned> reserve_buffer;
+
+  if (draw_call_descriptors[submesh].draw_mode != GL_TRIANGLES) {
+    switch (draw_call_descriptors[submesh].draw_mode) {
+      default:
+        return false;
+
+      case GL_TRIANGLE_FAN: {
+        const unsigned first_index = (*index_buffer)[0];
+        unsigned last_index_used = (*index_buffer)[1];
+        const auto nb_triangles = index_buffer->size() - 2;
+        reserve_buffer.resize(3 * (nb_triangles));
+        for (size_t i = 0; i < nb_triangles; ++i) {
+          reserve_buffer[3 * i + 0] = first_index;
+          reserve_buffer[3 * i + 1] = last_index_used;
+          last_index_used = (*index_buffer)[2 + i];
+          reserve_buffer[3 * i + 2];
+        }
+        index_buffer = &reserve_buffer;
+      } break;
+      case GL_TRIANGLE_STRIP: {
+        const auto nb_triangles = index_buffer->size() - 2;
+        reserve_buffer.resize(3 * (nb_triangles));
+        for (size_t i = 0; i < nb_triangles; ++i) {
+          reserve_buffer[3 * i + 0] = (*index_buffer)[2 + i];
+          reserve_buffer[3 * i + 1] = (*index_buffer)[1 + i];
+          reserve_buffer[3 * i + 2] = (*index_buffer)[i];
+        }
+        index_buffer = &reserve_buffer;
+      } break;
+    }
+  }
+
+  const auto nb_triangles = index_buffer->size() / 3;
   (void)nb_triangles;
 
   for (size_t v = 0; v < world_positions.size() / 3; ++v) {
@@ -599,13 +627,13 @@ bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
   }
 
   auto triangle_mesh = nanort::TriangleMesh<float>(
-      world_positions.data(), indices[submesh].data(), stride);
+      world_positions.data(), index_buffer->data(), stride);
   auto triangle_sha_pred = nanort::TriangleSAHPred<float>(
-      world_positions.data(), indices[submesh].data(), stride);
+      world_positions.data(), index_buffer->data(), stride);
 
   nanort::BVHBuildOptions<float> build_options;
   nanort::BVHAccel<float> accel;
-  accel.Build(static_cast<unsigned int>(indices[submesh].size()) / 3,
+  accel.Build(static_cast<unsigned int>(index_buffer->size()) / 3,
               triangle_mesh, triangle_sha_pred, build_options);
 
   nanort::Ray<float> mouse_ray;
@@ -637,7 +665,7 @@ bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
   mouse_ray.max_t = app::z_far;
 
   nanort::TriangleIntersector<float, nanort::TriangleIntersection<float>>
-      triangle_intersector(world_positions.data(), indices[submesh].data(),
+      triangle_intersector(world_positions.data(), index_buffer->data(),
                            3 * sizeof(float));
   nanort::TriangleIntersection<float> intersection;
   nanort::BVHTraceOptions options;
@@ -648,11 +676,11 @@ bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
     // std::cout << "primitive id is:" << intersection.prim_id << "\n";
     // std::cout << "number of triangles " << nb_triangles << "\n";
     app::active_poly_indices.x =
-        float(indices[submesh][size_t(intersection.prim_id) * 3]);
+        float((*index_buffer)[size_t(intersection.prim_id) * 3]);
     app::active_poly_indices.y =
-        float(indices[submesh][size_t(intersection.prim_id) * 3 + 1]);
+        float((*index_buffer)[size_t(intersection.prim_id) * 3 + 1]);
     app::active_poly_indices.z =
-        float(indices[submesh][size_t(intersection.prim_id) * 3 + 2]);
+        float((*index_buffer)[size_t(intersection.prim_id) * 3 + 2]);
 
     glm::vec3 v0 = glm::make_vec3(
         &world_positions[3 * size_t(app::active_poly_indices.x)]);
@@ -675,8 +703,8 @@ bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
     if (dmin == d2) clicked_vertex = 2;
 
     app::active_vertex_index =
-        int(indices[submesh]
-                   [size_t(intersection.prim_id) * 3 + size_t(clicked_vertex)]);
+        int((*index_buffer)[size_t(intersection.prim_id) * 3 +
+                            size_t(clicked_vertex)]);
 
     if (skinned) {
       const float* weight_array =
