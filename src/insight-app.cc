@@ -1904,7 +1904,8 @@ bool app::main_loop_frame() {
               mesh.weights[size_t(active_submesh_index)]
                           [4 * size_t(active_vertex_index) + size_t(i)] = w;
               mesh.joints[size_t(active_submesh_index)]
-                         [4 * size_t(active_vertex_index) + size_t(i)] = j;
+                         [4 * size_t(active_vertex_index) + size_t(i)] =
+                  static_cast<unsigned short>(j);
             }
             ImGui::Columns();
             if (ImGui::Button("Re-normalize weight vector")) {
