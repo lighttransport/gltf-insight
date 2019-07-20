@@ -11,12 +11,16 @@ uniform mat4 mvp;
 uniform mat3 normal;
 uniform int active_joint;
 
+uniform vec3 active_vertex;
+
 out vec3 interpolated_normal;
 out vec3 fragment_world_position;
 out vec4 interpolated_colors;
 
 out vec2 interpolated_uv;
 out vec4 interpolated_weights;
+
+out float selected;
 
 vec3 float_to_rgb(float value)
 {
@@ -69,4 +73,15 @@ void main()
   interpolated_uv = input_uv;
   interpolated_weights = weight_color();
   interpolated_colors = input_colors;
+
+  if(gl_VertexID == int(active_vertex.x)
+  || gl_VertexID == int(active_vertex.y)
+  || gl_VertexID == int(active_vertex.z))
+  {
+	selected = 1.f;
+  }
+  else
+  {
+    selected = 0.f;
+  }
 }

@@ -11,6 +11,7 @@ uniform mat4 model;
 uniform mat4 mvp;
 uniform mat3 normal;
 uniform int active_joint;
+uniform vec3 active_vertex;
 
 //TODO this array of matrices can represent too much uniform data for some rigging schemes.
 //Should replace this with another skinning method (dual quaternion skinning?) to prevent that.
@@ -24,6 +25,7 @@ out vec4 interpolated_colors;
 out vec2 interpolated_uv;
 out vec4 interpolated_weights;
 
+out float selected;
 
 vec3 float_to_rgb(float value)
 {
@@ -86,5 +88,16 @@ void main()
   interpolated_uv = input_uv;
   interpolated_weights = weight_color();
   interpolated_colors = input_colors;
+
+ if(gl_VertexID == int(active_vertex.x)
+  || gl_VertexID == int(active_vertex.y)
+  || gl_VertexID == int(active_vertex.z))
+  {
+	selected = 1.f;
+  }
+  else
+  {
+   selected = 0.f;
+  }
 }
 

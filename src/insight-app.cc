@@ -26,6 +26,11 @@ SOFTWARE.
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
+// These are due to static ctors/dtors only
+#pragma clang diagnostic ignored "-Wglobal-constructors"
+#pragma clang diagnostic ignored "-Wdouble-promotion"
+#pragma clang diagnostic ignored "-Wexit-time-destructors"
+#pragma clang diagnostic ignored "-Wfloat-equal"
 #endif
 
 #if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
@@ -40,7 +45,19 @@ SOFTWARE.
 #pragma clang diagnostic pop
 #endif
 
+#include <tuple>
 using namespace gltf_insight;
+
+color_identifier mesh::selection_id_counter = 0xFF000000;
+glm::vec3 app::debug_start, app::debug_stop, app::active_poly_indices;
+
+int app::active_mesh_index = -1;
+int app::active_submesh_index = -1;
+int app::active_vertex_index = -1;
+int app::active_joint_index_model = -1;
+
+float app::z_near = 0.1f;
+float app::z_far = 100.f;
 
 void app::unload() {
   asset_loaded = false;
@@ -80,6 +97,11 @@ void app::unload() {
   selectedEntry = -1;
   firstFrame = 0;
   expanded = true;
+
+  active_poly_indices = glm::vec3(0);
+  active_submesh_index = -1;
+  active_mesh_index = -1;
+  active_vertex_index = -1;
 }
 
 void app::load_as_metal_roughness(size_t i, material& currently_loading,
@@ -352,11 +374,16 @@ void app::load() {
     current_mesh.joints.resize(nb_submeshes);
     current_mesh.VAOs.resize(nb_submeshes);
     current_mesh.VBOs.resize(nb_submeshes);
+    current_mesh.submesh_selection_ids.resize(nb_submeshes);
+    std::generate(current_mesh.submesh_selection_ids.begin(),
+                  current_mesh.submesh_selection_ids.end(), [] {
+                    mesh::selection_id_counter.next();
+                    return mesh::selection_id_counter;
+                  });
 
     // Create OpenGL objects for submehes
     glGenVertexArrays(GLsizei(nb_submeshes), current_mesh.VAOs.data());
     for (auto& VBO : current_mesh.VBOs) {
-      // We have 5 vertex attributes per vertex + 1 element array.
       glGenBuffers(VBO_count, VBO.data());
     }
 
@@ -483,18 +510,6 @@ void app::load() {
 
   for (auto& animation : animations) {
     animation.set_gltf_graph_targets(&gltf_scene_tree);
-
-#if 0 && (defined(DEBUG) || defined(_DEBUG))
-    // Animation playing depend on these values being absolutely consistent:
-    for (auto &channel : animation.channels) {
-      // if this pointer is not null, it means that this channel is moving a
-      // node we are displaying:
-      if (channel.target_graph_node) {
-        assert(channel.target_node ==
-               channel.target_graph_node->gltf_model_node_index);
-      }
-    }
-#endif
   }
 
   // TODO this is ... mh... per node?
@@ -556,6 +571,168 @@ mesh::~mesh() {
   draw_call_descriptors.clear();
 }
 
+bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
+                                        glm::vec3 world_camera_position,
+                                        glm::mat4 vp, float x, float y) const {
+  constexpr size_t stride = 3 * sizeof(float);
+  std::vector<float> world_positions(positions[submesh].size());
+  auto* index_buffer = &indices[submesh];
+  std::vector<unsigned> reserve_buffer;
+
+  if (draw_call_descriptors[submesh].draw_mode != GL_TRIANGLES) {
+    switch (draw_call_descriptors[submesh].draw_mode) {
+      default:
+        return false;
+
+      case GL_TRIANGLE_FAN: {
+        const unsigned first_index = (*index_buffer)[0];
+        unsigned last_index_used = (*index_buffer)[1];
+        const auto nb_triangles = index_buffer->size() - 2;
+        reserve_buffer.resize(3 * (nb_triangles));
+        for (size_t i = 0; i < nb_triangles; ++i) {
+          reserve_buffer[3 * i + 0] = first_index;
+          reserve_buffer[3 * i + 1] = last_index_used;
+          last_index_used = (*index_buffer)[2 + i];
+          reserve_buffer[3 * i + 2];
+        }
+        index_buffer = &reserve_buffer;
+      } break;
+      case GL_TRIANGLE_STRIP: {
+        const auto nb_triangles = index_buffer->size() - 2;
+        reserve_buffer.resize(3 * (nb_triangles));
+        for (size_t i = 0; i < nb_triangles; ++i) {
+          reserve_buffer[3 * i + 0] = (*index_buffer)[2 + i];
+          reserve_buffer[3 * i + 1] = (*index_buffer)[1 + i];
+          reserve_buffer[3 * i + 2] = (*index_buffer)[i];
+        }
+        index_buffer = &reserve_buffer;
+      } break;
+    }
+  }
+
+  const auto nb_triangles = index_buffer->size() / 3;
+  (void)nb_triangles;
+
+  for (size_t v = 0; v < world_positions.size() / 3; ++v) {
+    const auto& model_vertex_buffer =
+        skinned ? soft_skinned_position : display_position;
+
+    glm::vec4 projected =
+        world_xform *
+        glm::vec4(glm::make_vec3(&model_vertex_buffer[submesh][3 * v]), 1.f);
+
+    world_positions[3 * v + 0] = projected.x;
+    world_positions[3 * v + 1] = projected.y;
+    world_positions[3 * v + 2] = projected.z;
+  }
+
+  auto triangle_mesh = nanort::TriangleMesh<float>(
+      world_positions.data(), index_buffer->data(), stride);
+  auto triangle_sha_pred = nanort::TriangleSAHPred<float>(
+      world_positions.data(), index_buffer->data(), stride);
+
+  nanort::BVHBuildOptions<float> build_options;
+  nanort::BVHAccel<float> accel;
+  accel.Build(static_cast<unsigned int>(index_buffer->size()) / 3,
+              triangle_mesh, triangle_sha_pred, build_options);
+
+  nanort::Ray<float> mouse_ray;
+  mouse_ray.org[0] = world_camera_position.x;
+  mouse_ray.org[1] = world_camera_position.y;
+  mouse_ray.org[2] = world_camera_position.z;
+
+  auto inverse_vp = glm::inverse(vp);
+
+  // flip Y axis
+  y = 1.0f - y;
+  glm::vec4 mouse_world_coordiantes =
+      inverse_vp * glm::vec4(2.f * x - 1.f, 2.f * y - 1.f, -100.f, 1.f);
+  mouse_world_coordiantes /= mouse_world_coordiantes.w;
+
+  glm::vec3 mouse_ray_direction = glm::normalize(
+      (glm::vec3(mouse_world_coordiantes) - world_camera_position));
+
+  const auto debug_direction =
+      world_camera_position + 50.f * mouse_ray_direction;
+
+  app::debug_start = world_camera_position;
+  app::debug_stop = debug_direction;
+
+  mouse_ray.dir[0] = mouse_ray_direction.x;
+  mouse_ray.dir[1] = mouse_ray_direction.y;
+  mouse_ray.dir[2] = mouse_ray_direction.z;
+  mouse_ray.min_t = app::z_near;
+  mouse_ray.max_t = app::z_far;
+
+  nanort::TriangleIntersector<float, nanort::TriangleIntersection<float>>
+      triangle_intersector(world_positions.data(), index_buffer->data(),
+                           3 * sizeof(float));
+  nanort::TriangleIntersection<float> intersection;
+  nanort::BVHTraceOptions options;
+  options.cull_back_face = false;
+
+  if (accel.Traverse(mouse_ray, triangle_intersector, &intersection, options)) {
+    // std::cout << "raycast successful!\n";
+    // std::cout << "primitive id is:" << intersection.prim_id << "\n";
+    // std::cout << "number of triangles " << nb_triangles << "\n";
+    app::active_poly_indices.x =
+        float((*index_buffer)[size_t(intersection.prim_id) * 3]);
+    app::active_poly_indices.y =
+        float((*index_buffer)[size_t(intersection.prim_id) * 3 + 1]);
+    app::active_poly_indices.z =
+        float((*index_buffer)[size_t(intersection.prim_id) * 3 + 2]);
+
+    glm::vec3 v0 = glm::make_vec3(
+        &world_positions[3 * size_t(app::active_poly_indices.x)]);
+    glm::vec3 v1 = glm::make_vec3(
+        &world_positions[3 * size_t(app::active_poly_indices.y)]);
+    glm::vec3 v2 = glm::make_vec3(
+        &world_positions[3 * size_t(app::active_poly_indices.z)]);
+
+    glm::vec3 hit = glm::make_vec3(mouse_ray.org) +
+                    intersection.t * glm::make_vec3(mouse_ray.dir);
+
+    const float d0 = glm::distance2(hit, v0), d1 = glm::distance2(hit, v1),
+                d2 = glm::distance2(hit, v2);
+
+    const float dmin = std::min(d0, std::min(d1, d2));
+
+    int clicked_vertex = 0;
+    if (dmin == d0) clicked_vertex = 0;
+    if (dmin == d1) clicked_vertex = 1;
+    if (dmin == d2) clicked_vertex = 2;
+
+    app::active_vertex_index =
+        int((*index_buffer)[size_t(intersection.prim_id) * 3 +
+                            size_t(clicked_vertex)]);
+
+    if (skinned) {
+      const float* weight_array =
+          &weights[submesh][3 * size_t(app::active_vertex_index)];
+      float max_weight = weight_array[0];
+      size_t index_max = 0;
+
+      for (size_t i = 1; i < 4; ++i) {
+        if (max_weight < weight_array[i]) {
+          max_weight = weight_array[i];
+          index_max = i;
+        }
+      }
+
+      int most_important_bone =
+          joints[submesh][4 * size_t(app::active_vertex_index) + index_max];
+
+      if (max_weight != 0) {
+        app::active_joint_index_model = most_important_bone;
+      }
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 mesh& mesh::operator=(mesh&& o) {
   nb_joints = o.nb_joints;
   nb_morph_targets = o.nb_morph_targets;
@@ -581,6 +758,7 @@ mesh& mesh::operator=(mesh&& o) {
 
   shader_list = std::move(o.shader_list);
   soft_skin_shader_list = std::move(o.soft_skin_shader_list);
+
   return *this;
 }
 
@@ -599,7 +777,7 @@ void editor_lighting::show_control() {
       ImGui::SliderFloat3("Light Direction Euler",
                           glm::value_ptr(non_normalized_direction), -1, 1);
 
-      // Since what wer are already doing is not ideal to set a light direction
+      // Since what we are already doing is not ideal to set a light direction
       // vector from an UI... Safeguard against null vector normalization
       // causing NANtastic things
       if (glm::length(non_normalized_direction) == 0.f)
@@ -728,6 +906,29 @@ static void drop_callabck(GLFWwindow* window, int nums, const char** paths) {
   }
 }
 
+void app::initialize_colorpick_framebuffer() {
+  glGenFramebuffers(1, &color_pick_fbo);
+  glGenTextures(1, &color_pick_screen_texture);
+  glGenTextures(1, &color_pick_depth_buffer);
+  glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
+  glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, GLTFI_BUFFER_SIZE, GLTFI_BUFFER_SIZE,
+               0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         color_pick_screen_texture, 0);
+  glBindTexture(GL_TEXTURE_2D, color_pick_depth_buffer);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, GLTFI_BUFFER_SIZE,
+               GLTFI_BUFFER_SIZE, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
+               nullptr);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                         GL_TEXTURE_2D, color_pick_depth_buffer, 0);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 app::app(int argc, char** argv) {
   parse_command_line(argc, argv);
 
@@ -747,13 +948,14 @@ app::app(int argc, char** argv) {
 
   // load fallback material.
   // This must be called before loading glTF scene since
-  // `setup_fallback_textures` creates GL texture ID for each fallback textures(e.g. white tex).
-  // TODO(LTE): Do not create fallback texture and add enabled/disabled flag to each texture.
+  // `setup_fallback_textures` creates GL texture ID for each fallback
+  // textures(e.g. white tex).
+  // TODO(LTE): Do not create fallback texture and add enabled/disabled flag to
+  // each texture.
   setup_fallback_textures();
   load_sensible_default_material(dummy_material);
   logo = load_gltf_insight_icon();
   utility_buffers::init_static_buffers();
-
 
   if (!input_filename.empty()) {
     try {
@@ -763,6 +965,8 @@ app::app(int argc, char** argv) {
       unload();
     }
   }
+
+  initialize_colorpick_framebuffer();
 }
 
 app::~app() {
@@ -876,9 +1080,8 @@ void app::write_deformed_meshes_to_obj(const std::string filename) {
           loaded_meshes[mesh_idx].soft_skinned_normals[submesh_idx];
       writer.attrib_.texcoords = loaded_meshes[mesh_idx].uvs[submesh_idx];
 
-      const auto nb_triangles =
-          loaded_meshes[mesh_idx].indices[submesh_idx].size() / 3;
-      shape.mesh.num_face_vertices.resize(nb_triangles);
+      shape.mesh.num_face_vertices.resize(
+          loaded_meshes[mesh_idx].indices[submesh_idx].size() / 3);
       std::generate(shape.mesh.num_face_vertices.begin(),
                     shape.mesh.num_face_vertices.end(), [] { return 3; });
 
@@ -1003,7 +1206,7 @@ void app::create_transparent_docking_area(const ImVec2 pos, const ImVec2 size,
   End();
 }
 
-void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
+void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
                     glm::mat3 normal_matrix, glm::mat4 model_matrix)
 
 {
@@ -1044,12 +1247,12 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
 
     material_to_use.set_shader_uniform(active_shader);
     update_uniforms(active_shader_list, editor_light.use_ibl,
-                    world_camera_position, editor_light.color,
+                    world_camera_location, editor_light.color,
                     editor_light.get_directional_light_direction(),
-                    active_joint, shader_to_use,
+                    active_joint_index_model, shader_to_use,
                     projection_matrix * view_matrix * model_matrix,
                     projection_matrix * view_matrix * model_matrix,
-                    normal_matrix, mesh.joint_matrices);
+                    normal_matrix, mesh.joint_matrices, active_poly_indices);
 
     const auto& draw_call = mesh.draw_call_descriptors[submesh];
     glEnable(GL_DEPTH_TEST);
@@ -1074,11 +1277,11 @@ void app::draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
   }
 }
 
-void app::draw_scene_recur(const glm::vec3& world_camera_position,
+void app::draw_scene_recur(const glm::vec3& world_camera_location,
                            gltf_node& node,
                            std::vector<defered_draw>& alpha_models) {
   for (auto child : node.children)
-    draw_scene_recur(world_camera_position, *child, alpha_models);
+    draw_scene_recur(world_camera_location, *child, alpha_models);
 
   if (node.type == gltf_node::node_type::mesh) {
     auto& mesh = loaded_meshes[size_t(node.gltf_mesh_id)];
@@ -1094,16 +1297,16 @@ void app::draw_scene_recur(const glm::vec3& world_camera_position,
     if (!defer) {
       const glm::mat3 normal_matrix =
           glm::transpose(glm::inverse(node.world_xform));
-      draw_mesh(world_camera_position, mesh, normal_matrix, node.world_xform);
+      draw_mesh(world_camera_location, mesh, normal_matrix, node.world_xform);
     } else {
       alpha_models.push_back(node.get_ptr());
     }
   }
 }
 
-void app::draw_scene(const glm::vec3& world_camera_position) {
+void app::draw_scene(const glm::vec3& world_camera_location) {
   std::vector<defered_draw> alpha;
-  draw_scene_recur(world_camera_position, gltf_scene_tree, alpha);
+  draw_scene_recur(world_camera_location, gltf_scene_tree, alpha);
 
   if (!alpha.empty()) {
     {
@@ -1111,9 +1314,9 @@ void app::draw_scene(const glm::vec3& world_camera_position) {
       if (alpha.size() > 1)
         std::sort(alpha.begin(), alpha.end(),
                   [&](const defered_draw& a, const defered_draw b) {
-                    const glm::vec3 a_pos = world_camera_position -
+                    const glm::vec3 a_pos = world_camera_location -
                                             glm::vec3(a.node->world_xform[3]);
-                    const glm::vec3 b_pos = world_camera_position -
+                    const glm::vec3 b_pos = world_camera_location -
                                             glm::vec3(b.node->world_xform[3]);
 
                     return glm::length2(a_pos) < glm::length2(b_pos);
@@ -1125,11 +1328,43 @@ void app::draw_scene(const glm::vec3& world_camera_position) {
         const glm::mat3 normal_matrix =
             glm::transpose(glm::inverse(node->world_xform));
 
-        draw_mesh(world_camera_position, mesh, normal_matrix,
+        draw_mesh(world_camera_location, mesh, normal_matrix,
                   node->world_xform);
       }
     }
   }
+}
+
+void app::draw_color_select_map_recur(gltf_node& node) {
+  for (auto child : node.children) draw_color_select_map_recur(*child);
+
+  if (node.type == gltf_node::node_type::mesh) {
+    auto& mesh = loaded_meshes[size_t(node.gltf_mesh_id)];
+
+    for (size_t i = 0; i < mesh.draw_call_descriptors.size(); ++i) {
+      const glm::vec4 id_color = mesh.submesh_selection_ids[i];
+
+      update_uniforms(*mesh.shader_list, editor_light.use_ibl,
+                      glm::vec3(0, 0, 0), editor_light.color,
+                      editor_light.get_directional_light_direction(),
+                      active_joint_index_model, "debug_color",
+                      projection_matrix * view_matrix * node.world_xform,
+                      projection_matrix * view_matrix * node.world_xform,
+                      glm::inverse(glm::transpose(node.world_xform)),
+                      mesh.joint_matrices, active_poly_indices);
+
+      const auto& color_shader = (*mesh.shader_list)["debug_color"];
+      color_shader.use();
+      color_shader.set_uniform(
+          "debug_color", glm::vec4(id_color.r, id_color.g, id_color.b, 1));
+
+      perform_draw_call(mesh.draw_call_descriptors[i]);
+    }
+  }
+}
+
+void app::draw_color_select_map() {
+  draw_color_select_map_recur(gltf_scene_tree);
 }
 
 #if defined(GLTF_INSIGHT_WITH_NATIVEFILEDIALOG)
@@ -1298,11 +1533,12 @@ bool app::main_loop_frame() {
 
       if (show_bone_selector) {
         if (ImGui::Begin("Bone selector", &show_bone_selector))
-          ImGui::InputInt("Active joint", &active_joint, 1, 1);
+          ImGui::InputInt("Active joint", &active_joint_index_model, 1, 1);
         ImGui::End();
       }
 
-      active_joint = glm::clamp(active_joint, 0, loaded_meshes[0].nb_joints);
+      active_joint_index_model =
+          glm::clamp(active_joint_index_model, 0, loaded_meshes[0].nb_joints);
     }
 
     // Animation player advances time and apply animation interpolation.
@@ -1322,9 +1558,10 @@ bool app::main_loop_frame() {
                            float(display_w) / float(display_h), z_near, z_far);
 
     run_3D_gizmo(
-        asset_loaded && (active_joint >= 0) &&
-                (active_joint < int(loaded_meshes[0].flat_joint_list.size()))
-            ? loaded_meshes[0].flat_joint_list[size_t(active_joint)]
+        asset_loaded && (active_joint_index_model >= 0) &&
+                (active_joint_index_model <
+                 int(loaded_meshes[0].flat_joint_list.size()))
+            ? loaded_meshes[0].flat_joint_list[size_t(active_joint_index_model)]
             : nullptr);
 
     update_mesh_skeleton_graph_transforms(gltf_scene_tree);
@@ -1332,7 +1569,8 @@ bool app::main_loop_frame() {
     const glm::quat camera_rotation(
         glm::vec3(glm::radians(gui_parameters.rot_pitch),
                   glm::radians(gui_parameters.rot_yaw), 0.f));
-    const auto world_camera_position = camera_rotation * camera_position;
+
+    world_camera_position = camera_rotation * camera_position;
 
     view_matrix = glm::lookAt(world_camera_position, glm::vec3(0.f),
                               camera_rotation * glm::vec3(0, 1.f, 0));
@@ -1347,12 +1585,25 @@ bool app::main_loop_frame() {
       }
     }
     if (asset_loaded) {
+      ImGui::Checkbox("Draw debug ray", &show_debug_ray);
+      if (show_debug_ray) {
+        ImGui::InputFloat3("debug_start", glm::value_ptr(debug_start));
+        ImGui::InputFloat3("debug_stop", glm::value_ptr(debug_stop));
+
+        auto& program = loaded_meshes[0].shader_list->operator[]("debug_color");
+        program.use();
+        program.set_uniform("mvp", projection_matrix * view_matrix);
+        draw_line(program.get_program(), debug_start, debug_stop,
+                  glm::vec4(1, 0, 0, 1), 5);
+      }
+
       int active_bone_gltf_node = -1;
       for (auto& a_mesh : loaded_meshes) {
-        if ((active_joint >= 0) &&
-            (active_joint < int(a_mesh.flat_joint_list.size())))
+        if ((active_joint_index_model >= 0) &&
+            (active_joint_index_model < int(a_mesh.flat_joint_list.size())))
           active_bone_gltf_node =
-              a_mesh.flat_joint_list[size_t(active_joint)]->gltf_node_index;
+              a_mesh.flat_joint_list[size_t(active_joint_index_model)]
+                  ->gltf_node_index;
 
         // Calculate all the needed matrices to render the frame, this
         // includes the "model view projection" that transform the geometry to
@@ -1429,6 +1680,216 @@ bool app::main_loop_frame() {
       obj_export_worker.ui();
     }
   }
+
+  // TODO move that code elsewhere. Need better way to get the "clicked" event
+  static bool last_frame_click = true;
+  const bool current_frame_click = gui_parameters.button_states[0];
+  const bool clicked = !last_frame_click && current_frame_click;
+  last_frame_click = current_frame_click;
+
+  // if clicked on anything that is not the GUI elements
+  if (clicked && !(ImGui::GetIO().WantCaptureMouse || ImGuizmo::IsOver() ||
+                   ImGuizmo::IsUsing())) {
+    // std::cout << "click on viewport detected\n";
+
+    {  // TODO refactor extract me this
+      glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
+      glClearColor(0, 0, 0, 0);
+      glViewport(0, 0, GLTFI_BUFFER_SIZE, GLTFI_BUFFER_SIZE);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      draw_color_select_map();
+
+      // get back to normal render buffer
+      glBindFramebuffer(GL_FRAMEBUFFER, 0);
+      glViewport(0, 0, display_w, display_h);
+    }
+
+    bool clicked_on_submesh = false;
+    size_t mesh_id = 0, submesh_id = 0;
+
+    {  // TODO refactor extract this
+      // copy data to CPU memory
+      static std::vector<uint32_t> img_data(GLTFI_BUFFER_SIZE *
+                                            GLTFI_BUFFER_SIZE);
+      glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
+      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                    reinterpret_cast<void*>(&img_data[0]));
+
+      // check pixel color to find clicked object
+      const float pixel_screen_map_x =
+          (512 * float(gui_parameters.last_mouse_x) / float(display_w));
+      const float pixel_screen_map_y =
+          (512 * float(gui_parameters.last_mouse_y) / float(display_h));
+      const size_t pixel_screen_map_x_clamp =
+          size_t(glm::clamp(pixel_screen_map_x, 0.f, float(GLTFI_BUFFER_SIZE)));
+      const size_t pixel_screen_map_y_clamp =
+          size_t(glm::clamp(pixel_screen_map_y, 0.f, float(GLTFI_BUFFER_SIZE)));
+      color_identifier id(
+          img_data[(GLTFI_BUFFER_SIZE - pixel_screen_map_y_clamp) *
+                       GLTFI_BUFFER_SIZE +
+                   pixel_screen_map_x_clamp]);
+      // std::cout << "color id is : " << int(id.content.RGBA.R) << ":"
+      //          << int(id.content.RGBA.B) << ":" << int(id.content.RGBA.G)
+      //          << ":" << int(id.content.RGBA.A) << "\n";
+
+      // declare identifiers
+
+      for (mesh_id = 0; mesh_id < loaded_meshes.size(); mesh_id++) {
+        for (submesh_id = 0;
+             submesh_id < loaded_meshes[mesh_id].submesh_selection_ids.size();
+             submesh_id++) {
+          if (loaded_meshes[mesh_id].submesh_selection_ids[submesh_id] == id) {
+            clicked_on_submesh = true;
+            break;
+          }
+        }
+        if (clicked_on_submesh) break;
+      }
+    }
+
+    // If we know who's been clicked :
+    if (clicked_on_submesh) {
+      // std::cout << "clicked on " << mesh_id << ":" << submesh_id << "\n";
+      const auto& mesh = loaded_meshes[mesh_id];
+
+      auto node = gltf_scene_tree.get_node_with_index(mesh.instance.node);
+      if (node) {
+        const auto world_xform = node->world_xform;
+        // std::cout << mesh.name << std::endl;
+
+        if (mesh.raycast_submesh_camera_mouse(
+                world_xform, submesh_id, world_camera_position,
+                projection_matrix * view_matrix,
+                float(gui_parameters.last_mouse_x) / float(display_w),
+                float(gui_parameters.last_mouse_y) / float(display_h))) {
+          active_mesh_index = int(mesh_id);
+          active_submesh_index = int(submesh_id);
+        }
+      }
+    }
+  }
+
+  //{
+  //   TODO refactor put this as an hidden debug feature
+  //   ImGui::Begin("color picker debug");
+  //   static bool show_color_map_render = false;
+  //   ImGui::Checkbox("show colormap for picking showed in main buffer",
+  //                  &show_color_map_render);
+  //   ImGui::Image(ImTextureID(size_t(color_pick_screen_texture)),
+  //               ImVec2(256, 256), ImVec2(0, 1), ImVec2(1, 0),
+  //               ImVec4(1, 1, 1, 1), ImVec4(0, 0, 0, 1));
+  //   ImGui::End();
+
+  //   if (show_color_map_render) {
+  //    glClearColor(0, 0, 0, 0);
+  //    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  //    glViewport(0, 0, display_w, display_h);
+  //    draw_color_select_map();
+  //  }
+  //}
+
+  // if selection is valid:
+  if (active_mesh_index >= 0 && active_mesh_index < int(loaded_meshes.size()))
+    if (active_submesh_index >= 0 &&
+        active_submesh_index <
+            int(loaded_meshes[size_t(active_mesh_index)].positions.size()))
+      if (active_vertex_index >= 0 &&
+          active_vertex_index < int(loaded_meshes[size_t(active_mesh_index)]
+                                        .indices[size_t(active_submesh_index)]
+                                        .size())) {
+        // Get the mesh
+        const auto& mesh = loaded_meshes[size_t(active_mesh_index)];
+
+        // Get the vertex buffer
+        const auto& vertex_buffer =
+            mesh.skinned
+                ? mesh.soft_skinned_position[size_t(active_submesh_index)]
+                : mesh.display_position[size_t(active_submesh_index)];
+
+        // Get the world matrix
+        const auto node =
+            gltf_scene_tree.get_node_with_index(mesh.instance.node);
+        const auto& world_xform = node->world_xform;
+
+        // Configure shader
+        shader& shader = (*mesh.shader_list)["debug_color"];
+        const auto mvp = projection_matrix * view_matrix * world_xform;
+
+        // Draw point
+        shader.use();
+        shader.set_uniform("mvp", mvp);
+
+        int selection = active_vertex_index;
+
+        if (ImGui::Begin("Selection Info")) {
+          ImGui::Text("Active face vertex [%d, %d, %d]",
+                      int(active_poly_indices.x), int(active_poly_indices.y),
+                      int(active_poly_indices.z));
+
+          ImGui::InputInt("Active Vertex Index", &selection, 1, 100);
+          selection =
+              glm::clamp<int>(selection, 0, int(vertex_buffer.size()) / 3);
+          active_vertex_index = selection;
+
+          glm::vec3 active_vertex_position =
+              glm::make_vec3(&vertex_buffer[3 * size_t(active_vertex_index)]);
+
+          glm::vec3 active_model_position =
+              glm::make_vec3(&mesh.positions[size_t(active_submesh_index)]
+                                            [3 * size_t(active_vertex_index)]);
+          draw_point(active_vertex_position, 5, shader.get_program(),
+                     glm::vec4(0.75, 0.25, 0, 0.8));
+
+          glm::vec3 active_vertex_normal =
+              glm::make_vec3(&mesh.normals[size_t(active_submesh_index)]
+                                          [3 * size_t(active_vertex_index)]);
+
+          ImGui::Text("Vertex Coordinates (%f, %f, %f)",
+                      active_model_position.x, active_model_position.y,
+                      active_model_position.z);
+          ImGui::Text("Vertex Normal (%f, %f, %f)", active_vertex_normal.x,
+                      active_vertex_normal.y, active_vertex_normal.z);
+
+          // Mesh uv are optional
+          if (mesh.uvs.size() > 0 &&
+              mesh.uvs[size_t(active_submesh_index)].size() > 0) {
+            glm::vec2 active_vertex_uv =
+                glm::make_vec2(&mesh.uvs[size_t(active_submesh_index)]
+                                        [2 * size_t(active_vertex_index)]);
+            ImGui::Text("Vertex UV (%f, %f)", active_vertex_uv.x,
+                        active_vertex_uv.y);
+          }
+
+          if (mesh.skinned) {
+            ImGui::Text("Skinning info");
+            glm::vec4 weight, joint;
+            weight =
+                glm::make_vec4(&mesh.weights[size_t(active_submesh_index)]
+                                            [4 * size_t(active_vertex_index)]);
+            joint =
+                glm::make_vec4(&mesh.joints[size_t(active_submesh_index)]
+                                           [4 * size_t(active_vertex_index)]);
+
+            ImGui::Columns(2);
+            ImGui::Text("Weight");
+            ImGui::NextColumn();
+            ImGui::Text("Joint");
+            ImGui::NextColumn();
+            ImGui::Separator();
+
+            for (glm::vec4::length_type i = 0; i < 4; ++i) {
+              ImGui::Text("%f", float(weight[i]));
+              ImGui::NextColumn();
+              ImGui::Text("%d", int(joint[i]));
+              ImGui::NextColumn();
+              ImGui::Separator();
+            }
+            ImGui::Columns();
+          }
+        }
+        ImGui::End();
+      }
+
   // Render all ImGui, then swap buffers
   gl_gui_end_frame(window);
   return !glfwWindowShouldClose(window);
@@ -1474,10 +1935,19 @@ void app::parse_command_line(int argc, char** argv) {
   using optparse::OptionParser;
   OptionParser parser = OptionParser().description("glTF data insight tool");
 
-  parser.add_option("-d", "--debug").action("store_true").dest("debug").help("Enable debugging");
+  parser.add_option("-d", "--debug")
+      .action("store_true")
+      .dest("debug")
+      .help("Enable debugging");
 
-  parser.add_option("-i", "--input").dest("input").help("Input glTF filename").metavar("FILE");
-  parser.add_option("-h", "--help").action("store_true").dest("help").help("Show help");
+  parser.add_option("-i", "--input")
+      .dest("input")
+      .help("Input glTF filename")
+      .metavar("FILE");
+  parser.add_option("-h", "--help")
+      .action("store_true")
+      .dest("help")
+      .help("Show help");
 
   optparse::Values options = parser.parse_args(argc, argv);
   std::vector<std::string> args = parser.args();
@@ -1533,13 +2003,17 @@ void app::load_all_textures(size_t nb_textures) {
 
   for (size_t i = 0; i < nb_textures; ++i) {
     glBindTexture(GL_TEXTURE_2D, textures[i]);
+
+    // TODO handle SRGB colorspace for accurate shading.
     glTexImage2D(GL_TEXTURE_2D, 0,
                  model.images[i].component == 4 ? GL_RGBA : GL_RGB,
                  model.images[i].width, model.images[i].height, 0,
                  model.images[i].component == 4 ? GL_RGBA : GL_RGB,
                  GL_UNSIGNED_BYTE, model.images[i].image.data());
     glGenerateMipmap(GL_TEXTURE_2D);
-    // TODO set texture sampling and filtering parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                    GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   }
   glBindTexture(GL_TEXTURE_2D, 0);
 }
@@ -1558,9 +2032,7 @@ void app::cpu_compute_morphed_display_mesh(
     const std::vector<std::vector<float>>& vertex_coord,
     const std::vector<std::vector<float>>& normals,
     std::vector<std::vector<float>>& display_position,
-    std::vector<std::vector<float>>& display_normal,
-
-    size_t vertex) {
+    std::vector<std::vector<float>>& display_normal, size_t vertex) {
   // Get the base vector
   display_position[submesh_id][vertex] = vertex_coord[submesh_id][vertex];
   display_normal[submesh_id][vertex] = normals[submesh_id][vertex];

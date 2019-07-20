@@ -47,7 +47,6 @@ SOFTWARE.
 #endif
 
 #include "OptionParser.h"
-
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/quaternion.hpp"
@@ -70,13 +69,69 @@ SOFTWARE.
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
 
-// last
+// NanoRT is used as a general purpose raytracer
+#define NANORT_USE_CPP11_FEATURE
+#define NANORT_ENABLE_PARALLEL_BUILD
+#include "nanort.h"
+
+// obj API
 #include "tiny_obj_loader.h"
+
+#define GLTFI_BUFFER_SIZE 512
 
 /// Main application class
 namespace gltf_insight {
 
+#pragma pack(push, 1)
+struct color_identifier {
+  union {
+    uint32_t bin;
+    struct {
+      uint8_t R, G, B, A;
+    } RGBA;
+    uint8_t arr[4];
+  } content;
+
+  color_identifier() = default;
+  color_identifier(uint32_t value) { content.bin = value; }
+  color_identifier(uint8_t value[4]) {
+    content.arr[0] = value[0];
+    content.arr[1] = value[1];
+    content.arr[2] = value[2];
+    content.arr[3] = value[3];
+  }
+
+  operator glm::vec4() const {
+    return glm::vec4(
+        float(content.RGBA.R) / 255.f, float(content.RGBA.B) / 255.f,
+        float(content.RGBA.G) / 255.f, float(content.RGBA.A) / 255.f);
+  }
+
+  operator uint32_t() const { return content.bin; }
+  uint8_t& operator[](size_t index) { return content.arr[index]; }
+  uint8_t operator[](size_t index) const { return content.arr[index]; }
+
+  void next() {
+    if (content.RGBA.R < 255)
+      content.RGBA.R++;
+    else if (content.RGBA.G < 255)
+      content.RGBA.G++;
+    else if (content.RGBA.B < 255)
+      content.RGBA.B++;
+    else if (content.RGBA.A < 255)
+      content.RGBA.A++;
+  }
+
+  bool operator==(const color_identifier& other) {
+    return content.bin == other.content.bin;
+  }
+};
+
+#pragma pack(pop)
+
 struct mesh {
+  static color_identifier selection_id_counter;
+
   gltf_mesh_instance instance;
   std::string name;
 
@@ -103,6 +158,7 @@ struct mesh {
   std::vector<std::vector<float>> soft_skinned_position;
   std::vector<std::vector<float>> soft_skinned_normals;
   std::vector<std::vector<float>> colors;
+  std::vector<color_identifier> submesh_selection_ids;
   std::vector<int> materials;
 
   // Rendering
@@ -127,6 +183,10 @@ struct mesh {
   mesh(mesh&& other);
   mesh();
   ~mesh();
+
+  bool raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
+                                    glm::vec3 world_camera_position,
+                                    glm::mat4 vp, float x, float y) const;
 };
 
 struct editor_lighting {
@@ -143,12 +203,23 @@ struct editor_lighting {
 
 class app {
  public:
+  static glm::vec3 debug_start, debug_stop;
+  static glm::vec3 active_poly_indices;
+
+  static float z_near, z_far;
+
+  static int active_mesh_index;
+  static int active_submesh_index;
+  static int active_vertex_index;
+  static int active_joint_index_model;
+
   enum class display_mode : int {
     normal = 0,
     debug = 1
   } current_display_mode = display_mode::normal;
 
   void load_sensible_default_material(material& material);
+  void initialize_colorpick_framebuffer();
   app(int argc, char** argv);
   ~app();
   void run_file_menu();
@@ -182,10 +253,17 @@ class app {
   application_parameters gui_parameters{camera_position};
 
  private:
+  glm::vec3 world_camera_position;
+  GLuint color_pick_fbo, color_pick_screen_texture, color_pick_depth_buffer;
+
   void draw_mesh(const glm::vec3& world_camera_position, const mesh& mesh,
                  glm::mat3 normal_matrix, glm::mat4 model_matrix);
 
   void draw_scene(const glm::vec3& world_camera_position);
+
+  void draw_color_select_map();
+
+  void draw_color_select_map_recur(gltf_node& node);
 
   struct defered_draw {
     gltf_node* node;
@@ -220,7 +298,8 @@ class app {
   bool show_material_window = true;
   bool show_bone_display_window = true;
   bool show_scene_outline_window = true;
-  bool do_soft_skinning = false;
+  bool do_soft_skinning = true;
+  bool show_debug_ray = false;
 
   std::vector<mesh> loaded_meshes;
   std::vector<material> loaded_material;
@@ -229,7 +308,6 @@ class app {
   // Application state
   bool asset_loaded = false;
   bool found_textured_shader = false;
-  int active_joint = 0;
 
   gltf_node gltf_scene_tree{gltf_node::node_type::empty};
 
@@ -246,8 +324,6 @@ class app {
   int display_w, display_h;
   glm::vec3 camera_position{0, 0, 7.f};
   float fovy = 45.f;
-  float z_near = 1.f;
-  float z_far = 100.f;
 
   // user interface state
   bool open_file_dialog = false;

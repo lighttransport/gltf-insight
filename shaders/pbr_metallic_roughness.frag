@@ -3,6 +3,7 @@
 #define ALPHA_BLEND 2
 
 out vec4 output_color;
+in float selected;
 
 in vec3 interpolated_normal;
 in vec3 fragment_world_position;
@@ -268,4 +269,11 @@ void main()
 	color += emissive;
 
 	output_color = vec4(color, float(base_color.a));
+
+
+	if(selected >= 0.999)
+	{
+		output_color = vec4(1, 0.5, 0, 1);
+	}
+
 }

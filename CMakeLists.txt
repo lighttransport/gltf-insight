@@ -213,6 +213,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/)
 set(EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/OptionParser.cpp)
 
+# [NanoRT]
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanort)
 
 #Discover the source code
 if (CMAKE_VERSION VERSION_GREATER 3.12)
@@ -229,7 +231,7 @@ endif()
 # TODO(LTE): GLOB is not recommended so do not use GLOB to list up source files at `SOURCES`
 IF (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT EMSCRIPTEN)
   # Assume C++ sources
-  set_source_files_properties(${SOURCES} PROPERTIES COMPILE_FLAGS "-Weverything -Wno-system-headers -Werror -Wno-padded -Wno-c++98-compat-pedantic -Wno-documentation -Wno-documentation-unknown-command -Wno-reserved-id-macro")
+  set_source_files_properties(${SOURCES} PROPERTIES COMPILE_FLAGS "-Weverything -Wno-system-headers -Werror -Wno-padded -Wno-c++98-compat-pedantic -Wno-documentation -Wno-documentation-unknown-command -Wno-reserved-id-macro -Wno-global-constructors -Wno-double-promotion -Wno-exit-time-destructors -Wno-float-equal")
 ENDIF ()
 
 #find xxd's executable
