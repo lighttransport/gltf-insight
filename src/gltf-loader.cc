@@ -228,33 +228,6 @@ void load_geometry(
 
     // TODO refcator the accessor -> array loading
 
-    // INDEX BUFFER
-    {
-      const auto& indices_accessor = model.accessors[primitive.indices];
-      const auto& indices_buffer_view =
-          model.bufferViews[indices_accessor.bufferView];
-      const auto& indices_buffer = model.buffers[indices_buffer_view.buffer];
-      const auto indices_start_pointer = indices_buffer.data.data() +
-                                         indices_buffer_view.byteOffset +
-                                         indices_accessor.byteOffset;
-      const auto indices_stride =
-          indices_accessor.ByteStride(indices_buffer_view);
-      indices[submesh].resize(indices_accessor.count);
-      const size_t byte_size_of_component =
-          tinygltf::GetComponentSizeInBytes(indices_accessor.componentType);
-      assert(indices_accessor.type == TINYGLTF_TYPE_SCALAR);
-      assert(sizeof(unsigned int) >= byte_size_of_component);
-
-      for (size_t i = 0; i < indices_accessor.count; ++i) {
-        unsigned int temp = 0;
-        memcpy(&temp, indices_start_pointer + i * indices_stride,
-               byte_size_of_component);
-        indices[submesh][i] = unsigned(temp);
-      }
-      // number of elements to pass to glDrawElements(...)
-      draw_call_descriptor[submesh].count = indices_accessor.count;
-    }
-
     // VERTEX POSITIONS
     {
       const auto position = primitive.attributes.at("POSITION");
@@ -286,6 +259,80 @@ void load_geometry(
                  position_start_pointer + i * position_stride,
                  byte_size_of_component * 3);
         }
+      }
+    }
+
+    // INDEX BUFFER
+    if (primitive.indices != -1) {
+      const auto& indices_accessor = model.accessors[primitive.indices];
+      const auto& indices_buffer_view =
+          model.bufferViews[indices_accessor.bufferView];
+      const auto& indices_buffer = model.buffers[indices_buffer_view.buffer];
+      const auto indices_start_pointer = indices_buffer.data.data() +
+                                         indices_buffer_view.byteOffset +
+                                         indices_accessor.byteOffset;
+      const auto indices_stride =
+          indices_accessor.ByteStride(indices_buffer_view);
+      indices[submesh].resize(indices_accessor.count);
+      const size_t byte_size_of_component =
+          tinygltf::GetComponentSizeInBytes(indices_accessor.componentType);
+      assert(indices_accessor.type == TINYGLTF_TYPE_SCALAR);
+      assert(sizeof(unsigned int) >= byte_size_of_component);
+
+      for (size_t i = 0; i < indices_accessor.count; ++i) {
+        unsigned int temp = 0;
+        memcpy(&temp, indices_start_pointer + i * indices_stride,
+               byte_size_of_component);
+        indices[submesh][i] = unsigned(temp);
+      }
+      // number of elements to pass to glDrawElements(...)
+      draw_call_descriptor[submesh].count = indices_accessor.count;
+    } else {
+      unsigned value = 0;  // temporary variable used by std::generate
+      // generate index buffer here
+
+      // TODO this utility could be added to tinygltf
+      const auto get_vertex_per_primitive = [](GLuint mode) -> size_t {
+        switch (mode) {
+          case TINYGLTF_MODE_TRIANGLES:
+          case TINYGLTF_MODE_TRIANGLE_FAN:
+          case TINYGLTF_MODE_TRIANGLE_STRIP:
+            return 3;
+
+          case TINYGLTF_MODE_LINE:
+          case TINYGLTF_MODE_LINE_LOOP:
+          case TINYGLTF_MODE_LINE_STRIP:
+            return 2;
+
+          case TINYGLTF_MODE_POINTS:
+            return 1;
+
+          default:
+            std::cerr << "Warn: cannot compute the number of vertex used in "
+                         "primitive mode "
+                      << mode << "\n";
+            return 0;
+        }
+      };
+
+      const auto vertex_per_primitive =
+          get_vertex_per_primitive(primitive.mode);
+      switch (primitive.mode) {
+        // These only use a sequence of contiguous numbers
+        case TINYGLTF_MODE_TRIANGLES:
+        case TINYGLTF_MODE_LINE:
+        case TINYGLTF_MODE_POINTS:
+          indices[submesh].resize(vertex_coord[submesh].size() /
+                                  vertex_per_primitive);
+          std::generate(indices[submesh].begin(), indices[submesh].end(),
+                        [&] { return value++; });
+          draw_call_descriptor[submesh].count = indices[submesh].size();
+          break;
+
+        default:
+          std::cerr << "TODO implement index buffer generation for triangle "
+                       "strip / triangle fan and line strip/loop";
+          break;
       }
     }
 
