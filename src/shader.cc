@@ -112,7 +112,10 @@ shader::shader(const char* shader_name, const char* vertex_shader_source_code,
   glDeleteShader(fragment_shader);
 }
 
-void shader::use() const { glUseProgram(program_); }
+void shader::use() const {
+  glUseProgram(program_);
+  set_uniform("highlight_color", gltf_insight::configuration::highlight_color);
+}
 
 const char* shader::get_name() const { return shader_name_.c_str(); }
 

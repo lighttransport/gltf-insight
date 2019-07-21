@@ -51,10 +51,9 @@ SOFTWARE.
 #include <vector>
 
 #include "animation.hh"
+#include "configuration.hh"
 
 struct gltf_node {
-  //~gltf_node();
-
   /// A node can be a mesh, or a bone, or can just be empty.
   ///
   /// A empty node can serve to just hold a transform
@@ -113,7 +112,7 @@ void update_mesh_skeleton_graph_transforms(
 void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
                          int gltf_index);
 
-void set_mesh_attachement(const tinygltf::Model& model, gltf_node& graph_root);
+void set_mesh_attachment(const tinygltf::Model& model, gltf_node& graph_root);
 
 struct gltf_mesh_instance {
   int node;

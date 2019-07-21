@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
 #ifdef _MSC_VER
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
@@ -952,9 +953,10 @@ void about_window(GLuint logo, bool* open) {
 #endif
 #endif
 
-    ImGui::Text("Version %d.%d.%d." LOCAL_ID, CMAKE_BUILD_MAJOR,
+    ImGui::Text("Version %d.%d.%d." LOCAL_ID ". Platform %s", CMAKE_BUILD_MAJOR,
                 CMAKE_BUILD_MINOR, CMAKE_BUILD_PATCH,
-                CMAKE_CI ? CMAKE_CI_BUILD : 0x1337F00D);
+                CMAKE_CI ? CMAKE_CI_BUILD : 0x1337F00D,
+                os_utils::platform().c_str());
 #undef LOCAL_ID
 
     ImGui::Text("Built from git commit " CMAKE_GIT_COMMIT_SHORT);

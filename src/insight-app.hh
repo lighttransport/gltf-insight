@@ -30,6 +30,7 @@ SOFTWARE.
 #endif
 
 #include "animation.hh"
+#include "configuration.hh"
 #include "material.hh"
 
 // This includes opengl for us, along side debuging callbacks
@@ -75,6 +76,7 @@ SOFTWARE.
 #include "nanort.h"
 
 // obj API
+#include "os_utils.hh"
 #include "tiny_obj_loader.h"
 
 #define GLTFI_BUFFER_SIZE 512
@@ -218,8 +220,8 @@ class app {
     debug = 1
   } current_display_mode = display_mode::normal;
 
-  void load_sensible_default_material(material& material);
-  void initialize_colorpick_framebuffer();
+  static void load_sensible_default_material(material& material);
+  void initialize_mouse_select_framebuffer();
   app(int argc, char** argv);
   ~app();
   void run_file_menu();
@@ -239,9 +241,26 @@ class app {
   void load();
 
   void main_loop();
+  void update_mouse_select_framebuffer();
+  void get_submesh_below_mouse_cursor(bool& clicked_on_submesh, size_t& mesh_id,
+                                      size_t& submesh_id);
+  void get_vertex_below_mouse_cursor(size_t mesh_id, size_t submesh_id);
+  void check_current_active_selection_valid(bool& current_selection_valid);
+  void handle_click_on_geometry();
+  void handle_current_selection();
+  void handle_obj_export_animation_sequence();
+  void run_mouse_click_handler();
+  void render_loaded_gltf_scene(int active_bone_gltf_node);
+  void update_rendering_matrices();
+  void perform_skinning_and_morphing(bool gpu_geometry_buffers_dirty,
+                                     std::vector<mesh>::value_type& a_mesh);
+  void soft_skinning_controls(bool& gpu_geometry_buffers_dirty);
+  void mouse_ray_debug_control();
+  void find_gltf_node_index_for_active_joint(
+      int& active_bone_gltf_node, std::vector<mesh>::value_type& a_mesh);
+  void update_geometry(bool gpu_geometry_buffers_dirty,
+                       int& active_joint_gltf_node);
   bool main_loop_frame();
-
-  static void open_url(std::string url);
 
   void set_input_filename(const std::string& filename) {
     input_filename = filename;
@@ -300,6 +319,7 @@ class app {
   bool show_scene_outline_window = true;
   bool do_soft_skinning = true;
   bool show_debug_ray = false;
+  bool show_obj_export_window = true;
 
   std::vector<mesh> loaded_meshes;
   std::vector<material> loaded_material;

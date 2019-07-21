@@ -32,6 +32,8 @@ uniform vec3 camera_position;
 uniform vec3 light_direction;
 uniform vec3 light_color;
 
+uniform vec4 highlight_color;
+
 
 //To hold the data during computation
 struct pbr_info
@@ -273,7 +275,7 @@ void main()
 
 	if(selected >= 0.999)
 	{
-		output_color = vec4(1, 0.5, 0, 1);
+		output_color = mix(output_color, highlight_color, 0.5);
 	}
 
 }

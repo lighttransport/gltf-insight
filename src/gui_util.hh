@@ -29,7 +29,7 @@ SOFTWARE.
 #endif
 
 // include glad first
-#ifndef __EMSCRIPTEN__ //we directly have GLES3
+#ifndef __EMSCRIPTEN__  // we directly have GLES3
 #include <glad/glad.h>
 #else
 #include <GLES3/gl3.h>
@@ -55,9 +55,9 @@ SOFTWARE.
 
 #include "animation.hh"
 #include "gltf-graph.hh"
+#include "material.hh"
 #include "tiny_gltf.h"
 #include "tiny_gltf_util.h"
-#include "material.hh"
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -126,11 +126,6 @@ struct mesh;
 void mesh_display_window(std::vector<gltf_insight::mesh>& mesh,
                          bool* open = nullptr);
 
-// Window that display joint and weights asignements of the gltf asset
-void skinning_data_window(
-    const std::vector<std::vector<float>>& weights,
-    const std::vector<std::vector<unsigned short>>& joints);
-
 // Window that display the morph target and their current weights
 void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets,
                          bool* open = nullptr);
@@ -168,10 +163,10 @@ void camera_parameters_window(float& fovy, float& z_far, bool* open = nullptr);
 GLuint load_gltf_insight_icon();
 void about_window(GLuint logo, bool* open = nullptr);
 
-// NOTE(LTE): material may have a chance to be modified, so no `const` qualifiers.
-void material_info_window(
-    gltf_insight::material& dummy,
-    std::vector<gltf_insight::material>& loaded_materials,
-    bool* open = nullptr);
+// NOTE(LTE): material may have a chance to be modified, so no `const`
+// qualifiers.
+void material_info_window(gltf_insight::material& dummy,
+                          std::vector<gltf_insight::material>& loaded_materials,
+                          bool* open = nullptr);
 
 void scene_outline_window(gltf_node& sene, bool* open = nullptr);

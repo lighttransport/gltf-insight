@@ -312,7 +312,7 @@ void app::load() {
     populate_gltf_graph(model, root, root_index);
   }
 
-  set_mesh_attachement(model, gltf_scene_tree);
+  set_mesh_attachment(model, gltf_scene_tree);
   auto meshes_indices = get_list_of_mesh_instances(gltf_scene_tree);
 
   loaded_meshes.resize(meshes_indices.size());
@@ -672,9 +672,6 @@ bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
   options.cull_back_face = false;
 
   if (accel.Traverse(mouse_ray, triangle_intersector, &intersection, options)) {
-    // std::cout << "raycast successful!\n";
-    // std::cout << "primitive id is:" << intersection.prim_id << "\n";
-    // std::cout << "number of triangles " << nb_triangles << "\n";
     app::active_poly_indices.x =
         float((*index_buffer)[size_t(intersection.prim_id) * 3]);
     app::active_poly_indices.y =
@@ -707,8 +704,10 @@ bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
                             size_t(clicked_vertex)]);
 
     if (skinned) {
+      // TODO we need a better strategy to be able to click a joint
       const float* weight_array =
           &weights[submesh][3 * size_t(app::active_vertex_index)];
+
       float max_weight = weight_array[0];
       size_t index_max = 0;
 
@@ -721,6 +720,8 @@ bool mesh::raycast_submesh_camera_mouse(glm::mat4 world_xform, size_t submesh,
 
       int most_important_bone =
           joints[submesh][4 * size_t(app::active_vertex_index) + index_max];
+
+      std::cout << "clicked bone " << most_important_bone << "\n";
 
       if (max_weight != 0) {
         app::active_joint_index_model = most_important_bone;
@@ -906,7 +907,7 @@ static void drop_callabck(GLFWwindow* window, int nums, const char** paths) {
   }
 }
 
-void app::initialize_colorpick_framebuffer() {
+void app::initialize_mouse_select_framebuffer() {
   glGenFramebuffers(1, &color_pick_fbo);
   glGenTextures(1, &color_pick_screen_texture);
   glGenTextures(1, &color_pick_depth_buffer);
@@ -966,7 +967,7 @@ app::app(int argc, char** argv) {
     }
   }
 
-  initialize_colorpick_framebuffer();
+  initialize_mouse_select_framebuffer();
 }
 
 app::~app() {
@@ -1018,6 +1019,9 @@ void app::run_edit_menu() {
     if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
       mCurrentGizmoMode = ImGuizmo::LOCAL;
     ImGui::Separator();
+    if (ImGui::MenuItem("Editor configuration...")) {
+      configuration::editor_configuration_open = true;
+    }
     ImGui::EndMenu();
   }
 }
@@ -1042,6 +1046,7 @@ void app::run_view_menu() {
     ImGui::MenuItem("Material info", nullptr, &show_material_window);
     ImGui::MenuItem("Bone display window", nullptr, &show_bone_display_window);
     ImGui::MenuItem("Scene outline", nullptr, &show_scene_outline_window);
+    ImGui::MenuItem("OBJ export window", nullptr, &show_obj_export_window);
     ImGui::Separator();
     ImGui::MenuItem("Show Gizmo", nullptr, &show_gizmo);
     ImGui::MenuItem("Editor light controls", nullptr,
@@ -1049,15 +1054,6 @@ void app::run_view_menu() {
     ImGui::EndMenu();
   }
 }
-
-#include <sys/stat.h>
-#include <sys/types.h>
-
-#include <string>
-
-#if defined(_WIN32)
-#include <direct.h>
-#endif
 
 void app::write_deformed_meshes_to_obj(const std::string filename) {
   tinyobj::ObjWriter writer;
@@ -1102,22 +1098,7 @@ void app::write_deformed_meshes_to_obj(const std::string filename) {
     writer.shapes_.push_back(shape);
   }
 
-  const std::string path_to_last_dir =
-      filename.substr(0, filename.find_last_of("/\\"));
-
-  int nError = 0;
-#if defined(_WIN32)
-  nError = _mkdir(path_to_last_dir.c_str());  // can be used on Windows
-#else
-  mode_t nMode = 0733;  // UNIX style permissions
-  nError =
-      mkdir(path_to_last_dir.c_str(), nMode);  // can be used on non-Windows
-#endif
-  if (nError != 0 && errno != EEXIST) {
-    (void)nError;
-    std::cerr << "We attempted to create directory " << path_to_last_dir
-              << " And there's an error that is not EEXIST\n";
-  }
+  os_utils::mkdir_from_filepath(filename);
 
   const auto status = writer.SaveTofile(filename);
   if (!writer.Warning().empty())
@@ -1157,7 +1138,7 @@ void app::run_help_menu(bool& about_open) {
   if (ImGui::BeginMenu("Help")) {
     if (ImGui::MenuItem("About...")) about_open = true;
     if (ImGui::MenuItem("See on GitHub"))
-      open_url("https://github.com/lighttransport/gltf-insight/");
+      os_utils::open_url("https://github.com/lighttransport/gltf-insight/");
     ImGui::EndMenu();
   }
 }
@@ -1210,6 +1191,7 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
                     glm::mat3 normal_matrix, glm::mat4 model_matrix)
 
 {
+  if (!mesh.displayed) return;
   for (size_t submesh = 0; submesh < mesh.draw_call_descriptors.size();
        ++submesh) {
     const auto& material_to_use =
@@ -1402,6 +1384,380 @@ void app::main_loop() {
   }
 }
 
+void app::update_mouse_select_framebuffer() {
+  // TODO refactor extract me this
+  glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
+  glClearColor(0, 0, 0, 0);
+  glViewport(0, 0, GLTFI_BUFFER_SIZE, GLTFI_BUFFER_SIZE);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  draw_color_select_map();
+
+  // get back to normal render buffer
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glViewport(0, 0, display_w, display_h);
+}
+
+void app::get_submesh_below_mouse_cursor(bool& clicked_on_submesh,
+                                         size_t& mesh_id, size_t& submesh_id) {
+  // TODO refactor extract this
+  // copy data to CPU memory
+  static std::vector<uint32_t> img_data(GLTFI_BUFFER_SIZE * GLTFI_BUFFER_SIZE);
+  glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
+  glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                reinterpret_cast<void*>(&img_data[0]));
+
+  // check pixel color to find clicked object
+  const float pixel_screen_map_x =
+      (512 * float(gui_parameters.last_mouse_x) / float(display_w));
+  const float pixel_screen_map_y =
+      (512 * float(gui_parameters.last_mouse_y) / float(display_h));
+  const size_t pixel_screen_map_x_clamp =
+      size_t(glm::clamp(pixel_screen_map_x, 0.f, float(GLTFI_BUFFER_SIZE)));
+  const size_t pixel_screen_map_y_clamp =
+      size_t(glm::clamp(pixel_screen_map_y, 0.f, float(GLTFI_BUFFER_SIZE)));
+  color_identifier id(img_data[(GLTFI_BUFFER_SIZE - pixel_screen_map_y_clamp) *
+                                   GLTFI_BUFFER_SIZE +
+                               pixel_screen_map_x_clamp]);
+  // std::cout << "color id is : " << int(id.content.RGBA.R) << ":"
+  //          << int(id.content.RGBA.B) << ":" << int(id.content.RGBA.G)
+  //          << ":" << int(id.content.RGBA.A) << "\n";
+
+  // declare identifiers
+
+  for (mesh_id = 0; mesh_id < loaded_meshes.size(); mesh_id++) {
+    for (submesh_id = 0;
+         submesh_id < loaded_meshes[mesh_id].submesh_selection_ids.size();
+         submesh_id++) {
+      if (loaded_meshes[mesh_id].submesh_selection_ids[submesh_id] == id) {
+        clicked_on_submesh = true;
+        break;
+      }
+    }
+    if (clicked_on_submesh) break;
+  }
+}
+
+void app::get_vertex_below_mouse_cursor(size_t mesh_id, size_t submesh_id) {
+  // std::cout << "clicked on " << mesh_id << ":" << submesh_id << "\n";
+  const auto& mesh = loaded_meshes[mesh_id];
+
+  auto node = gltf_scene_tree.get_node_with_index(mesh.instance.node);
+  if (node) {
+    const auto world_xform = node->world_xform;
+    // std::cout << mesh.name << std::endl;
+
+    if (mesh.raycast_submesh_camera_mouse(
+            world_xform, submesh_id, world_camera_position,
+            projection_matrix * view_matrix,
+            float(gui_parameters.last_mouse_x) / float(display_w),
+            float(gui_parameters.last_mouse_y) / float(display_h))) {
+      active_mesh_index = int(mesh_id);
+      active_submesh_index = int(submesh_id);
+    }
+  }
+}
+
+void app::check_current_active_selection_valid(bool& current_selection_valid) {
+  if (active_mesh_index >= 0 && active_mesh_index < int(loaded_meshes.size()))
+    if (active_submesh_index >= 0 &&
+        active_submesh_index <
+            int(loaded_meshes[size_t(active_mesh_index)].positions.size()))
+      if (active_vertex_index >= 0 &&
+          active_vertex_index < int(loaded_meshes[size_t(active_mesh_index)]
+                                        .indices[size_t(active_submesh_index)]
+                                        .size()))
+        current_selection_valid = true;
+}
+
+void app::handle_click_on_geometry() {
+  // TODO move that code elsewhere. Need better way to get the "clicked" event
+  static bool last_frame_click = true;
+  const bool current_frame_click = gui_parameters.button_states[0];
+  const bool clicked = !last_frame_click && current_frame_click;
+  last_frame_click = current_frame_click;
+
+  // if clicked on anything that is not the GUI elements
+  if (clicked && !(ImGui::GetIO().WantCaptureMouse || ImGuizmo::IsOver() ||
+                   ImGuizmo::IsUsing())) {
+    update_mouse_select_framebuffer();
+
+    bool clicked_on_submesh = false;
+    size_t mesh_id = 0, submesh_id = 0;
+
+    get_submesh_below_mouse_cursor(clicked_on_submesh, mesh_id, submesh_id);
+
+    // If we know who's been clicked :
+    if (clicked_on_submesh) {
+      get_vertex_below_mouse_cursor(mesh_id, submesh_id);
+    }
+  }
+}
+
+void app::handle_current_selection() {
+  // Get the mesh
+  auto& mesh = loaded_meshes[size_t(active_mesh_index)];
+
+  // Get the vertex buffer
+  const auto& vertex_buffer =
+      mesh.skinned ? mesh.soft_skinned_position[size_t(active_submesh_index)]
+                   : mesh.display_position[size_t(active_submesh_index)];
+
+  // Get the world matrix
+  const auto node = gltf_scene_tree.get_node_with_index(mesh.instance.node);
+  const auto& world_xform = node->world_xform;
+  const auto model_view_projection =
+      projection_matrix * view_matrix * world_xform;
+
+  // Configure shader
+  shader& shader = (*mesh.shader_list)["debug_color"];
+  shader.use();
+  shader.set_uniform("mvp", model_view_projection);
+
+  if (ImGui::Begin("Selection Manipulation")) {
+    ImGui::Text("Active face indices [%d, %d, %d]", int(active_poly_indices.x),
+                int(active_poly_indices.y), int(active_poly_indices.z));
+
+    ImGui::InputInt("Active Vertex Index", &active_vertex_index, 1, 100);
+    active_vertex_index =
+        glm::clamp<int>(active_vertex_index, 0, int(vertex_buffer.size()) / 3);
+
+    glm::vec3 active_vertex_position =
+        glm::make_vec3(&vertex_buffer[3 * size_t(active_vertex_index)]);
+
+    glm::vec3 active_model_position =
+        glm::make_vec3(&mesh.positions[size_t(active_submesh_index)]
+                                      [3 * size_t(active_vertex_index)]);
+    glDisable(GL_DEPTH_TEST);
+    draw_point(active_vertex_position, configuration::vertex_highlight_size,
+               shader.get_program(), configuration::highlight_color);
+    glEnable(GL_DEPTH_TEST);
+
+    glm::vec3 active_vertex_normal =
+        glm::make_vec3(&mesh.normals[size_t(active_submesh_index)]
+                                    [3 * size_t(active_vertex_index)]);
+
+    ImGui::Text("Vertex Coordinates (%f, %f, %f)", active_model_position.x,
+                active_model_position.y, active_model_position.z);
+    ImGui::Text("Vertex Normal (%f, %f, %f)", active_vertex_normal.x,
+                active_vertex_normal.y, active_vertex_normal.z);
+
+    // Mesh uv are optional
+    if (mesh.uvs.size() > 0 &&
+        mesh.uvs[size_t(active_submesh_index)].size() > 0) {
+      glm::vec2 active_vertex_uv =
+          glm::make_vec2(&mesh.uvs[size_t(active_submesh_index)]
+                                  [2 * size_t(active_vertex_index)]);
+      ImGui::Text("Vertex UV (%f, %f)", active_vertex_uv.x, active_vertex_uv.y);
+    }
+
+    if (mesh.skinned) {
+      ImGui::Text("Skinning info");
+      ImGui::Text("Currently active joint [%d]", active_joint_index_model);
+
+      // Fetch vectors for display
+      glm::vec4 weight, joint;
+      weight = glm::make_vec4(&mesh.weights[size_t(active_submesh_index)]
+                                           [4 * size_t(active_vertex_index)]);
+      joint = glm::make_vec4(&mesh.joints[size_t(active_submesh_index)]
+                                         [4 * size_t(active_vertex_index)]);
+
+      ImGui::Columns(2);
+      ImGui::Text("Weight");
+      ImGui::NextColumn();
+      ImGui::Text("Joint");
+      ImGui::NextColumn();
+      ImGui::Separator();
+
+      bool changed = false;
+
+      for (glm::vec4::length_type i = 0; i < 4; ++i) {
+        std::string weight_name = "###w[" + std::to_string(i) + "]";
+        std::string joint_name = "###j[" + std::to_string(i) + "]";
+        float w = weight[i];
+        int j = int(joint[i]);
+        if (ImGui::SliderFloat(weight_name.c_str(), &w, 0, 1)) {
+          changed = true;
+        }
+        ImGui::NextColumn();
+        if (ImGui::InputInt(joint_name.c_str(), &j)) {
+          changed = true;
+        }
+        ImGui::NextColumn();
+        ImGui::Separator();
+
+        w = glm::clamp(w, 0.f, 1.f);
+        j = glm::clamp(j, 0, mesh.nb_joints - 1);
+
+        mesh.weights[size_t(active_submesh_index)]
+                    [4 * size_t(active_vertex_index) + size_t(i)] = w;
+        mesh.joints[size_t(active_submesh_index)]
+                   [4 * size_t(active_vertex_index) + size_t(i)] =
+            static_cast<unsigned short>(j);
+      }
+      ImGui::Columns();
+      if (ImGui::Button("Re-normalize weight vector")) {
+        weight = glm::normalize(weight);
+        memcpy(&mesh.weights[size_t(active_submesh_index)]
+                            [4 * size_t(active_vertex_index)],
+               glm::value_ptr(weight), 4 * sizeof(float));
+        changed = true;
+      }
+
+      if (changed) {
+        gpu_update_submesh_skinning_data(size_t(active_submesh_index),
+                                         mesh.weights, mesh.joints, mesh.VBOs);
+      }
+    }
+  }
+  ImGui::End();
+}
+
+void app::handle_obj_export_animation_sequence() {
+  if (show_obj_export_window) {
+    ImGui::Begin("OBJ export animation sequence", &show_obj_export_window);
+    ImGui::Text("Select an animation sequence, then hit the RUN button");
+    static int animation_sequence_item = 0;
+    std::vector<std::string> names;
+    for (auto& s : sequence.myItems) names.push_back(s.name);
+    ImGuiCombo("sequence", &animation_sequence_item, names);
+    if (ImGui::Button("RUN")) {
+      if (!animations.empty()) {
+        // setup the exporter
+        obj_export_worker.setup_new_sequence(&sequence);
+
+        // make sure only the selected animation will play
+        for (size_t i = 0; i < animations.size(); ++i) {
+          animations[i].playing = size_t(animation_sequence_item) == i;
+        }
+
+        // Start the work
+        obj_export_worker.start_work();
+      }
+    }
+    ImGui::End();
+  }
+
+  // We decouple the work from the render loop (or more true : we spread it
+  // on multiple frames to keep the
+  obj_export_worker.work_for_one_frame();
+  obj_export_worker.ui();
+}
+
+void app::run_mouse_click_handler() {
+  handle_click_on_geometry();
+  bool current_selection_valid = false;
+  check_current_active_selection_valid(current_selection_valid);
+  if (current_selection_valid) handle_current_selection();
+}
+
+void app::render_loaded_gltf_scene(int active_bone_gltf_node) {
+  draw_scene(world_camera_position);
+  for (auto& mesh : loaded_meshes)
+    draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
+                      projection_matrix, *loaded_meshes[0].shader_list, mesh);
+}
+
+void app::update_rendering_matrices() {
+  if (display_h && display_w)  // not zero please
+    projection_matrix = glm::perspective(
+        glm::radians(fovy), float(display_w) / float(display_h), z_near, z_far);
+
+  run_3D_gizmo(
+      asset_loaded && (active_joint_index_model >= 0) &&
+              (active_joint_index_model <
+               int(loaded_meshes[0].flat_joint_list.size()))
+          ? loaded_meshes[0].flat_joint_list[size_t(active_joint_index_model)]
+          : nullptr);
+
+  update_mesh_skeleton_graph_transforms(gltf_scene_tree);
+
+  const glm::quat camera_rotation(
+      glm::vec3(glm::radians(gui_parameters.rot_pitch),
+                glm::radians(gui_parameters.rot_yaw), 0.f));
+
+  world_camera_position = camera_rotation * camera_position;
+
+  view_matrix = glm::lookAt(world_camera_position, glm::vec3(0.f),
+                            camera_rotation * glm::vec3(0, 1.f, 0));
+}
+
+void app::perform_skinning_and_morphing(bool gpu_geometry_buffers_dirty,
+                                        std::vector<mesh>::value_type& a_mesh) {
+  for (size_t submesh = 0; submesh < a_mesh.draw_call_descriptors.size();
+       ++submesh) {
+    if (gltf_scene_tree.pose.blend_weights.size() > 0)
+      perform_software_morphing(
+          gltf_scene_tree, submesh, a_mesh.morph_targets, a_mesh.positions,
+          a_mesh.normals, a_mesh.display_position, a_mesh.display_normals,
+          a_mesh.VBOs, a_mesh.skinned ? !do_soft_skinning : true);
+
+    // do not upload to GPU if soft skin is on
+
+    if (a_mesh.skinned) {
+      if (do_soft_skinning) {
+        perform_software_skinning(
+            submesh, a_mesh.joint_matrices, a_mesh.display_position,
+            a_mesh.display_normals, a_mesh.joints, a_mesh.weights,
+            a_mesh.soft_skinned_position, a_mesh.soft_skinned_normals);
+        // now, upload new mesh to GPU
+        gpu_update_submesh_buffers(submesh, a_mesh.soft_skinned_position,
+                                   a_mesh.soft_skinned_normals, a_mesh.VBOs);
+      } else if (gpu_geometry_buffers_dirty) {
+        gpu_update_submesh_buffers(submesh, a_mesh.display_position,
+                                   a_mesh.display_normals, a_mesh.VBOs);
+      }
+    }
+  }
+}
+
+void app::soft_skinning_controls(bool& gpu_geometry_buffers_dirty) {
+  if (ImGui::Checkbox("Software skinning", &do_soft_skinning)) {
+    if (!do_soft_skinning)  // if we clicked on this, and we are not doing
+                            // soft skinning anymore, gpu buffer contains
+                            // what is effectively garbage for us and needs to
+                            // be updated
+    {
+      gpu_geometry_buffers_dirty = true;
+    }
+  }
+}
+
+void app::mouse_ray_debug_control() {
+  ImGui::Checkbox("Debug draw mouse ray", &show_debug_ray);
+  if (show_debug_ray) {
+    ImGui::InputFloat3("debug_start", glm::value_ptr(debug_start));
+    ImGui::InputFloat3("debug_stop", glm::value_ptr(debug_stop));
+
+    auto& program = loaded_meshes[0].shader_list->operator[]("debug_color");
+    program.use();
+    program.set_uniform("mvp", projection_matrix * view_matrix);
+    draw_line(program.get_program(), debug_start, debug_stop,
+              glm::vec4(1, 0, 0, 1), 5);
+  }
+}
+
+void app::find_gltf_node_index_for_active_joint(
+    int& active_bone_gltf_node, std::vector<mesh>::value_type& a_mesh) {
+  if ((active_joint_index_model >= 0) &&
+      (active_joint_index_model < int(a_mesh.flat_joint_list.size())))
+    active_bone_gltf_node =
+        a_mesh.flat_joint_list[size_t(active_joint_index_model)]
+            ->gltf_node_index;
+}
+
+void app::update_geometry(bool gpu_geometry_buffers_dirty,
+                          int& active_joint_gltf_node) {
+  active_joint_gltf_node = -1;
+  for (auto& a_mesh : loaded_meshes) {
+    find_gltf_node_index_for_active_joint(active_joint_gltf_node, a_mesh);
+    if (a_mesh.skinned)
+      compute_joint_matrices(root_node_model_matrix, a_mesh.joint_matrices,
+                             a_mesh.flat_joint_list,
+                             a_mesh.inverse_bind_matrices);
+    perform_skinning_and_morphing(gpu_geometry_buffers_dirty, a_mesh);
+  }
+}
+
 bool app::main_loop_frame() {
   {
     // GUI
@@ -1507,6 +1863,7 @@ bool app::main_loop_frame() {
 #endif
     }
 
+    configuration::show_editor_configuration_window();
     camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
 
     if (asset_loaded) {
@@ -1515,7 +1872,6 @@ bool app::main_loop_frame() {
       model_info_window(model, &show_model_info_window);
       asset_images_window(textures, &show_asset_image_window);
       animation_window(animations, &show_animation_window);
-      // skinning_data_window(weights, joints);
       mesh_display_window(loaded_meshes, &show_mesh_display_window);
       morph_target_window(gltf_scene_tree,
                           loaded_meshes.front().nb_morph_targets,
@@ -1523,10 +1879,8 @@ bool app::main_loop_frame() {
       shader_selector_window(shader_names, selected_shader, shader_to_use,
                              reinterpret_cast<int&>(current_display_mode),
                              &show_shader_selector_window);
-
       material_info_window(dummy_material, loaded_material,
                            &show_material_window);
-
       bone_display_window(&show_bone_display_window);
 
       editor_light.show_control();
@@ -1552,379 +1906,21 @@ bool app::main_loop_frame() {
   {
     // 3D rendering
     gl_new_frame(window, viewport_background_color, display_w, display_h);
-    if (display_h && display_w)  // not zero please
-      projection_matrix =
-          glm::perspective(glm::radians(fovy),
-                           float(display_w) / float(display_h), z_near, z_far);
 
-    run_3D_gizmo(
-        asset_loaded && (active_joint_index_model >= 0) &&
-                (active_joint_index_model <
-                 int(loaded_meshes[0].flat_joint_list.size()))
-            ? loaded_meshes[0].flat_joint_list[size_t(active_joint_index_model)]
-            : nullptr);
+    update_rendering_matrices();
+    bool gpu_geometry_buffers_dirty = false;
+    soft_skinning_controls(gpu_geometry_buffers_dirty);
 
-    update_mesh_skeleton_graph_transforms(gltf_scene_tree);
-
-    const glm::quat camera_rotation(
-        glm::vec3(glm::radians(gui_parameters.rot_pitch),
-                  glm::radians(gui_parameters.rot_yaw), 0.f));
-
-    world_camera_position = camera_rotation * camera_position;
-
-    view_matrix = glm::lookAt(world_camera_position, glm::vec3(0.f),
-                              camera_rotation * glm::vec3(0, 1.f, 0));
-
-    bool gpu_dirty = false;
-    if (ImGui::Checkbox("Software skinning", &do_soft_skinning)) {
-      if (!do_soft_skinning)  // if we clicked on this, and we are not doing
-                              // soft skinning anymore, gpu buffer contains
-                              // pre-skinned garbage
-      {
-        gpu_dirty = true;
-      }
-    }
     if (asset_loaded) {
-      ImGui::Checkbox("Draw debug ray", &show_debug_ray);
-      if (show_debug_ray) {
-        ImGui::InputFloat3("debug_start", glm::value_ptr(debug_start));
-        ImGui::InputFloat3("debug_stop", glm::value_ptr(debug_stop));
-
-        auto& program = loaded_meshes[0].shader_list->operator[]("debug_color");
-        program.use();
-        program.set_uniform("mvp", projection_matrix * view_matrix);
-        draw_line(program.get_program(), debug_start, debug_stop,
-                  glm::vec4(1, 0, 0, 1), 5);
-      }
-
-      int active_bone_gltf_node = -1;
-      for (auto& a_mesh : loaded_meshes) {
-        if ((active_joint_index_model >= 0) &&
-            (active_joint_index_model < int(a_mesh.flat_joint_list.size())))
-          active_bone_gltf_node =
-              a_mesh.flat_joint_list[size_t(active_joint_index_model)]
-                  ->gltf_node_index;
-
-        // Calculate all the needed matrices to render the frame, this
-        // includes the "model view projection" that transform the geometry to
-        // the screen space, the normal matrix, and the joint matrix array
-        // that is used to deform the skin with the bones
-        if (a_mesh.skinned)
-          compute_joint_matrices(root_node_model_matrix, a_mesh.joint_matrices,
-                                 a_mesh.flat_joint_list,
-                                 a_mesh.inverse_bind_matrices);
-
-        for (size_t submesh = 0; submesh < a_mesh.draw_call_descriptors.size();
-             ++submesh) {
-          if (gltf_scene_tree.pose.blend_weights.size() > 0)
-            perform_software_morphing(
-                gltf_scene_tree, submesh, a_mesh.morph_targets,
-                a_mesh.positions, a_mesh.normals, a_mesh.display_position,
-                a_mesh.display_normals, a_mesh.VBOs,
-                a_mesh.skinned ? !do_soft_skinning : true);
-
-          // do not upload to GPU if soft skin is on
-
-          if (a_mesh.skinned) {
-            if (do_soft_skinning) {
-              perform_software_skinning(
-                  submesh, a_mesh.joint_matrices, a_mesh.display_position,
-                  a_mesh.display_normals, a_mesh.joints, a_mesh.weights,
-                  a_mesh.soft_skinned_position, a_mesh.soft_skinned_normals);
-              // now, upload new mesh to GPU
-              gpu_update_submesh_buffers(submesh, a_mesh.soft_skinned_position,
-                                         a_mesh.soft_skinned_normals,
-                                         a_mesh.VBOs);
-            } else if (gpu_dirty) {
-              gpu_update_submesh_buffers(submesh, a_mesh.display_position,
-                                         a_mesh.display_normals, a_mesh.VBOs);
-            }
-          }
-        }
-      }
-
-      draw_scene(world_camera_position);
-
-      for (auto& mesh : loaded_meshes)
-        draw_bone_overlay(gltf_scene_tree, active_bone_gltf_node, view_matrix,
-                          projection_matrix, *loaded_meshes[0].shader_list,
-                          mesh);
+      mouse_ray_debug_control();
+      int active_joint_gltf_node = -1;
+      update_geometry(gpu_geometry_buffers_dirty, active_joint_gltf_node);
+      render_loaded_gltf_scene(active_joint_gltf_node);
     }
 
-    {
-      ImGui::Begin("OBJ export animation sequence");
-      ImGui::Text("Select an animation sequence, then hit the RUN button");
-      static int animation_sequence_item = 0;
-      std::vector<std::string> names;
-      for (auto& s : sequence.myItems) names.push_back(s.name);
-      ImGuiCombo("sequence", &animation_sequence_item, names);
-      if (ImGui::Button("RUN")) {
-        if (!animations.empty()) {
-          // setup the exporter
-          obj_export_worker.setup_new_sequence(&sequence);
-
-          // make sure only the selected animation will play
-          for (size_t i = 0; i < animations.size(); ++i) {
-            animations[i].playing = size_t(animation_sequence_item) == i;
-          }
-
-          // Start the work
-          obj_export_worker.start_work();
-        }
-      }
-      ImGui::End();
-
-      // We decouple the work from the render loop (or more true : we spread it
-      // on multiple frames to keep the
-      obj_export_worker.work_for_one_frame();
-      obj_export_worker.ui();
-    }
+    handle_obj_export_animation_sequence();
+    run_mouse_click_handler();
   }
-
-  // TODO move that code elsewhere. Need better way to get the "clicked" event
-  static bool last_frame_click = true;
-  const bool current_frame_click = gui_parameters.button_states[0];
-  const bool clicked = !last_frame_click && current_frame_click;
-  last_frame_click = current_frame_click;
-
-  // if clicked on anything that is not the GUI elements
-  if (clicked && !(ImGui::GetIO().WantCaptureMouse || ImGuizmo::IsOver() ||
-                   ImGuizmo::IsUsing())) {
-    // std::cout << "click on viewport detected\n";
-
-    {  // TODO refactor extract me this
-      glBindFramebuffer(GL_FRAMEBUFFER, color_pick_fbo);
-      glClearColor(0, 0, 0, 0);
-      glViewport(0, 0, GLTFI_BUFFER_SIZE, GLTFI_BUFFER_SIZE);
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      draw_color_select_map();
-
-      // get back to normal render buffer
-      glBindFramebuffer(GL_FRAMEBUFFER, 0);
-      glViewport(0, 0, display_w, display_h);
-    }
-
-    bool clicked_on_submesh = false;
-    size_t mesh_id = 0, submesh_id = 0;
-
-    {  // TODO refactor extract this
-      // copy data to CPU memory
-      static std::vector<uint32_t> img_data(GLTFI_BUFFER_SIZE *
-                                            GLTFI_BUFFER_SIZE);
-      glBindTexture(GL_TEXTURE_2D, color_pick_screen_texture);
-      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                    reinterpret_cast<void*>(&img_data[0]));
-
-      // check pixel color to find clicked object
-      const float pixel_screen_map_x =
-          (512 * float(gui_parameters.last_mouse_x) / float(display_w));
-      const float pixel_screen_map_y =
-          (512 * float(gui_parameters.last_mouse_y) / float(display_h));
-      const size_t pixel_screen_map_x_clamp =
-          size_t(glm::clamp(pixel_screen_map_x, 0.f, float(GLTFI_BUFFER_SIZE)));
-      const size_t pixel_screen_map_y_clamp =
-          size_t(glm::clamp(pixel_screen_map_y, 0.f, float(GLTFI_BUFFER_SIZE)));
-      color_identifier id(
-          img_data[(GLTFI_BUFFER_SIZE - pixel_screen_map_y_clamp) *
-                       GLTFI_BUFFER_SIZE +
-                   pixel_screen_map_x_clamp]);
-      // std::cout << "color id is : " << int(id.content.RGBA.R) << ":"
-      //          << int(id.content.RGBA.B) << ":" << int(id.content.RGBA.G)
-      //          << ":" << int(id.content.RGBA.A) << "\n";
-
-      // declare identifiers
-
-      for (mesh_id = 0; mesh_id < loaded_meshes.size(); mesh_id++) {
-        for (submesh_id = 0;
-             submesh_id < loaded_meshes[mesh_id].submesh_selection_ids.size();
-             submesh_id++) {
-          if (loaded_meshes[mesh_id].submesh_selection_ids[submesh_id] == id) {
-            clicked_on_submesh = true;
-            break;
-          }
-        }
-        if (clicked_on_submesh) break;
-      }
-    }
-
-    // If we know who's been clicked :
-    if (clicked_on_submesh) {
-      // std::cout << "clicked on " << mesh_id << ":" << submesh_id << "\n";
-      const auto& mesh = loaded_meshes[mesh_id];
-
-      auto node = gltf_scene_tree.get_node_with_index(mesh.instance.node);
-      if (node) {
-        const auto world_xform = node->world_xform;
-        // std::cout << mesh.name << std::endl;
-
-        if (mesh.raycast_submesh_camera_mouse(
-                world_xform, submesh_id, world_camera_position,
-                projection_matrix * view_matrix,
-                float(gui_parameters.last_mouse_x) / float(display_w),
-                float(gui_parameters.last_mouse_y) / float(display_h))) {
-          active_mesh_index = int(mesh_id);
-          active_submesh_index = int(submesh_id);
-        }
-      }
-    }
-  }
-
-  //{
-  //   TODO refactor put this as an hidden debug feature
-  //   ImGui::Begin("color picker debug");
-  //   static bool show_color_map_render = false;
-  //   ImGui::Checkbox("show colormap for picking showed in main buffer",
-  //                  &show_color_map_render);
-  //   ImGui::Image(ImTextureID(size_t(color_pick_screen_texture)),
-  //               ImVec2(256, 256), ImVec2(0, 1), ImVec2(1, 0),
-  //               ImVec4(1, 1, 1, 1), ImVec4(0, 0, 0, 1));
-  //   ImGui::End();
-
-  //   if (show_color_map_render) {
-  //    glClearColor(0, 0, 0, 0);
-  //    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  //    glViewport(0, 0, display_w, display_h);
-  //    draw_color_select_map();
-  //  }
-  //}
-
-  // if selection is valid:
-  if (active_mesh_index >= 0 && active_mesh_index < int(loaded_meshes.size()))
-    if (active_submesh_index >= 0 &&
-        active_submesh_index <
-            int(loaded_meshes[size_t(active_mesh_index)].positions.size()))
-      if (active_vertex_index >= 0 &&
-          active_vertex_index < int(loaded_meshes[size_t(active_mesh_index)]
-                                        .indices[size_t(active_submesh_index)]
-                                        .size())) {
-        // Get the mesh
-        auto& mesh = loaded_meshes[size_t(active_mesh_index)];
-
-        // Get the vertex buffer
-        const auto& vertex_buffer =
-            mesh.skinned
-                ? mesh.soft_skinned_position[size_t(active_submesh_index)]
-                : mesh.display_position[size_t(active_submesh_index)];
-
-        // Get the world matrix
-        const auto node =
-            gltf_scene_tree.get_node_with_index(mesh.instance.node);
-        const auto& world_xform = node->world_xform;
-
-        // Configure shader
-        shader& shader = (*mesh.shader_list)["debug_color"];
-        const auto mvp = projection_matrix * view_matrix * world_xform;
-
-        // Draw point
-        shader.use();
-        shader.set_uniform("mvp", mvp);
-
-        int selection = active_vertex_index;
-
-        if (ImGui::Begin("Selection Manipulation")) {
-          ImGui::Text("Active face indices [%d, %d, %d]",
-                      int(active_poly_indices.x), int(active_poly_indices.y),
-                      int(active_poly_indices.z));
-
-          ImGui::InputInt("Active Vertex Index", &selection, 1, 100);
-          selection =
-              glm::clamp<int>(selection, 0, int(vertex_buffer.size()) / 3);
-          active_vertex_index = selection;
-
-          glm::vec3 active_vertex_position =
-              glm::make_vec3(&vertex_buffer[3 * size_t(active_vertex_index)]);
-
-          glm::vec3 active_model_position =
-              glm::make_vec3(&mesh.positions[size_t(active_submesh_index)]
-                                            [3 * size_t(active_vertex_index)]);
-          draw_point(active_vertex_position, 5, shader.get_program(),
-                     glm::vec4(0.75, 0.25, 0, 0.8));
-
-          glm::vec3 active_vertex_normal =
-              glm::make_vec3(&mesh.normals[size_t(active_submesh_index)]
-                                          [3 * size_t(active_vertex_index)]);
-
-          ImGui::Text("Vertex Coordinates (%f, %f, %f)",
-                      active_model_position.x, active_model_position.y,
-                      active_model_position.z);
-          ImGui::Text("Vertex Normal (%f, %f, %f)", active_vertex_normal.x,
-                      active_vertex_normal.y, active_vertex_normal.z);
-
-          // Mesh uv are optional
-          if (mesh.uvs.size() > 0 &&
-              mesh.uvs[size_t(active_submesh_index)].size() > 0) {
-            glm::vec2 active_vertex_uv =
-                glm::make_vec2(&mesh.uvs[size_t(active_submesh_index)]
-                                        [2 * size_t(active_vertex_index)]);
-            ImGui::Text("Vertex UV (%f, %f)", active_vertex_uv.x,
-                        active_vertex_uv.y);
-          }
-
-          if (mesh.skinned) {
-            ImGui::Text("Skinning info");
-            ImGui::Text("Currently active joint [%d]",
-                        active_joint_index_model);
-
-            // Fetch vectors for display
-            glm::vec4 weight, joint;
-            weight =
-                glm::make_vec4(&mesh.weights[size_t(active_submesh_index)]
-                                            [4 * size_t(active_vertex_index)]);
-            joint =
-                glm::make_vec4(&mesh.joints[size_t(active_submesh_index)]
-                                           [4 * size_t(active_vertex_index)]);
-
-            ImGui::Columns(2);
-            ImGui::Text("Weight");
-            ImGui::NextColumn();
-            ImGui::Text("Joint");
-            ImGui::NextColumn();
-            ImGui::Separator();
-
-            bool changed = false;
-
-            for (glm::vec4::length_type i = 0; i < 4; ++i) {
-              std::string weight_name = "###w[" + std::to_string(i) + "]";
-              std::string joint_name = "###j[" + std::to_string(i) + "]";
-              float w = weight[i];
-              int j = int(joint[i]);
-              if (ImGui::SliderFloat(weight_name.c_str(), &w, 0, 1)) {
-                changed = true;
-              }
-              ImGui::NextColumn();
-              if (ImGui::InputInt(joint_name.c_str(), &j)) {
-                changed = true;
-              }
-              ImGui::NextColumn();
-              ImGui::Separator();
-
-              w = glm::clamp(w, 0.f, 1.f);
-              j = glm::clamp(j, 0, mesh.nb_joints - 1);
-
-              mesh.weights[size_t(active_submesh_index)]
-                          [4 * size_t(active_vertex_index) + size_t(i)] = w;
-              mesh.joints[size_t(active_submesh_index)]
-                         [4 * size_t(active_vertex_index) + size_t(i)] =
-                  static_cast<unsigned short>(j);
-            }
-            ImGui::Columns();
-            if (ImGui::Button("Re-normalize weight vector")) {
-              weight = glm::normalize(weight);
-              memcpy(&mesh.weights[size_t(active_submesh_index)]
-                                  [4 * size_t(active_vertex_index)],
-                     glm::value_ptr(weight), 4 * sizeof(float));
-              changed = true;
-            }
-
-            if (changed) {
-              gpu_update_submesh_skinning_data(size_t(active_submesh_index),
-                                               mesh.weights, mesh.joints,
-                                               mesh.VBOs);
-            }
-          }
-        }
-        ImGui::End();
-      }
 
   // Render all ImGui, then swap buffers
   gl_gui_end_frame(window);
@@ -2504,36 +2500,4 @@ void app::fill_sequencer() {
     }
     sequence.mFrameMax = max_time;
   }
-}
-
-#include <cstdlib>
-#ifdef WIN32
-#include <Windows.h>
-#include <shellapi.h>
-#endif
-#ifdef __APPLE__
-#include <ApplicationServices/ApplicationServices.h>
-#include <CoreFoundation/CFBundle.h>
-#endif
-void app::open_url(std::string url) {
-#if defined(WIN32)
-  (void)ShellExecuteA(nullptr, nullptr, url.c_str(), nullptr, nullptr, SW_SHOW);
-#elif defined(__linux__)
-  std::string command = "xdg-open " + url;
-  (void)std::system(command.c_str());
-#elif defined(__APPLE__)
-  CFURLRef cfurl = CFURLCreateWithBytes(
-      nullptr,                                      // allocator
-      reinterpret_cast<const UInt8*>(url.c_str()),  // URLBytes
-      static_cast<long>(url.length()),              // length
-      kCFStringEncodingASCII,                       // encoding
-      nullptr                                       // baseURL
-  );
-  LSOpenCFURLRef(cfurl, nullptr);
-  CFRelease(cfurl);
-#else
-  std::cerr
-      << "Warn: Cannot open URLs on this platform. We should have displayed "
-      << url << ". Please send bug request on github\n";
-#endif
 }

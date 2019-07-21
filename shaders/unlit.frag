@@ -12,6 +12,7 @@ uniform vec3 emissive_factor;
 uniform vec4 base_color_factor;
 uniform int alpha_mode;
 uniform float alpha_cutoff;
+uniform vec4 highlight_color;
 
 #define ALPHA_OPAQUE 0
 #define ALPHA_MASK 1
@@ -48,6 +49,6 @@ void main()
 
   	if(selected >= 0.999)
 	{
-		output_color = vec4(1, 0.5, 0, 1);
+		output_color = highlight_color;
 	}
 }

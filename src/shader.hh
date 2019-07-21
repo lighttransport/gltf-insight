@@ -28,7 +28,6 @@ SOFTWARE.
 #pragma clang diagnostic ignored "-Weverything"
 #endif
 
-
 #ifndef __EMSCRIPTEN__
 #include <glad/glad.h>
 #else
@@ -44,6 +43,7 @@ SOFTWARE.
 #include <string>
 #include <vector>
 
+#include "configuration.hh"
 
 class shader {
   GLuint program_;

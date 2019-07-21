@@ -21,6 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
 #ifdef _MSC_VER
 #ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
@@ -31,13 +32,13 @@ SOFTWARE.
 #include "gl_util.hh"
 #include "tiny_gltf_util.h"
 
+using namespace gltf_insight;
+
 static bool draw_joint_point = false;
 static bool draw_bone_segment = false;
 static bool draw_childless_bone_extension = false;
 static bool draw_mesh_anchor_point = false;
 static bool draw_bone_axes = false;
-
-// gltf_node::~gltf_node() = default;
 
 gltf_node::gltf_node(node_type t, gltf_node* p)
     : type(t), local_xform(1.f), world_xform(1.f), parent(p) {}
@@ -99,7 +100,7 @@ void update_mesh_skeleton_graph_transforms(gltf_node& node,
    * node needs to be moved in space, relative to it's parent from this
    * binding pose to be in the correct transform the animation wants it to
    * be. The parent_matrix is the "world_transform" of the parent node,
-   * recusively passed down along the graph.
+   * recursively passed down along the graph.
    *
    * The content of the node's "pose" structure used here will be updated by
    * the animation playing system in accordance to it's current clock,
@@ -179,7 +180,7 @@ void populate_gltf_graph(const tinygltf::Model& model, gltf_node& graph_root,
   }
 }
 
-void set_mesh_attachement(const tinygltf::Model& model, gltf_node& graph_root) {
+void set_mesh_attachment(const tinygltf::Model& model, gltf_node& graph_root) {
   if (graph_root.gltf_node_index != -1) {
     const auto& node = model.nodes[size_t(graph_root.gltf_node_index)];
 
@@ -188,17 +189,8 @@ void set_mesh_attachement(const tinygltf::Model& model, gltf_node& graph_root) {
       graph_root.type = gltf_node::node_type::mesh;
     }
   }
-  for (auto& child : graph_root.children) set_mesh_attachement(model, *child);
+  for (auto& child : graph_root.children) set_mesh_attachment(model, *child);
 }
-
-#if 0  // UNUSED
-static void get_number_of_meshes_recur(const gltf_node& root, size_t& number) {
-  if (root.type == gltf_node::node_type::mesh) ++number;
-  for (auto child : root.children) {
-    get_number_of_meshes_recur(*child, number);
-  }
-}
-#endif
 
 static void get_list_of_mesh_recur(const gltf_node& root,
                                    std::vector<gltf_mesh_instance>& meshes) {
@@ -250,17 +242,18 @@ void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
       for (auto child : joint_node->children)
         if (child->type == gltf_node::node_type::bone) {
           draw_line(shader, glm::vec3(0.f), child->local_xform[3],
-                    (is_active ? glm::vec4(1.f, .5f, .5f, 1.f)
-                               : glm::vec4(0.f, .5f, .5f, 1.f)),
-                    3);
+                    (is_active ? configuration::bone_highlight_color
+                               : configuration::bone_draw_color),
+                    configuration::bone_draw_size);
         }
 
     if (draw_childless_bone_extension && joint_node->children.empty()) {
       draw_line(shader, glm::vec3(0.f),
                 glm::vec3(0.f, .25f, 0.f) /*Y is length*/,
-                is_active ? glm::vec4(.5f, .25f, .5f, 1.f)
-                          : glm::vec4(.5f, .75f, .5f, 1.f),
-                2);
+                glm::vec4(0.9, 0.9, 0.9, 1) *
+                    (is_active ? configuration::bone_highlight_color
+                               : configuration::bone_draw_color),
+                configuration::bone_draw_size);
     }
 
     if (draw_bone_axes) {
@@ -269,12 +262,13 @@ void draw_bones(gltf_node& root, int active_joint_node_index, GLuint shader,
       glm::quat orientation;
       glm::decompose(gltf_mesh_node->world_xform, scale, orientation,
                      translation, skew, persp);
-      const float axis_scale = 0.125f * glm::length(scale);
+      const float axis_scale = 0.125f * scale.x * scale.y * scale.z;
       draw_space_base(shader, 1.5, axis_scale);
     }
     if (draw_joint_point)
-      draw_space_origin_point(
-          3, shader, is_active ? glm::vec4(0, 1, 1, 1) : glm::vec4(1, 0, 0, 1));
+      draw_space_origin_point(configuration::joint_draw_size, shader,
+                              is_active ? configuration::joint_highlight_color
+                                        : configuration::joint_draw_color);
   }
 }
 
