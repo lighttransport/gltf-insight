@@ -33,7 +33,7 @@ std::string os_utils::platform() {
   return "UNIX-like";
 #else
   return "unknown";
-#endif;
+#endif
 }
 
 // mkdir
