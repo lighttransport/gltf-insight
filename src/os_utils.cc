@@ -53,7 +53,7 @@ bool os_utils::mkdir(const std::string& dir_path) {
 
 #ifdef OS_UTILS_UNIX
   mode_t dir_mode = 0733;                      // UNIX style permissions
-  status = mkdir(dirnpath.c_str(), dir_mode);  // can be used on non-Windows
+  status = mkdir(dir_path.c_str(), dir_mode);  // can be used on non-Windows
 #endif
 
   if (status != 0 && errno != EEXIST) {
