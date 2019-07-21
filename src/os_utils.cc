@@ -26,7 +26,8 @@ std::string os_utils::platform() {
 #elif defined(OS_UTILS_LINUX)
   return "GNU/Linux";
 #elif defined(OS_UTILS_APPLE)
-  return "Apple UNIX"
+  // TODO detect if macOs or iOs ?
+  return "Apple UNIX";
 #elif defined(OS_UTILS_WEB)
   return "Web";
 #elif defined(OS_UTILS_UNIX)
