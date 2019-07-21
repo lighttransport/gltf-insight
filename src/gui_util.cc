@@ -440,6 +440,8 @@ void mesh_display_window(std::vector<gltf_insight::mesh>& meshes, bool* open) {
   ImGui::End();
 }
 
+#if 0  // I'm keeping this for the sake of the ImGui table here, I'm going to
+       // reuse this at some point
 void skinning_data_window(
     const std::vector<std::vector<float>>& weights,
     const std::vector<std::vector<unsigned short>>& joints) {
@@ -486,6 +488,7 @@ void skinning_data_window(
   ImGui::EndChild();
   ImGui::End();
 }
+#endif
 
 void morph_target_window(gltf_node& mesh_skeleton_graph, int nb_morph_targets,
                          bool* open) {
