@@ -29,7 +29,7 @@ std::string os_utils::platform() {
   return "Apple UNIX"
 #elif defined(OS_UTILS_WEB)
   return "Web";
-#elif defined(OS_UTIL_UNIX)
+#elif defined(OS_UTILS_UNIX)
   return "UNIX-like";
 #else
   return "unknown";
@@ -52,8 +52,8 @@ bool os_utils::mkdir(const std::string& dir_path) {
 #endif
 
 #ifdef OS_UTILS_UNIX
-  mode_t dir_mode = 0733;                      // UNIX style permissions
-  status = mkdir(dir_path.c_str(), dir_mode);  // can be used on non-Windows
+  mode_t dir_mode = 0733;                        // UNIX style permissions
+  status = ::mkdir(dir_path.c_str(), dir_mode);  // can be used on non-Windows
 #endif
 
   if (status != 0 && errno != EEXIST) {
