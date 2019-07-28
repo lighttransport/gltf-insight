@@ -102,6 +102,11 @@ void app::unload() {
   active_submesh_index = -1;
   active_mesh_index = -1;
   active_vertex_index = -1;
+
+  audio_clips.clear();
+  audio_clip_names.clear();
+  play_audio = false;
+  active_audio_clip_index = -1;
 }
 
 void app::load_as_metal_roughness(size_t i, material& currently_loading,
@@ -540,6 +545,19 @@ void app::load() {
         break;
       }
     }
+  }
+
+  // MSFT_audio_emitter
+  bool has_MSFT_audio_emitter = false;
+  for (const auto &extension : model.extensionsUsed) {
+    if (extension.compare("MSFT_audio_emitter") == 0) {
+      has_MSFT_audio_emitter = true;
+    }
+  }
+  std::cout << "extension.MSFT_audio_emitter : " << has_MSFT_audio_emitter << "\n";
+
+  if (has_MSFT_audio_emitter) {
+    load_audio_clips();
   }
 }
 
@@ -1044,6 +1062,7 @@ void app::run_view_menu() {
     ImGui::MenuItem("Timeline", nullptr, &show_timeline);
     ImGui::MenuItem("Shader selector", nullptr, &show_shader_selector_window);
     ImGui::MenuItem("Material info", nullptr, &show_material_window);
+    ImGui::MenuItem("Audio", nullptr, &show_audio_window);
     ImGui::MenuItem("Bone display window", nullptr, &show_bone_display_window);
     ImGui::MenuItem("Scene outline", nullptr, &show_scene_outline_window);
     ImGui::MenuItem("OBJ export window", nullptr, &show_obj_export_window);
@@ -1881,6 +1900,8 @@ bool app::main_loop_frame() {
                              &show_shader_selector_window);
       material_info_window(dummy_material, loaded_material,
                            &show_material_window);
+      audio_window(audio_clip_names, active_audio_clip_index, play_audio,
+                           &show_audio_window);
       bone_display_window(&show_bone_display_window);
 
       editor_light.show_control();
@@ -1893,6 +1914,11 @@ bool app::main_loop_frame() {
 
       active_joint_index_model =
           glm::clamp(active_joint_index_model, 0, loaded_meshes[0].nb_joints);
+
+      if (play_audio) {
+        playback_audio_clip();
+        play_audio = false;
+      }
     }
 
     // Animation player advances time and apply animation interpolation.
@@ -1934,6 +1960,42 @@ std::string app::GetFilePathExtension(const std::string& FileName) {
     return FileName.substr(FileName.find_last_of(".") + 1);
   return "";
 }
+
+std::string GetBaseDir(const std::string &filepath) {
+  if (filepath.find_last_of("/\\") != std::string::npos)
+    return filepath.substr(0, filepath.find_last_of("/\\"));
+  return "";
+}
+
+// https://stackoverflow.com/questions/8520560/get-a-file-name-from-a-path
+std::string GetBaseFilename(const std::string &filepath) {
+  return filepath.substr(filepath.find_last_of("/\\") + 1);
+}
+
+std::string JoinPath(const std::string &dir, const std::string &filename) {
+  if (dir.empty()) {
+    return filename;
+  } else {
+    // check '/'
+    char lastChar = *dir.rbegin();
+    if (lastChar != '/') {
+      return dir + std::string("/") + filename;
+    } else {
+      return dir + filename;
+    }
+  }
+}
+
+bool FileExists(const std::string &filepath) {
+  std::ifstream ifs(filepath);
+
+  if (!ifs) {
+    return false;
+  }
+
+  return true;
+}
+
 
 void app::parse_command_line(int argc, char** argv) {
 #if 0
@@ -2049,6 +2111,90 @@ void app::load_all_textures(size_t nb_textures) {
   }
   glBindTexture(GL_TEXTURE_2D, 0);
 }
+
+void app::load_audio_clips()
+{
+  play_audio = false;
+  active_audio_clip_index = -1;
+  audio_clips.clear();
+  audio_clip_names.clear();
+
+  if (model.extensions.count("MSFT_audio_emitter") == 0) {
+    std::cerr << "MSFT_audio_emitter extension not found in glTF model\n";
+    return;
+  }
+
+  tinygltf::Value &MSFT_audio_emitter = model.extensions["MSFT_audio_emitter"];
+  if (!MSFT_audio_emitter.IsObject()) {
+    std::cerr << "Invalid MSFT_audio_emitter extension\n";
+    return;
+  }
+
+  if (!MSFT_audio_emitter.Has("clips")) {
+    std::cerr << "No `clips' object in MSFT_audio_emitter extension\n";
+    return;
+  }
+
+  const tinygltf::Value &clips = MSFT_audio_emitter.Get("clips");
+  if (clips.ArrayLen() == 0) {
+    std::cerr << "No array elements in `clips' or `clips` is not an array object.\n";
+    return;
+  }
+
+  std::string base_path = GetBaseDir(input_filename);
+
+  std::cout << "MSFT_audio_emitter.clips.size = " << clips.ArrayLen() << "\n";
+
+  for (size_t i = 0; i < clips.ArrayLen(); i++) {
+    const tinygltf::Value &clip = clips.Get(i);
+
+    if (!clip.IsObject()) {
+      std::cerr << "clips[" << i << "] is not an object.\n";
+      audio_clips.clear();
+      return;
+    }
+
+    if (!clip.Has("uri")) {
+      std::cerr << "clips[" << i << "] does not have `uri' field.\n";
+      audio_clips.clear();
+      return;
+    }
+
+    const tinygltf::Value &uri = clip.Get("uri");
+    if (!uri.IsString()) {
+      std::cerr << "clips[" << i << "].uri is not a string.\n";
+      audio_clips.clear();
+      return;
+    }
+
+    // Assume URI is relative.
+    const std::string &filename = uri.Get<std::string>();
+
+    std::string filepath = JoinPath(base_path, filename);
+    if (!FileExists(filepath)) {
+      std::cerr << "File not found : " << filepath << "\n";
+      audio_clips.clear();
+      return;
+    }
+
+    std::string err;
+    std::unique_ptr<Audio> audio(new Audio());
+    if (!audio->load_from_file(filepath, &err)) {
+      std::cerr << "Audio load err: " << err << "\n";
+      audio_clips.clear();
+      return;
+    }
+
+    audio_clips.emplace_back(std::move(audio));
+    audio_clip_names.push_back(filename);
+  }
+
+  assert(audio_clips.size() == audio_clip_names.size());
+  std::cout << "Loaded " << audio_clips.size() << " audio clip(s)\n";
+  active_audio_clip_index = 0;
+
+}
+
 
 void app::genrate_joint_inverse_bind_matrix_map(
     const tinygltf::Skin& skin, const std::vector<int>::size_type nb_joints,
@@ -2501,3 +2647,34 @@ void app::fill_sequencer() {
     sequence.mFrameMax = max_time;
   }
 }
+
+bool app::playback_audio_clip() {
+  std::cout << "Play audio....\n";
+  if (active_audio_clip_index < 0) {
+    std::cerr << "Invalid selected index " << active_audio_clip_index << "\n";
+    return false;
+  }
+
+  if (active_audio_clip_index >= int(audio_clips.size())) {
+    std::cerr << "Invalid selected index " << active_audio_clip_index << "\n";
+    return false;
+  }
+
+  if (audio_clips[active_audio_clip_index] == nullptr) {
+    std::cerr << "Audio is not inialized.\n";
+    return false;
+  }
+
+  // re-playing audio requires `stop`
+  if (audio_clips[active_audio_clip_index]->is_playing()) {
+    audio_clips[active_audio_clip_index]->stop();
+  }
+
+  bool ret = audio_clips[active_audio_clip_index]->play();
+  if (!ret) {
+    std::cerr << "Failed to play audio for some reason.\n";
+  }
+
+  return ret;
+}
+

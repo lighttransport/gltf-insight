@@ -932,6 +932,25 @@ void camera_parameters_window(float& fovy, float& z_far, bool* open) {
   ImGui::End();
 }
 
+void audio_window(const std::vector<std::string>& audio_clip_names,
+                  int& selected_clip, bool& play_audio, bool* isopen) {
+  play_audio = false;
+
+  if (isopen && !*isopen) return;
+  if (ImGui::Begin("Audio(MSFT_audio_emitter. exterimental)", isopen)) {
+    if (audio_clip_names.size() == 0) {
+      ImGui::TextUnformatted("No audio clips in glTF model");
+    } else {
+      ImGuiCombo("Choose audio clip", &selected_clip, audio_clip_names);
+
+      if (ImGui::Button("play")) {
+        play_audio = true;
+      }
+    }
+  }
+  ImGui::End();
+}
+
 #include "IconsIonicons.h"
 #include "cmake_config.hh"
 void about_window(GLuint logo, bool* open) {

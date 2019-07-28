@@ -160,6 +160,8 @@ void utilities_window(bool& show_imgui_demo);
 
 void camera_parameters_window(float& fovy, float& z_far, bool* open = nullptr);
 
+void audio_window(const std::vector<std::string> &audio_clip_names, int &selected_clip, bool& play_audio, bool *isopen);
+
 GLuint load_gltf_insight_icon();
 void about_window(GLuint logo, bool* open = nullptr);
 

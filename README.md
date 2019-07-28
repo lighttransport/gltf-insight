@@ -144,6 +144,14 @@ cmake --build .
 
 * `GLTF_INSIGHT_USE_NATIVEFILEDIALOG` : Use NativeFileDialog https://github.com/mlabbe/nativefiledialog instead of ImGuiFileDialog for file browser. Requires GTK3(and pkg-config) on Linux.
 
+### Supported glTF extensions
+
+* [ ] MSFT_audio_emitter(audio)
+  * [x] Simple audio playback(.wav, .mp3, .flac)
+  * [ ] Emitter
+  * [ ] Animation event
+  * [ ] Display waveform
+
 ## TODO
 
 * [ ] PBR shading(in CPU)
@@ -177,5 +185,6 @@ gltf-insight is built upon the following open-source projects:
 * ionic framework icon font : MIT
 * Roboto icons : Apache 2
 * nativefiledialog : ZLIB license.
+* miniaudio(and dr_libs) : MIT license. https://github.com/dr-soft/miniaudio
 
 *“glTF and the glTF logo are trademarks of the Khronos Group Inc.”*

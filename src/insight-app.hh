@@ -32,6 +32,7 @@ SOFTWARE.
 #include "animation.hh"
 #include "configuration.hh"
 #include "material.hh"
+#include "audio.hh"
 
 // This includes opengl for us, along side debuging callbacks
 #include <cstdio>
@@ -320,6 +321,7 @@ class app {
   bool do_soft_skinning = true;
   bool show_debug_ray = false;
   bool show_obj_export_window = true;
+  bool show_audio_window = true;
 
   std::vector<mesh> loaded_meshes;
   std::vector<material> loaded_material;
@@ -383,6 +385,17 @@ class app {
   } obj_export_worker = this;
 
   GLuint logo = 0;
+
+  // for audio playback based on MSFT_audio_emitter extension.
+  // Currently we only support single playback of audio.
+  // TODO(LTE): Support emitter, animation event, and sync with animation playback.
+  bool play_audio = false;
+  int active_audio_clip_index = -1; // -1 = no clip exists or selected.
+  std::vector<std::unique_ptr<Audio>> audio_clips;
+  std::vector<std::string> audio_clip_names; // for ImGui
+
+  // Simply playback selected audio clip(`active_audio_clip_index`)
+  bool playback_audio_clip();
 
   // Loaded data
   std::vector<GLuint> textures;
@@ -464,6 +477,9 @@ class app {
   void run_3D_gizmo(gltf_node* active_bone);
 
   void fill_sequencer();
+
+  // Load audio clips from MSFT_audio_emitter extension
+  void load_audio_clips();
 };
 
 }  // namespace gltf_insight

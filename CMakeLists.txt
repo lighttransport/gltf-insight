@@ -209,9 +209,15 @@ endif()
 # [tinygltf]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf)
 
+
+set(EXTRA_SOURCES)
+
 # [cpp-optparse]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/)
-set(EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/OptionParser.cpp)
+list(APPEND EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/OptionParser.cpp)
+
+# [miniaudio]
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/)
 
 #Discover the source code
 if (CMAKE_VERSION VERSION_GREATER 3.12)
