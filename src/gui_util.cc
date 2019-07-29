@@ -50,7 +50,8 @@ SOFTWARE.
 #include "gltf-insight-64.png.inc.hh"
 #include "gltf-insight-96.png.inc.hh"
 #include "ionicons_embed.inc.h"
-#include "roboto_embed.inc.h"
+//#include "roboto_embed.inc.h"
+#include "roboto_light_embed.inc.h"
 #include "roboto_mono_embed.inc.h"
 
 // image loader
@@ -641,11 +642,26 @@ void initialize_imgui(GLFWwindow* window) {
   ImFontConfig roboto_config;
   strcpy(roboto_config.Name, "Roboto");
   roboto_config.SizePixels = default_font_scale;
+#if defined(__APPLE__)
+  // Assuem retina display. 2 is suffice
   roboto_config.OversampleH = 2;
   roboto_config.OversampleV = 2;
+#else
+  // 2 is a bit blurry on Windows. 4~8 gives nicer anti aliasing
+  roboto_config.OversampleH = 6;
+  roboto_config.OversampleV = 6;
+#endif
+
+#if 0
   io.Fonts->AddFontFromMemoryCompressedTTF(roboto_compressed_data,
                                            roboto_compressed_size,
                                            default_font_scale, &roboto_config);
+#else
+  io.Fonts->AddFontFromMemoryCompressedTTF(roboto_light_compressed_data,
+                                           roboto_light_compressed_size,
+                                           default_font_scale, &roboto_config);
+
+ #endif
 
   ImFontConfig ionicons_config;
   ionicons_config.MergeMode = true;
@@ -663,8 +679,8 @@ void initialize_imgui(GLFWwindow* window) {
   roboto_mono_config.OversampleH = 2;
   roboto_mono_config.OversampleV = 2;
   io.Fonts->AddFontFromMemoryCompressedTTF(
-      roboto_mono_compressed_data, roboto_compressed_size, default_font_scale,
-      &roboto_mono_config);
+      roboto_mono_compressed_data, roboto_mono_compressed_size,
+      default_font_scale, &roboto_mono_config);
 
   ImGuiFileDialog::fileLabel = ICON_II_ANDROID_DOCUMENT;
   ImGuiFileDialog::dirLabel = ICON_II_ANDROID_FOLDER;
@@ -675,7 +691,7 @@ void initialize_imgui(GLFWwindow* window) {
 #ifdef __EMSCRIPTEN__  // Just Web for now (Android in the future)
   // ESSL 3.00
   ImGui_ImplOpenGL3_Init("#version 300 es");
-#else  // All destktop platforms
+#else                  // All destktop platforms
   // GLSL 3.30
   ImGui_ImplOpenGL3_Init("#version 330");
 #endif
@@ -692,7 +708,7 @@ void initialize_imgui(GLFWwindow* window) {
   ImGui::GetStyle().PopupRounding = 1.0f;
   ImGui::GetStyle().ScrollbarRounding = 1.0f;
   ImGui::GetStyle().TabRounding = 1.0f;
-  ImGui::GetStyle().FrameBorderSize = 2.f;
+  ImGui::GetStyle().FrameBorderSize = 1.0f;  // original 2.f
   ImGui::GetStyle().ScrollbarSize = 18.f;
 
   ImVec4* colors = ImGui::GetStyle().Colors;
@@ -701,7 +717,8 @@ void initialize_imgui(GLFWwindow* window) {
   colors[ImGuiCol_WindowBg] = ImVec4(0.180f, 0.180f, 0.180f, 0.9f);
   colors[ImGuiCol_ChildBg] = ImVec4(0.280f, 0.280f, 0.280f, 0.007843f);
   colors[ImGuiCol_PopupBg] = ImVec4(0.313f, 0.313f, 0.313f, 1.000f);
-  colors[ImGuiCol_Border] = ImVec4(0.266f, 0.266f, 0.266f, 1.000f);
+  // colors[ImGuiCol_Border] = ImVec4(0.266f, 0.266f, 0.266f, 1.000f);
+  colors[ImGuiCol_Border] = ImVec4(0.236f, 0.236f, 0.236f, 1.000f);  // darken
   colors[ImGuiCol_BorderShadow] = ImVec4(0.000f, 0.000f, 0.000f, 0.000f);
   colors[ImGuiCol_FrameBg] = ImVec4(0.160f, 0.160f, 0.160f, 1.000f);
   colors[ImGuiCol_FrameBgHovered] = ImVec4(0.200f, 0.200f, 0.200f, 1.000f);
