@@ -217,218 +217,6 @@ void model_info_window(const tinygltf::Model& model, bool* open) {
   ImGui::End();
 }
 
-void animation_window(const std::vector<animation>& animations, bool* open) {
-  if (open && !*open) return;
-  ImGui::Begin("Animations", open);
-
-  if (animations.size() == 0) {
-    ImGui::Text("No animations in glTF");
-    ImGui::End();
-    return;
-  }
-
-  std::vector<std::string> animation_names;
-
-  for (const auto& input_animation : animations)
-    animation_names.push_back(input_animation.name);
-
-  static int idx = 0;
-  ImGuiCombo("animations", &idx, animation_names);
-
-  // const tinygltf::Animation &animation = model.animations[size_t(idx)];
-  const auto& animation = animations[size_t(idx)];
-
-  ImGui::Text("Min time [%f]", double(animation.min_time));
-  ImGui::Text("Max time [%f]", double(animation.max_time));
-
-  //
-  // channels
-  //
-  if (ImGui::CollapsingHeader("channels")) {
-    ImGui::Text("Animation has [%zu] channels", animation.channels.size());
-    static int channel_idx = 0;
-    ImGui::InputInt("channel", &channel_idx, 1, 1);
-    channel_idx = std::max<int>(
-        std::min<int>(channel_idx, int(animation.channels.size()) - 1), 0);
-    const auto& channel = animation.channels[size_t(channel_idx)];
-
-    // ImGui::Text("sampler [%d]", channel.sampler);
-    ImGui::Text("target node [%d] path [%s]", channel.target_node, [channel] {
-      switch (channel.mode) {
-        case animation::channel::path::translation:
-          return "translation";
-        case animation::channel::path::rotation:
-          return "rotation";
-        case animation::channel::path::scale:
-          return "scale";
-        case animation::channel::path::weight:
-          return "weight";
-        case animation::channel::path::not_assigned:
-          return "ERROR";
-      }
-      return "ERROR";
-    }());
-
-    switch (channel.mode) {
-      case animation::channel::path::weight:
-
-        // TODO look up the new "tables" thingy
-        ImGui::Columns(2);
-        ImGui::Separator();
-        ImGui::Text("Frame");
-        ImGui::NextColumn();
-        ImGui::Text("Weight Value");
-        ImGui::NextColumn();
-        ImGui::Separator();
-        for (auto keyframe : channel.keyframes) {
-          {
-            ImGui::Text("%d", keyframe.first);
-            ImGui::NextColumn();
-            ImGui::Text("%f", double(keyframe.second.motion.weight));
-            ImGui::NextColumn();
-            ImGui::Separator();
-          }
-        }
-        ImGui::Columns();
-        break;
-      case animation::channel::path::translation:
-        ImGui::Columns(4);
-        ImGui::Separator();
-        ImGui::Text("Frame");
-        ImGui::NextColumn();
-        ImGui::Text("X");
-        ImGui::NextColumn();
-        ImGui::Text("Y");
-        ImGui::NextColumn();
-        ImGui::Text("Z");
-        ImGui::NextColumn();
-        ImGui::Separator();
-        for (auto keyframe : channel.keyframes) {
-          ImGui::Text("%d", keyframe.first);
-          ImGui::NextColumn();
-          auto v = keyframe.second.motion.translation;
-          ImGui::Text("%f", double(v.x));
-          ImGui::NextColumn();
-          ImGui::Text("%f", double(v.y));
-          ImGui::NextColumn();
-          ImGui::Text("%f", double(v.z));
-          ImGui::NextColumn();
-          ImGui::Separator();
-        }
-        ImGui::Columns();
-        break;
-      case animation::channel::path::scale:
-        ImGui::Columns(4);
-        ImGui::Separator();
-        ImGui::Text("Frame");
-        ImGui::NextColumn();
-        ImGui::Text("X");
-        ImGui::NextColumn();
-        ImGui::Text("Y");
-        ImGui::NextColumn();
-        ImGui::Text("Z");
-        ImGui::NextColumn();
-        ImGui::Separator();
-        for (auto keyframe : channel.keyframes) {
-          ImGui::Text("%d", keyframe.first);
-          ImGui::NextColumn();
-          auto v = keyframe.second.motion.scale;
-          ImGui::Text("%f", double(v.x));
-          ImGui::NextColumn();
-          ImGui::Text("%f", double(v.y));
-          ImGui::NextColumn();
-          ImGui::Text("%f", double(v.z));
-          ImGui::NextColumn();
-          ImGui::Separator();
-        }
-        ImGui::Columns();
-        break;
-      case animation::channel::path::rotation:
-        ImGui::Columns(5);
-        ImGui::Separator();
-        ImGui::Text("Frame");
-        ImGui::NextColumn();
-        ImGui::Text("X");
-        ImGui::NextColumn();
-        ImGui::Text("Y");
-        ImGui::NextColumn();
-        ImGui::Text("Z");
-        ImGui::NextColumn();
-        ImGui::Text("W");
-        ImGui::NextColumn();
-        ImGui::Separator();
-        for (auto keyframe : channel.keyframes) {
-          ImGui::Text("%d", keyframe.first);
-          ImGui::NextColumn();
-          auto quat = keyframe.second.motion.rotation;
-          ImGui::Text("%f", double(quat.x));
-          ImGui::NextColumn();
-          ImGui::Text("%f", double(quat.y));
-          ImGui::NextColumn();
-          ImGui::Text("%f", double(quat.z));
-          ImGui::NextColumn();
-          ImGui::Text("%f", double(quat.w));
-          ImGui::NextColumn();
-          ImGui::Separator();
-        }
-        ImGui::Columns();
-        break;
-      case animation::channel::path::not_assigned:
-        ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.1f, 1.0f),
-                           "ERROR Unknown target path name");
-    }
-  }
-
-  //
-  // samplers
-  //
-  if (ImGui::CollapsingHeader("samplers")) {
-    std::vector<std::string> sampler_names;
-
-    ImGui::Text("Animation has [%zu] samplers", animation.samplers.size());
-    static int sampler_idx = 0;
-    ImGui::InputInt("sampler", &sampler_idx, 1, 1);
-    sampler_idx = std::max<int>(
-        std::min<int>(sampler_idx, int(animation.samplers.size()) - 1), 0);
-    const auto& sampler = animation.samplers[size_t(sampler_idx)];
-
-    ImGui::Text("Interpolation method [%s]", [sampler] {
-      switch (sampler.mode) {
-        case animation::sampler::interpolation::linear:
-          return "LINEAR";
-        case animation::sampler::interpolation::step:
-          return "STEP";
-        case animation::sampler::interpolation::cubic_spline:
-          return "CUBICSPLINE";
-        case animation::sampler::interpolation::not_assigned:
-          return "ERROR";
-      }
-      return "ERROR";
-    }());
-
-    ImGui::Text("Keyframe range : %f, %f [secs]", double(sampler.min_v),
-                double(sampler.max_v));
-    ImGui::Text("# of key frames : %zu", sampler.keyframes.size());
-
-    ImGui::Columns(2);
-    ImGui::Text("Frame Number");
-    ImGui::NextColumn();
-    ImGui::Text("Timestamp");
-    ImGui::NextColumn();
-    ImGui::Separator();
-    for (auto keyframe : sampler.keyframes) {
-      ImGui::Text("%d", keyframe.first);
-      ImGui::NextColumn();
-      ImGui::Text("%f", double(keyframe.second));
-      ImGui::NextColumn();
-      ImGui::Separator();
-    }
-    ImGui::Columns();
-  }
-
-  ImGui::End();
-}
-
 // Need access to mesh type.
 // TODO create mesh.hh and extract this definition
 #include "insight-app.hh"
@@ -661,7 +449,7 @@ void initialize_imgui(GLFWwindow* window) {
                                            roboto_light_compressed_size,
                                            default_font_scale, &roboto_config);
 
- #endif
+#endif
 
   ImFontConfig ionicons_config;
   ionicons_config.MergeMode = true;
@@ -691,7 +479,7 @@ void initialize_imgui(GLFWwindow* window) {
 #ifdef __EMSCRIPTEN__  // Just Web for now (Android in the future)
   // ESSL 3.00
   ImGui_ImplOpenGL3_Init("#version 300 es");
-#else                  // All destktop platforms
+#else  // All destktop platforms
   // GLSL 3.30
   ImGui_ImplOpenGL3_Init("#version 330");
 #endif
@@ -940,6 +728,256 @@ void shader_selector_window(const std::vector<std::string>& shader_names,
   ImGui::End();
 }
 
+void animation_window(std::vector<animation>& animations, bool* open) {
+  if (open && !*open) return;
+
+  static int selected_animation_index = 0;
+  static int selected_animation_channel_index;
+
+  static std::vector<std::string> animation_names;
+
+  // Copying a bunch of strings at each frame will slow down the program, we
+  // keep a cached list of the animations names
+  // We can quicly test if we need to rebuild the animation_name lists:
+  bool rebuild_name_list = false;
+  if (animations.size() != animation_names.size())
+    rebuild_name_list = true;
+  else {
+    for (size_t i = 0; i < animations.size(); ++i) {
+      if (animation_names[i] != animations[i].name) {
+        rebuild_name_list = true;
+        break;
+      }
+    }
+  }
+
+  // Rebuild efficiently the list of name for the combo box
+  if (rebuild_name_list) {
+    // allocate all the std::strings at once
+    animation_names.resize(animations.size());
+    for (size_t i = 0; i < animations.size(); ++i) {
+      animation_names[i] = animations[i].name;
+    }
+  }
+
+  // ImGui window
+  if (ImGui::Begin("Animation explorer"), open) {
+    // Not all glTF have animations, ignore the rest of the code if there's none
+    if (animations.empty()) {
+      // Display a message that expalin why windo is empty in a cool orange
+      // shade
+      ImGui::TextColored(
+          ImVec4(1, .5, 0, 1),
+          "The currently loaded glTF doesn't have any animations");
+    }
+
+    // Display the animation motion widget
+    else {
+      // This is likely due to loading another glTF asset
+      if (selected_animation_index >= animations.size())
+        selected_animation_index = 0;
+      ImGuiCombo("Animations", &selected_animation_index, animation_names);
+
+      animation& selected_animation = animations[selected_animation_index];
+
+      // We are going to mix in the view the sampler data and the channel data
+      // as editing them separately makes little sense.
+      ImGui::Text("Current Animation [%s]", selected_animation.name.c_str());
+      ImGui::Text("Contains [%d] channels", selected_animation.channels.size());
+      ImGui::Separator();
+
+      // Propose to change the channel we dsiplay why being sure we point to a
+      // correct one in the array
+      if (selected_animation_channel_index >=
+          selected_animation.channels.size())
+        selected_animation_channel_index = 0;
+      ImGui::InputInt("Channel to display", &selected_animation_channel_index,
+                      1, 1);
+      selected_animation_channel_index =
+          glm::clamp<int>(selected_animation_channel_index, 0,
+                          selected_animation.channels.size() - 1);
+
+      // Get the channel object :
+      auto& channel =
+          selected_animation.channels[selected_animation_channel_index];
+
+      // Get the associated sampler object :
+      auto& sampler = selected_animation.samplers[channel.sampler_index];
+
+      ImGui::Text("target node [%d] path [%s]", channel.target_node, [channel] {
+        switch (channel.mode) {
+          case animation::channel::path::translation:
+            return "translation";
+          case animation::channel::path::rotation:
+            return "rotation";
+          case animation::channel::path::scale:
+            return "scale";
+          case animation::channel::path::weight:
+            return "weight";
+          case animation::channel::path::not_assigned:
+            return "ERROR";
+        }
+        return "ERROR";
+      }());
+
+      bool is_cubic_spline = false;
+      ImGui::Text("Animation channel has [%d] keyframes",
+                  sampler.keyframes.size());
+      ImGui::Text("Sampler is set to [%s] interpolation_mode", [&] {
+        switch (sampler.mode) {
+          case animation::sampler::interpolation::linear:
+            return "LINEAR";
+          case animation::sampler::interpolation::step:
+            return "STEP";
+          case animation::sampler::interpolation::cubic_spline:
+            is_cubic_spline = true;
+            return "CUBICSPLINE";
+          case animation::sampler::interpolation::not_assigned:
+            return "ERROR";
+        }
+        return "ERROR";
+      }());
+
+      const auto column_count = [channel]() -> int {
+        switch (channel.mode) {
+          case animation::channel::path::scale:
+          case animation::channel::path::translation:
+            return 4;
+          case animation::channel::path::rotation:
+            return 5;
+          case animation::channel::path::weight:
+            return 2;
+          default:
+            return -1;
+        }
+      }();
+
+      if (column_count == -1) {
+        // error
+      }
+
+      ImGui::Separator();
+      ImGui::Columns(column_count);
+      ImGui::TextColored(ImVec4(1, .5, 0, 1), "TimePoint");
+      ImGui::NextColumn();
+      if (column_count == 2) {
+        ImGui::TextColored(ImVec4(1, .5, 0, 1), "Weight");
+        ImGui::NextColumn();
+      } else
+        for (size_t i = 1; i < column_count; ++i) {
+          static const char vector_comp[] = "XYZW";
+          ImGui::TextColored(ImVec4(1, .5, 0, 1), "%c", vector_comp[i - 1]);
+          ImGui::NextColumn();
+        }
+
+      for (size_t frame = 0; frame < sampler.keyframes.size(); ++frame) {
+        const std::string keyframe_input_name =
+            "###"
+            "keyframe_input" +
+            std::to_string(frame);
+
+        ImGui::PushItemWidth(-1);
+        ImGui::InputFloat(keyframe_input_name.c_str(),
+                          &sampler.keyframes[frame].second);
+        ImGui::PopItemWidth();
+        ImGui::NextColumn();
+
+        for (size_t c = 1; c < column_count; ++c) {
+          size_t i = c - 1;
+
+          if (is_cubic_spline) {
+            for (int cs_c = 0; cs_c < 3; cs_c++) {
+              const auto cs_frame = 3 * frame + cs_c;
+              if (i == 0) {
+                switch (cs_c) {
+                  case 0:
+                    ImGui::Text("InTan ");
+                    break;
+                  case 1:
+                    ImGui::Text("KeyVal");
+                    break;
+                  case 2:
+                    ImGui::Text("OutTan");
+                    break;
+                  default:
+                    break;
+                }
+                ImGui::SameLine();
+              }
+              const std::string keyframe_frame_comp_name =
+                  "###"
+                  "keyframe_input" +
+                  std::to_string(frame) + "comp" + std::to_string(c) +
+                  "cubic_spline" + std::to_string(cs_c);
+
+              float* value_to_manipulate = [&]() -> float* {
+                switch (channel.mode) {
+                  case animation::channel::path::translation:
+                    return &channel.keyframes[size_t(cs_frame)]
+                                .second.motion.translation[i];
+                  case animation::channel::path::rotation:
+                    return &channel.keyframes[size_t(cs_frame)]
+                                .second.motion.rotation[i];
+                  case animation::channel::path::scale:
+                    return &channel.keyframes[size_t(cs_frame)]
+                                .second.motion.scale[i];
+                  case animation::channel::path::weight:
+                    return &channel.keyframes[size_t(cs_frame)]
+                                .second.motion.weight;
+                  default:
+                  case animation::channel::path::not_assigned:
+                    return nullptr;
+                }
+              }();
+
+              if (value_to_manipulate) {
+                ImGui::PushItemWidth(-1);
+                ImGui::InputFloat(keyframe_frame_comp_name.c_str(),
+                                  value_to_manipulate, 0, 0, "%.6f");
+                ImGui::PopItemWidth();
+              }
+            }
+          } else {
+            const std::string keyframe_frame_comp_name =
+                "###"
+                "keyframe_input" +
+                std::to_string(frame) + "comp" + std::to_string(c);
+            float* value_to_manipulate = [&]() -> float* {
+              switch (channel.mode) {
+                case animation::channel::path::translation:
+                  return &channel.keyframes[size_t(frame)]
+                              .second.motion.translation[i];
+                case animation::channel::path::rotation:
+                  return &channel.keyframes[size_t(frame)]
+                              .second.motion.rotation[i];
+                case animation::channel::path::scale:
+                  return &channel.keyframes[size_t(frame)]
+                              .second.motion.scale[i];
+                case animation::channel::path::weight:
+                  return &channel.keyframes[size_t(frame)].second.motion.weight;
+                default:
+                case animation::channel::path::not_assigned:
+                  return nullptr;
+              }
+            }();
+
+            if (value_to_manipulate) {
+              ImGui::PushItemWidth(-1);
+              ImGui::InputFloat(keyframe_frame_comp_name.c_str(),
+                                value_to_manipulate, 0, 0, "%.6f");
+              ImGui::PopItemWidth();
+            }
+          }
+
+          ImGui::NextColumn();
+        }
+        ImGui::Separator();
+      }
+    }
+  }
+  ImGui::End();
+}
+
 void camera_parameters_window(float& fovy, float& z_far, bool* open) {
   if (open && !*open) return;
   if (ImGui::Begin("Camera Parameters", open)) {
@@ -948,7 +986,6 @@ void camera_parameters_window(float& fovy, float& z_far, bool* open) {
   }
   ImGui::End();
 }
-
 #include "IconsIonicons.h"
 #include "cmake_config.hh"
 void about_window(GLuint logo, bool* open) {
@@ -1001,7 +1038,8 @@ void about_window(GLuint logo, bool* open) {
         "\n\n");
 
     ImGui::Text(
-        "This program is Free (Libre) and Open-Source. It's development is "
+        "This program is Free (Libre) and Open-Source. It's "
+        "development is "
         "hosted on GitHub");
 
     ImGui::Text("\t" ICON_II_SOCIAL_GITHUB);
@@ -1012,7 +1050,9 @@ void about_window(GLuint logo, bool* open) {
                        "\n\n");
 
     ImGui::Text(
-        "glTF and the glTF logo are trademarks of the Khronos Group Inc.");
+        "glTF and the glTF logo are trademarks of the Khronos "
+        "Group "
+        "Inc.");
     ImGui::NextColumn();
     ImGui::Columns();
     ImGui::SetWindowFontScale(1);

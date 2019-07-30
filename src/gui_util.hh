@@ -118,8 +118,6 @@ void describe_node_topology_in_imgui_tree(const tinygltf::Model& model,
 void model_info_window(const tinygltf::Model& model, bool* open = nullptr);
 
 // Window that display data about the animations in the model
-void animation_window(const std::vector<animation>& animations,
-                      bool* open = nullptr);
 namespace gltf_insight {
 struct mesh;
 }
@@ -157,6 +155,8 @@ void shader_selector_window(const std::vector<std::string>& shader_names,
                             int& display_mode, bool* open = nullptr);
 
 void utilities_window(bool& show_imgui_demo);
+
+void animation_window(std::vector<animation>& animations, bool* open = nullptr);
 
 void camera_parameters_window(float& fovy, float& z_far, bool* open = nullptr);
 
