@@ -774,16 +774,18 @@ void animation_window(std::vector<animation>& animations, bool* open) {
     // Display the animation motion widget
     else {
       // This is likely due to loading another glTF asset
-      if (selected_animation_index >= animations.size())
+      if (selected_animation_index >= int(animations.size()))
         selected_animation_index = 0;
       ImGuiCombo("Animations", &selected_animation_index, animation_names);
 
-      animation& selected_animation = animations[selected_animation_index];
+      animation& selected_animation =
+          animations[size_t(selected_animation_index)];
 
       // We are going to mix in the view the sampler data and the channel data
       // as editing them separately makes little sense.
       ImGui::Text("Current Animation [%s]", selected_animation.name.c_str());
-      ImGui::Text("Contains [%d] channels", selected_animation.channels.size());
+      ImGui::Text("Contains [%zu] channels",
+                  selected_animation.channels.size());
       ImGui::Separator();
 
       // Propose to change the channel we dsiplay why being sure we point to a
@@ -795,14 +797,15 @@ void animation_window(std::vector<animation>& animations, bool* open) {
                       1, 1);
       selected_animation_channel_index =
           glm::clamp<int>(selected_animation_channel_index, 0,
-                          selected_animation.channels.size() - 1);
+                          int(selected_animation.channels.size()) - 1);
 
       // Get the channel object :
       auto& channel =
-          selected_animation.channels[selected_animation_channel_index];
+          selected_animation.channels[size_t(selected_animation_channel_index)];
 
       // Get the associated sampler object :
-      auto& sampler = selected_animation.samplers[channel.sampler_index];
+      auto& sampler =
+          selected_animation.samplers[size_t(channel.sampler_index)];
 
       ImGui::Text("target node [%d] path [%s]", channel.target_node, [channel] {
         switch (channel.mode) {
@@ -821,7 +824,7 @@ void animation_window(std::vector<animation>& animations, bool* open) {
       }());
 
       bool is_cubic_spline = false;
-      ImGui::Text("Animation channel has [%d] keyframes",
+      ImGui::Text("Animation channel has [%zu] keyframes",
                   sampler.keyframes.size());
       ImGui::Text("Sampler is set to [%s] interpolation_mode", [&] {
         switch (sampler.mode) {
@@ -848,6 +851,7 @@ void animation_window(std::vector<animation>& animations, bool* open) {
           case animation::channel::path::weight:
             return 2;
           default:
+          case animation::channel::path::not_assigned:
             return -1;
         }
       }();
@@ -886,7 +890,7 @@ void animation_window(std::vector<animation>& animations, bool* open) {
           size_t i = c - 1;
 
           if (is_cubic_spline) {
-            for (int cs_c = 0; cs_c < 3; cs_c++) {
+            for (size_t cs_c = 0; cs_c < 3; cs_c++) {
               const auto cs_frame = 3 * frame + cs_c;
               if (i == 0) {
                 switch (cs_c) {
@@ -914,13 +918,13 @@ void animation_window(std::vector<animation>& animations, bool* open) {
                 switch (channel.mode) {
                   case animation::channel::path::translation:
                     return &channel.keyframes[size_t(cs_frame)]
-                                .second.motion.translation[i];
+                                .second.motion.translation[int(i)];
                   case animation::channel::path::rotation:
                     return &channel.keyframes[size_t(cs_frame)]
-                                .second.motion.rotation[i];
+                                .second.motion.rotation[int(i)];
                   case animation::channel::path::scale:
                     return &channel.keyframes[size_t(cs_frame)]
-                                .second.motion.scale[i];
+                                .second.motion.scale[int(i)];
                   case animation::channel::path::weight:
                     return &channel.keyframes[size_t(cs_frame)]
                                 .second.motion.weight;
@@ -946,13 +950,13 @@ void animation_window(std::vector<animation>& animations, bool* open) {
               switch (channel.mode) {
                 case animation::channel::path::translation:
                   return &channel.keyframes[size_t(frame)]
-                              .second.motion.translation[i];
+                              .second.motion.translation[int(i)];
                 case animation::channel::path::rotation:
                   return &channel.keyframes[size_t(frame)]
-                              .second.motion.rotation[i];
+                              .second.motion.rotation[int(i)];
                 case animation::channel::path::scale:
                   return &channel.keyframes[size_t(frame)]
-                              .second.motion.scale[i];
+                              .second.motion.scale[int(i)];
                 case animation::channel::path::weight:
                   return &channel.keyframes[size_t(frame)].second.motion.weight;
                 default:
