@@ -850,11 +850,10 @@ void animation_window(std::vector<animation>& animations, bool* open) {
             return 5;
           case animation::channel::path::weight:
             return 2;
-
           case animation::channel::path::not_assigned:
-          default:
             return -1;
         }
+        return -1;
       }();
 
       if (column_count == -1) {
@@ -887,7 +886,7 @@ void animation_window(std::vector<animation>& animations, bool* open) {
         ImGui::PopItemWidth();
         ImGui::NextColumn();
 
-        for (size_t c = 1; c < column_count; ++c) {
+        for (size_t c = 1; c < size_t(column_count); ++c) {
           size_t i = c - 1;
 
           if (is_cubic_spline) {
@@ -930,9 +929,9 @@ void animation_window(std::vector<animation>& animations, bool* open) {
                     return &channel.keyframes[size_t(cs_frame)]
                                 .second.motion.weight;
                   case animation::channel::path::not_assigned:
-                  default:
                     return nullptr;
                 }
+                return nullptr;
               }();
 
               if (value_to_manipulate) {
@@ -961,9 +960,9 @@ void animation_window(std::vector<animation>& animations, bool* open) {
                 case animation::channel::path::weight:
                   return &channel.keyframes[size_t(frame)].second.motion.weight;
                 case animation::channel::path::not_assigned:
-                default:
                   return nullptr;
               }
+              return nullptr;
             }();
 
             if (value_to_manipulate) {
