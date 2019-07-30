@@ -761,7 +761,7 @@ void animation_window(std::vector<animation>& animations, bool* open) {
   }
 
   // ImGui window
-  if (ImGui::Begin("Animation explorer"), open) {
+  if (ImGui::Begin("Animation explorer", open)) {
     // Not all glTF have animations, ignore the rest of the code if there's none
     if (animations.empty()) {
       // Display a message that expalin why windo is empty in a cool orange
@@ -791,7 +791,7 @@ void animation_window(std::vector<animation>& animations, bool* open) {
       // Propose to change the channel we dsiplay why being sure we point to a
       // correct one in the array
       if (selected_animation_channel_index >=
-          selected_animation.channels.size())
+          int(selected_animation.channels.size()))
         selected_animation_channel_index = 0;
       ImGui::InputInt("Channel to display", &selected_animation_channel_index,
                       1, 1);
@@ -850,8 +850,9 @@ void animation_window(std::vector<animation>& animations, bool* open) {
             return 5;
           case animation::channel::path::weight:
             return 2;
-          default:
+
           case animation::channel::path::not_assigned:
+          default:
             return -1;
         }
       }();
@@ -868,7 +869,7 @@ void animation_window(std::vector<animation>& animations, bool* open) {
         ImGui::TextColored(ImVec4(1, .5, 0, 1), "Weight");
         ImGui::NextColumn();
       } else
-        for (size_t i = 1; i < column_count; ++i) {
+        for (size_t i = 1; i < size_t(column_count); ++i) {
           static const char vector_comp[] = "XYZW";
           ImGui::TextColored(ImVec4(1, .5, 0, 1), "%c", vector_comp[i - 1]);
           ImGui::NextColumn();
@@ -928,8 +929,8 @@ void animation_window(std::vector<animation>& animations, bool* open) {
                   case animation::channel::path::weight:
                     return &channel.keyframes[size_t(cs_frame)]
                                 .second.motion.weight;
-                  default:
                   case animation::channel::path::not_assigned:
+                  default:
                     return nullptr;
                 }
               }();
@@ -959,8 +960,8 @@ void animation_window(std::vector<animation>& animations, bool* open) {
                               .second.motion.scale[int(i)];
                 case animation::channel::path::weight:
                   return &channel.keyframes[size_t(frame)].second.motion.weight;
-                default:
                 case animation::channel::path::not_assigned:
+                default:
                   return nullptr;
               }
             }();
