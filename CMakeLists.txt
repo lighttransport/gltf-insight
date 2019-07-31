@@ -16,6 +16,7 @@ project(${BUILD_TARGET})
 
 option(GLTF_INSIGHT_USE_CCACHE "Compile with ccache(if available. Linux only)" OFF)
 option(GLTF_INSIGHT_USE_NATIVEFILEDIALOG "Use NativeFileDialog instead of ImGuiFileDialog for file browser(requires GTK3 on Linux)" OFF)
+option(GLTF_INSIGHT_USE_JSONRPC "Use JSON-RPC(over HTTP) to communicate with other process" OFF)
 
 if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/third_party/glfw/include")
   message(FATAL_ERROR "The glfw submodule directory is missing! "
@@ -70,7 +71,31 @@ if (GLTF_INSIGHT_USE_CCACHE)
   endif()
 endif()
 
+set(EXTRA_SOURCES)
 
+# [fmtlib]
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/third_party/fmt/include")
+list(APPEND EXTRA_SOURCES
+	"${CMAKE_CURRENT_SOURCE_DIR}/third_party/fmt/src/format.cc"
+	"${CMAKE_CURRENT_SOURCE_DIR}/third_party/fmt/src/posix.cc")
+
+# [civetweb]
+if (GLTF_INSIGHT_USE_JSONRPC)
+
+  include_directories("${CMAKE_CURRENT_SOURCE_DIR}/deps/civetweb/include")
+  list(APPEND EXTRA_SOURCES 
+  	"${CMAKE_CURRENT_SOURCE_DIR}/deps/civetweb/src/civetweb.c"
+  	"${CMAKE_CURRENT_SOURCE_DIR}/deps/civetweb/src/CivetServer.cpp"
+  )
+  
+  add_definitions(-DGLTF_INSIGHT_WITH_JSONRPC)
+  
+  if (WIN32)
+    # winsock2
+    list(APPEND EXT_LIBRARIES ws2_32 mswsock)
+  endif ()
+
+endif(GLTF_INSIGHT_USE_JSONRPC)
 
 
 # [glfw]
@@ -211,7 +236,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/third_party/tinygltf)
 
 # [cpp-optparse]
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/)
-set(EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/OptionParser.cpp)
+list(APPEND EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-optparse/OptionParser.cpp)
 
 #Discover the source code
 if (CMAKE_VERSION VERSION_GREATER 3.12)

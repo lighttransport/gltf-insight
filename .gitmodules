@@ -22,3 +22,6 @@
 [submodule "third_party/nativefiledialog"]
 	path = third_party/nativefiledialog
 	url = https://github.com/mlabbe/nativefiledialog
+[submodule "third_party/fmt"]
+	path = third_party/fmt
+	url = https://github.com/fmtlib/fmt.git

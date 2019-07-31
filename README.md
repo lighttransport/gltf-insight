@@ -177,5 +177,7 @@ gltf-insight is built upon the following open-source projects:
 * ionic framework icon font : MIT
 * Roboto icons : Apache 2
 * nativefiledialog : ZLIB license.
+* civetweb : MIT license.
+* fmtlib : 2-clause BSD license. https://fmt.dev/dev/index.html
 
 *“glTF and the glTF logo are trademarks of the Khronos Group Inc.”*
