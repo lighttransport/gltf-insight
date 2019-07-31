@@ -24,10 +24,19 @@ SOFTWARE.
 #include "insight-app.hh"
 #include "jsonrpc-http.hh"
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
 // Include tinygltf's json.hpp
 #include "json.hpp"
 
 #include "fmt/core.h"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 #include <iostream>
 #include <vector>
@@ -75,7 +84,7 @@ bool app::jsonrpc_dispatch(const std::string &json_str)
   try {
     j = json::parse(json_str);
   } catch (const std::exception &e) {
-    std::cerr << "Invalid JSON message.\n";
+    fmt::print("Invalid JSON string. what = {}\n", e.what());
     return false;
   }
 

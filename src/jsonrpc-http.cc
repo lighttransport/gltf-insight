@@ -1,10 +1,20 @@
 #include "jsonrpc-http.hh"
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
 #if defined(GLTF_INSIGHT_WITH_JSONRPC)
+
 #include "CivetServer.h"
 #endif
 
 #include <fmt/core.h>
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 #include <iostream>
 #include <vector>
