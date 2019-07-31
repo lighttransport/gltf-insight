@@ -155,6 +155,7 @@ void app::load_as_metal_roughness(size_t i, material& currently_loading,
 }
 
 void app::load() {
+
   load_glTF_asset();
 
   const auto nb_textures = model.images.size();
@@ -971,6 +972,11 @@ app::app(int argc, char** argv) {
 }
 
 app::~app() {
+  if (_jsonrpc_thread_running) {
+    _jsonrpc_thread.join();
+    _jsonrpc_thread_running = false;
+  }
+
   unload();
   deinitialize_gui_and_window(window);
 }
@@ -1378,6 +1384,14 @@ static bool show_file_dialog(const std::string& title,
 #endif
 
 void app::main_loop() {
+
+#if defined(GLTF_INSIGHT_WITH_JSONRPC)
+  std::cout << "Run http server for JSON-RPC...\n";
+  // start http server
+  bool ret = spawn_http_listen();
+  (void)ret;
+#endif
+
   bool status = true;
   while (status) {
     status = main_loop_frame();

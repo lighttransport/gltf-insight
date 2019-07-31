@@ -464,6 +464,19 @@ class app {
   void run_3D_gizmo(gltf_node* active_bone);
 
   void fill_sequencer();
+
+
+  // JSONRPC over HTTP
+  std::string _address = "localhost";
+  int         _port = 21264;
+  std::thread _jsonrpc_thread;
+  bool        _jsonrpc_thread_running = false;
+  std::atomic<bool> _jsonrpc_exit_flag;
+
+  bool spawn_http_listen();
+
+  // Callback function For JSON-RPC based modification of glTF data.
+  bool jsonrpc_dispatch(const std::string &json_msg);
 };
 
 }  // namespace gltf_insight

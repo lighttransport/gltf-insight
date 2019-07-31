@@ -79,26 +79,27 @@ bool JSONRPC::listen_blocking(
   _addr = address;
   _port = port;
 
-
   std::vector<std::string> options;
   options.push_back("listening_ports");
   options.push_back(std::to_string(port));
 
   CivetServer server(options);
 
-  std::cout << "Listen on " << address << ":" << port << "\n";
+  fmt::print("Listen on {}:{}\n", address, port);
+  std::cout << std::flush;
 
   JHandler h_j(exit_flag, callback);
   server.addHandler("/v1", h_j);
 
   while (!(*exit_flag)) {
+
     std::this_thread::sleep_for(std::chrono::seconds(1));
   }
 
   return true;
 #else
 
-  fmt::print("JSONRPC feature is not enabled in this build.");
+  fmt::print("JSONRPC feature is not enabled in this build.\n");
   (void)address;
   (void)port;
   (void)callback;
@@ -106,6 +107,5 @@ bool JSONRPC::listen_blocking(
   return false;
 #endif
 }
-
 
 } // namespace gltf_insight
