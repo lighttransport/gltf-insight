@@ -22,23 +22,28 @@ T.B.W.
 
 ### Morph target
 
-Specify the weight of each morph target.
+```
+"morph_weights" : ARRAY
+```
+
+Each object in ARRAY specifies the weight of each morph target.
 
 ```json
 { "target_id" : 0, "weight": 0.5 }
 ```
 
-And Use `"morph_weight" : ARRAY` as an message tag.
-
 Example:
 
 ```json
-"params" : {
-  "morph_weight" : [
-    { "target_id" : 0, "weight": 0.5 },
-    { "target_id" : 1, "weight": 0.0 }
-  ]
-
+{ "jsonrpc" : "2.0",
+  "method" : "update",
+  "params" : {
+    "morph_weights" : [
+      { "target_id" : 0, "weight": 0.5 },
+      { "target_id" : 1, "weight": 0.0 }
+    ]
+  }
+}
 ```
 
 #### TODO

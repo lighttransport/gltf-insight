@@ -208,20 +208,6 @@ bool app::jsonrpc_dispatch(const std::string &json_str)
       }
     }
 
-#if 0
-    if (gltf_scene_tree.pose.blend_weights.size() > 0) {
-      for (size_t i = 0; i < morph_params.size(); i++) {
-        int idx = morph_params[i].first;
-
-        if ((idx >= 0) && (gltf_scene_tree.pose.blend_weights.size())) {
-          float weight = std::min(1.0f, std::max(0.0f, morph_params[i].second));
-
-          gltf_scene_tree.pose.blend_weights[size_t(idx)] = weight;
-          std::cout << "Update " << idx << "th morph_weight with " << weight << "\n";
-        }
-      }
-    }
-#endif
   }
 
   return true;

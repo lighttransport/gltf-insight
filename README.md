@@ -143,6 +143,16 @@ cmake --build .
 ### Build options
 
 * `GLTF_INSIGHT_USE_NATIVEFILEDIALOG` : Use NativeFileDialog https://github.com/mlabbe/nativefiledialog instead of ImGuiFileDialog for file browser. Requires GTK3(and pkg-config) on Linux.
+* `GLTF_INSIGHT_USE_JSONRPC` : Enable JSON-RPC over HTTP feature.
+
+### Update scene content using JSON-RPC over HTTP
+
+See `doc/jsonrpc.md` and `tools/jsonrpc/` for details.
+
+Currently we support updating scene content(e.g. morph weights).
+Sending scene content information to other tool using JSON-RPC over HTTP is a TODO.
+Using other transport channel(e.g. websocket) is also a TODO.
+
 
 ## TODO
 
