@@ -18,7 +18,7 @@ namespace gltf_insight {
 
 class JSONRPC {
  public:
-   JSONRPC() : _addr("localhost"), _port(21264) {}
+   JSONRPC() {}
 
    /// Start http server. The method is blocking operation and goes to infinite loop.
    /// application must invoke `listen_blockking` method by creating a dedicated thread.
@@ -34,8 +34,6 @@ class JSONRPC {
                         const int port = 21264);
 
  private:
-  std::string _addr = "localhost";
-  int _port = 21264;
 
 };
 

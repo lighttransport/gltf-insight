@@ -186,7 +186,6 @@ bool app::jsonrpc_dispatch(const std::string &json_str)
   if (params.count("morph_weights")) {
     json morph_weights = params["morph_weights"];
 
-
     std::vector<std::pair<int, float>> morph_params;
     bool ret = DecodeMorphWeights(morph_weights, &morph_params);
     if (ret) {

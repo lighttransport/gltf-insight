@@ -85,9 +85,6 @@ bool JSONRPC::listen_blocking(
     const int port)
 {
 #if defined(GLTF_INSIGHT_WITH_JSONRPC)
-  // TODO(LTE): Implement
-  _addr = address;
-  _port = port;
 
   std::vector<std::string> options;
   options.push_back("listening_ports");

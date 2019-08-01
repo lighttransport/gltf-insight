@@ -470,10 +470,12 @@ class app {
   void fill_sequencer();
 
 
+#if defined(GLTF_INSIGHT_WITH_JSONRPC)
   // JSONRPC over HTTP
   std::string _address = "localhost";
   int         _port = 21264;
   std::atomic<bool> _jsonrpc_exit_flag;
+#endif
 
   ///
   /// Please call this function from a thread.
