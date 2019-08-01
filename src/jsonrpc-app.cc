@@ -77,10 +77,10 @@ bool app::spawn_http_listen()
   std::cout << "Listen...\n";
   bool ret = rpc.listen_blocking(cb_f, &_jsonrpc_exit_flag, _address, _port);
   std::cout << "Listen ret = " << ret << "\n";
+  return true;
 
 #endif
 
-  return true;
 }
 
 static bool DecodeMorphWeights(const json &j, std::vector<std::pair<int, float>> *params)
