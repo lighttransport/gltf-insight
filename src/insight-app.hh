@@ -32,6 +32,7 @@ SOFTWARE.
 #include "animation.hh"
 #include "configuration.hh"
 #include "material.hh"
+#include "jsonrpc-command.hh"
 
 // This includes opengl for us, along side debuging callbacks
 #include <cstdio>
@@ -39,6 +40,7 @@ SOFTWARE.
 #include <iostream>
 #include <map>
 #include <vector>
+#include <queue>
 
 #include "gl_util.hh"
 
@@ -254,7 +256,7 @@ class app {
   void update_rendering_matrices();
   void perform_skinning_and_morphing(bool gpu_geometry_buffers_dirty,
                                      std::vector<mesh>::value_type& a_mesh);
-  void soft_skinning_controls(bool& gpu_geometry_buffers_dirty);
+  void soft_skinning_controls(bool& gpu_geometry_buffers_dirty, bool *isopen);
   void mouse_ray_debug_control();
   void find_gltf_node_index_for_active_joint(
       int& active_bone_gltf_node, std::vector<mesh>::value_type& a_mesh);
@@ -320,6 +322,8 @@ class app {
   bool do_soft_skinning = true;
   bool show_debug_ray = false;
   bool show_obj_export_window = true;
+  bool show_softskinning_window = true;
+  bool show_jsonrpc_window = true;
 
   std::vector<mesh> loaded_meshes;
   std::vector<material> loaded_material;
@@ -469,14 +473,24 @@ class app {
   // JSONRPC over HTTP
   std::string _address = "localhost";
   int         _port = 21264;
-  std::thread _jsonrpc_thread;
-  bool        _jsonrpc_thread_running = false;
   std::atomic<bool> _jsonrpc_exit_flag;
 
+  ///
+  /// Please call this function from a thread.
+  /// `spawn_http_listen` is a blocking method.
+  ///
   bool spawn_http_listen();
 
   // Callback function For JSON-RPC based modification of glTF data.
   bool jsonrpc_dispatch(const std::string &json_msg);
+
+  // lock for update command queue.
+  std::mutex _command_queue_mutex;
+  std::queue<Command> _command_queue;
+
+  // Update scene content with `Command`.
+  // This method must be called from a main thread.
+  bool update_scene(const Command &command);
 };
 
 }  // namespace gltf_insight

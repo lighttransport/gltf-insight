@@ -170,3 +170,5 @@ void material_info_window(gltf_insight::material& dummy,
                           bool* open = nullptr);
 
 void scene_outline_window(gltf_node& sene, bool* open = nullptr);
+
+void jsonrpc_window(const int port, bool *isopen = nullptr);

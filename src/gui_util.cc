@@ -1256,3 +1256,11 @@ GLuint load_gltf_insight_icon() {
   stbi_image_free(data);
   return gl_image;
 }
+
+void jsonrpc_window(const int port, bool* isopen) {
+  if (isopen && !*isopen) return;
+  if (ImGui::Begin("JSON-RPC", isopen)) {
+    ImGui::Text("Port: %d", port);
+  }
+  ImGui::End();
+}

@@ -972,11 +972,6 @@ app::app(int argc, char** argv) {
 }
 
 app::~app() {
-  if (_jsonrpc_thread_running) {
-    _jsonrpc_thread.join();
-    _jsonrpc_thread_running = false;
-  }
-
   unload();
   deinitialize_gui_and_window(window);
 }
@@ -1053,6 +1048,10 @@ void app::run_view_menu() {
     ImGui::MenuItem("Bone display window", nullptr, &show_bone_display_window);
     ImGui::MenuItem("Scene outline", nullptr, &show_scene_outline_window);
     ImGui::MenuItem("OBJ export window", nullptr, &show_obj_export_window);
+    ImGui::MenuItem("Software skinning control window", nullptr, &show_softskinning_window);
+#if defined(GLTF_INSIGHT_WITH_JSONRPC)
+    ImGui::MenuItem("JSON-RPC window", nullptr, &show_jsonrpc_window);
+#endif
     ImGui::Separator();
     ImGui::MenuItem("Show Gizmo", nullptr, &show_gizmo);
     ImGui::MenuItem("Editor light controls", nullptr,
@@ -1388,14 +1387,34 @@ void app::main_loop() {
 #if defined(GLTF_INSIGHT_WITH_JSONRPC)
   std::cout << "Run http server for JSON-RPC...\n";
   // start http server
-  bool ret = spawn_http_listen();
-  (void)ret;
+  std::thread th([&]{
+    spawn_http_listen();
+  });
+
 #endif
 
   bool status = true;
   while (status) {
+
+#if defined(GLTF_INSIGHT_WITH_JSONRPC)
+    // Consume command queue.
+    {
+      std::lock_guard<std::mutex> lock(_command_queue_mutex);
+      while (!_command_queue.empty()) {
+        Command command = _command_queue.front();
+        this->update_scene(command);
+        _command_queue.pop();
+      }
+    }
+#endif
+
     status = main_loop_frame();
   }
+
+#if defined(GLTF_INSIGHT_WITH_JSONRPC)
+  _jsonrpc_exit_flag = true; // let the thread know exit their loop
+  th.join();
+#endif
 }
 
 void app::update_mouse_select_framebuffer() {
@@ -1724,16 +1743,26 @@ void app::perform_skinning_and_morphing(bool gpu_geometry_buffers_dirty,
   }
 }
 
-void app::soft_skinning_controls(bool& gpu_geometry_buffers_dirty) {
-  if (ImGui::Checkbox("Software skinning", &do_soft_skinning)) {
-    if (!do_soft_skinning)  // if we clicked on this, and we are not doing
-                            // soft skinning anymore, gpu buffer contains
-                            // what is effectively garbage for us and needs to
-                            // be updated
-    {
-      gpu_geometry_buffers_dirty = true;
+void app::soft_skinning_controls(bool& gpu_geometry_buffers_dirty, bool *isopen) {
+
+  if (isopen && !*isopen) {
+    return;
+  }
+
+  if (ImGui::Begin("Skinning control", isopen)) {
+
+    if (ImGui::Checkbox("Software skinning", &do_soft_skinning)) {
+      if (!do_soft_skinning)  // if we clicked on this, and we are not doing
+                              // soft skinning anymore, gpu buffer contains
+                              // what is effectively garbage for us and needs to
+                              // be updated
+      {
+        gpu_geometry_buffers_dirty = true;
+      }
     }
   }
+
+  ImGui::End();
 }
 
 void app::mouse_ray_debug_control() {
@@ -1880,6 +1909,10 @@ bool app::main_loop_frame() {
     configuration::show_editor_configuration_window();
     camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
 
+#if defined(GLTF_INSIGHT_WITH_JSONRPC)
+    jsonrpc_window(_port, &show_jsonrpc_window);
+#endif
+
     if (asset_loaded) {
       // Draw all windows
       scene_outline_window(gltf_scene_tree, &show_scene_outline_window);
@@ -1923,7 +1956,7 @@ bool app::main_loop_frame() {
 
     update_rendering_matrices();
     bool gpu_geometry_buffers_dirty = false;
-    soft_skinning_controls(gpu_geometry_buffers_dirty);
+    soft_skinning_controls(gpu_geometry_buffers_dirty, &show_softskinning_window);
 
     if (asset_loaded) {
       mouse_ray_debug_control();
