@@ -1910,7 +1910,7 @@ bool app::main_loop_frame() {
     camera_parameters_window(fovy, z_far, &show_camera_parameter_window);
 
 #if defined(GLTF_INSIGHT_WITH_JSONRPC)
-    jsonrpc_window(_port, &show_jsonrpc_window);
+    jsonrpc_window(!_http_failed, _port, &show_jsonrpc_window);
 #endif
 
     if (asset_loaded) {

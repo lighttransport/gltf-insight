@@ -475,6 +475,7 @@ class app {
   std::string _address = "localhost";
   int         _port = 21264;
   std::atomic<bool> _jsonrpc_exit_flag;
+  bool        _http_failed = false; // Will be set true if the port was already used.
 #endif
 
   ///

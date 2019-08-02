@@ -90,13 +90,20 @@ bool JSONRPC::listen_blocking(
   options.push_back("listening_ports");
   options.push_back(std::to_string(port));
 
-  CivetServer server(options);
+  std::unique_ptr<CivetServer> server;
+  try {
+    server.reset(new CivetServer(options));
+  } catch (std::exception &e) {
+    fmt::print("CiverServer run error: what = {}\n", e.what());
+
+    return false;
+  }
 
   fmt::print("Listen on {}:{}\n", address, port);
   std::cout << std::flush;
 
   JHandler h_j(exit_flag, callback);
-  server.addHandler("/v1", h_j);
+  server->addHandler("/v1", h_j);
 
   while (!(*exit_flag)) {
 

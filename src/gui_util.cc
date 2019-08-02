@@ -1257,10 +1257,19 @@ GLuint load_gltf_insight_icon() {
   return gl_image;
 }
 
-void jsonrpc_window(const int port, bool* isopen) {
+void jsonrpc_window(const bool connected, const int port, bool* isopen) {
   if (isopen && !*isopen) return;
   if (ImGui::Begin("JSON-RPC", isopen)) {
-    ImGui::Text("Port: %d", port);
+
+    if (connected) {
+      ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.3f, 1.0f), ICON_II_EYE);
+      ImGui::SameLine();
+      ImGui::Text("port: %d", port);
+    } else {
+      ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), ICON_II_EYE_DISABLED);
+      ImGui::SameLine();
+      ImGui::Text("port: %d(disconnected)", port);
+    }
   }
   ImGui::End();
 }

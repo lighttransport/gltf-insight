@@ -64,21 +64,17 @@ bool app::spawn_http_listen()
 
   };
 
-#if 0
-  std::thread th([&]{
-    JSONRPC rpc;
-    std::cout << "Listen...\n";
-    bool ret = rpc.listen_blocking(cb_f, &_jsonrpc_exit_flag, _address, _port);
-    std::cout << "Listen ret = " << ret << "\n";
-  });
-#endif
-
   JSONRPC rpc;
   std::cout << "Listen...\n";
   bool ret = rpc.listen_blocking(cb_f, &_jsonrpc_exit_flag, _address, _port);
   std::cout << "Listen ret = " << ret << "\n";
-  return true;
 
+  if (!ret) {
+    _http_failed = true;
+    return false;
+  }
+
+  return true;
 #endif
 
 }
