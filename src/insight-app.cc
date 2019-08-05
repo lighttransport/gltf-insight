@@ -1199,7 +1199,7 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
 
     if (submesh < mesh.materials.size()) {
       int material_id = mesh.materials[submesh];
-      if ((material_id >= 0) && (material_id < loaded_material.size())) {
+      if ((material_id >= 0) && (material_id < int(loaded_material.size()))) {
         const auto& material_to_use =
             loaded_material[size_t(mesh.materials[submesh])];
 
