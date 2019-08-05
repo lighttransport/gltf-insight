@@ -1194,65 +1194,83 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
   if (!mesh.displayed) return;
   for (size_t submesh = 0; submesh < mesh.draw_call_descriptors.size();
        ++submesh) {
-    const auto& material_to_use =
-        loaded_material[size_t(mesh.materials[submesh])];
 
-    if (current_display_mode == display_mode::normal) {
-      switch (material_to_use.intended_shader) {
-        case shading_type::pbr_metal_rough:
-          shader_to_use = "pbr_metal_rough";
-          break;
-        case shading_type::pbr_specular_glossy:
-          shader_to_use = "pbr_metal_rough";
-          {
-            static bool first_print = true;
-            if (first_print) {
-              std::cout << "Warn: unimplemented specular_blossy shader mode "
-                           "required.\n";
-              first_print = false;
-            }
+    bool double_sided = true;
+
+    if (submesh < mesh.materials.size()) {
+      int material_id = mesh.materials[submesh];
+      if ((material_id >= 0) && (material_id < loaded_material.size())) {
+        const auto& material_to_use =
+            loaded_material[size_t(mesh.materials[submesh])];
+
+        if (current_display_mode == display_mode::normal) {
+          switch (material_to_use.intended_shader) {
+            case shading_type::pbr_metal_rough:
+              shader_to_use = "pbr_metal_rough";
+              break;
+            case shading_type::pbr_specular_glossy:
+              shader_to_use = "pbr_metal_rough";
+              {
+                static bool first_print = true;
+                if (first_print) {
+                  std::cout
+                      << "Warn: unimplemented specular_blossy shader mode "
+                         "required.\n";
+                  first_print = false;
+                }
+              }
+              break;
+            case shading_type::unlit:
+              shader_to_use = "unlit";
+              break;
           }
-          break;
-        case shading_type::unlit:
-          shader_to_use = "unlit";
-          break;
+        }
+
+        material_to_use.bind_textures();
+
+        auto& active_shader_list = (mesh.skinned && do_soft_skinning)
+                                       ? *mesh.soft_skin_shader_list
+                                       : *mesh.shader_list;
+
+        const auto& active_shader = active_shader_list[shader_to_use];
+
+        material_to_use.set_shader_uniform(active_shader);
+
+        update_uniforms(
+            active_shader_list, editor_light.use_ibl, world_camera_location,
+            editor_light.color, editor_light.get_directional_light_direction(),
+            active_joint_index_model, shader_to_use,
+            projection_matrix * view_matrix * model_matrix,
+            projection_matrix * view_matrix * model_matrix, normal_matrix,
+            mesh.joint_matrices, active_poly_indices);
+
+
+        double_sided = material_to_use.double_sided;
+
+        if (material_to_use.alpha_mode == alpha_coverage::blend) {
+          glDisable(GL_CULL_FACE);
+          glEnable(GL_BLEND);
+          glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+          glBlendEquation(GL_FUNC_ADD);
+        }
+
       }
+
+    } else {
+      shader_to_use = "unlit"; // TODO(LTE): Assign dummy shader
     }
 
-    material_to_use.bind_textures();
-
-    auto& active_shader_list = (mesh.skinned && do_soft_skinning)
-                                   ? *mesh.soft_skin_shader_list
-                                   : *mesh.shader_list;
-
-    const auto& active_shader = active_shader_list[shader_to_use];
-
-    material_to_use.set_shader_uniform(active_shader);
-    update_uniforms(active_shader_list, editor_light.use_ibl,
-                    world_camera_location, editor_light.color,
-                    editor_light.get_directional_light_direction(),
-                    active_joint_index_model, shader_to_use,
-                    projection_matrix * view_matrix * model_matrix,
-                    projection_matrix * view_matrix * model_matrix,
-                    normal_matrix, mesh.joint_matrices, active_poly_indices);
 
     const auto& draw_call = mesh.draw_call_descriptors[submesh];
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glFrontFace(GL_CCW);
-    if (!material_to_use.double_sided) {
+    if (double_sided) {
       glEnable(GL_CULL_FACE);
       glCullFace(GL_BACK);
       glFrontFace(GL_CCW);
     } else {
       glDisable(GL_CULL_FACE);
-    }
-
-    if (material_to_use.alpha_mode == alpha_coverage::blend) {
-      glDisable(GL_CULL_FACE);
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-      glBlendEquation(GL_FUNC_ADD);
     }
 
     perform_draw_call(draw_call);
@@ -1269,12 +1287,15 @@ void app::draw_scene_recur(const glm::vec3& world_camera_location,
     auto& mesh = loaded_meshes[size_t(node.gltf_mesh_id)];
 
     bool defer = false;
-    for (auto material : mesh.materials)
-      if (loaded_material[size_t(material)].alpha_mode ==
-          alpha_coverage::blend) {
-        defer = true;
-        break;
+    for (auto material_id : mesh.materials) {
+      if ((material_id >= 0) && (material_id < int(loaded_material.size()))) {
+        if (loaded_material[size_t(material_id)].alpha_mode ==
+            alpha_coverage::blend) {
+          defer = true;
+          break;
+        }
       }
+    }
 
     if (!defer) {
       const glm::mat3 normal_matrix =
