@@ -3,21 +3,48 @@
 
 namespace gltf_insight {
 
-struct Command
-{
- public:
+struct Xform {
+  std::array<float, 3> translation = {0.0f, 0.0f, 0.0f};
+  std::array<float, 4> rotate = {0.0f, 0.0f, 0.0f, 1.0f};  // quat
+  std::array<float, 3> scale = {1.0f, 1.0f, 1.0f};
+};
 
+///
+/// TODO(LTE): Create a class hierarchy once we need to handle more commands and
+/// parameters.
+///
+struct Command {
+ public:
   enum Type {
+    JOINT_TRANSFORM,
     MORPH_WEIGHT,
+    ANIMATION_CLIP,
+    TIMELINE_CURRENT_FRAME,
+    TIMELINE_CURRENT_TIME,
+    TIMELINE_SET_FPS,
   };
 
   Type type;
 
-  // for MORPH_WEIGHT
-  std::pair<int, float> morph_weight; // <target_id, weight>
+  // for JOINT_TRANSFORM
+  std::pair<int, Xform> joint_transform;  // <joint_id, xform>
 
+  // for MORPH_WEIGHT
+  std::pair<int, float> morph_weight;  // <target_id, weight>
+
+  // for ANIMATION_CLIP
+  float animation_clip_time = 0.0f;
+
+  // for TIMELINE_CURRENT_FRAME
+  int current_frame = 0;
+
+  // for TIMELINE_CURRENT_TIME
+  float current_time = 0.0f;
+
+  // for TIMELINE_SET_FPS
+  int fps = 60;
 };
 
-} // gltf_insight
+}  // namespace gltf_insight
 
-#endif // GLTF_INSIGHT_JSONRPC_COMMAND_HH_
+#endif  // GLTF_INSIGHT_JSONRPC_COMMAND_HH_
