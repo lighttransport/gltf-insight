@@ -1906,6 +1906,7 @@ bool app::main_loop_frame() {
 
       editor_light.show_control();
 
+      // TODO(LTE): Move to `src/gui_util.cc`
       if (show_bone_selector) {
         if (ImGui::Begin("Bone selector", &show_bone_selector))
           ImGui::InputInt("Active joint", &active_joint_index_model, 1, 1);
@@ -1913,7 +1914,7 @@ bool app::main_loop_frame() {
       }
 
       active_joint_index_model =
-          glm::clamp(active_joint_index_model, 0, loaded_meshes[0].nb_joints);
+          glm::clamp(active_joint_index_model, 0, loaded_meshes[0].nb_joints - 1);
     }
 
     // Animation player advances time and apply animation interpolation.
