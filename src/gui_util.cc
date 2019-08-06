@@ -423,6 +423,13 @@ void initialize_imgui(GLFWwindow* window) {
   ImGui::CreateContext();
   auto& io = ImGui::GetIO();
 
+  // Use imgui.ini in user config directory.
+  static std::string config_filepath = os_utils::expand_filepath("~/.gltf-insight/imgui.ini");
+  if (os_utils::file_exists(config_filepath)) {
+    std::cout << "Use imgui config in [" << config_filepath << "]\n";
+    io.IniFilename = config_filepath.c_str();
+  }
+
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
   // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 

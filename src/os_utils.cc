@@ -2,6 +2,12 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
+
+#if defined(ANDROID)
+#else
+#include <wordexp.h>
+#endif
 
 // Platform detection macros :
 #if defined(_WIN32)
@@ -111,3 +117,64 @@ bool os_utils::open_url(const std::string& url) {
   return true;
 }
 // end of open_url
+
+std::string os_utils::expand_filepath(const std::string &filepath) {
+#ifdef _WIN32
+  DWORD len = ExpandEnvironmentStringsA(filepath.c_str(), NULL, 0);
+  char *str = new char[len];
+  ExpandEnvironmentStringsA(filepath.c_str(), str, len);
+
+  std::string s(str);
+
+  delete[] str;
+
+  return s;
+#else
+
+#if defined(ANDROID)
+  // no expansion
+  std::string s = filepath;
+#else
+  std::string s;
+  wordexp_t p;
+
+  if (filepath.empty()) {
+    return "";
+  }
+
+  // char** w;
+  int ret = wordexp(filepath.c_str(), &p, 0);
+  if (ret) {
+    std::cerr << "Filepath expansion err: " << ret << "\n";
+    // err
+    s = filepath;
+    return s;
+  }
+
+  // Use first element only.
+  if (p.we_wordv) {
+    s = std::string(p.we_wordv[0]);
+    wordfree(&p);
+  } else {
+    s = filepath;
+  }
+
+#endif
+
+  return s;
+#endif
+}
+
+
+bool os_utils::file_exists(const std::string &filepath) {
+  std::ifstream ifs(filepath);
+
+  if (!ifs) {
+    return false;
+  }
+
+  return true;
+}
+
+
+

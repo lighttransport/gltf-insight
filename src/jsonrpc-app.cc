@@ -383,11 +383,11 @@ bool app::update_scene(const Command &command)
   } else if (command.type == Command::JOINT_TRANSFORM) {
     std::pair<int, Xform> param = command.joint_transform;
 
-    int idx = param.first;
+    int joint_id = param.first;
     const Xform &xform = param.second;
 
-    if ((idx >= 0) && (idx < int(loaded_meshes[0].flat_joint_list.size()))) {
-      gltf_node* joint = loaded_meshes[0].flat_joint_list[size_t(idx)];
+    if ((joint_id >= 0) && (joint_id < int(loaded_meshes[0].flat_joint_list.size()))) {
+      gltf_node* joint = loaded_meshes[0].flat_joint_list[size_t(joint_id)];
 
       joint->pose.translation.x = xform.translation[0];
       joint->pose.translation.y = xform.translation[1];
@@ -402,7 +402,7 @@ bool app::update_scene(const Command &command)
       joint->pose.scale.y = xform.scale[1];
       joint->pose.scale.z = xform.scale[2];
     } else {
-      fmt::print("Invalid joint ID {}. joints.size = {}\n", idx, loaded_meshes[0].flat_joint_list.size());
+      fmt::print("Invalid joint ID {}. joints.size = {}\n", joint_id, loaded_meshes[0].flat_joint_list.size());
     }
 
   }

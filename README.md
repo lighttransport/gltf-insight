@@ -145,6 +145,14 @@ cmake --build .
 * `GLTF_INSIGHT_USE_NATIVEFILEDIALOG` : Use NativeFileDialog https://github.com/mlabbe/nativefiledialog instead of ImGuiFileDialog for file browser. Requires GTK3(and pkg-config) on Linux.
 * `GLTF_INSIGHT_USE_JSONRPC` : Enable JSON-RPC over HTTP feature.
 
+### ImGui imgui.ini
+
+``gltf-insight` will use `~/.gltf-insight/imgui.ini` if it exists.  Otherwise `imgui.ini` will be read and write in current working directory.
+
+Reading imgui from `~/.gltf-insight` is good if you want to save the dock settings in parmanently.
+`~/.gltf-insight` folder and `~/.gltf-insight/imgui.ini` file must be manually generated in the first time.
+Also, it will be required to delete and re-generate `~/.gltf-insight/imgui.ini` manually once you update `gltf-insight`.
+
 ### Update scene content using JSON-RPC over HTTP
 
 See `doc/jsonrpc.md` and `tools/jsonrpc/` for details.
