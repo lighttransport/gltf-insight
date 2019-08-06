@@ -158,19 +158,6 @@ static void error_callback(int error, const char* description) {
   std::cerr << "GLFW Error : " << error << ", " << description << std::endl;
 }
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action,
-                  int mods) {
-  (void)scancode;
-
-  ImGuiIO& io = ImGui::GetIO();
-  if (io.WantCaptureKeyboard) {
-    return;
-  }
-
-  if (key == GLFW_KEY_Q && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
-    glfwSetWindowShouldClose(window, GLFW_TRUE);
-  }
-}
 
 void describe_node_topology_in_imgui_tree(const tinygltf::Model& model,
                                           int node_index) {
@@ -220,6 +207,40 @@ void model_info_window(const tinygltf::Model& model, bool* open) {
 // Need access to mesh type.
 // TODO create mesh.hh and extract this definition
 #include "insight-app.hh"
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action,
+                  int mods) {
+  (void)scancode;
+
+
+  ImGuiIO& io = ImGui::GetIO();
+  if (io.WantCaptureKeyboard) {
+    return;
+  }
+
+  if ((key == GLFW_KEY_LEFT_SHIFT) || (key == GLFW_KEY_RIGHT_SHIFT)) {
+    auto* param =
+        &(reinterpret_cast<gltf_insight::app*>(glfwGetWindowUserPointer(window))
+              ->gui_parameters);
+
+    param->shift_pressed = (action == GLFW_PRESS);
+
+  }
+
+  if ((key == GLFW_KEY_LEFT_CONTROL) || (key == GLFW_KEY_RIGHT_CONTROL)) {
+    auto* param =
+        &(reinterpret_cast<gltf_insight::app*>(glfwGetWindowUserPointer(window))
+              ->gui_parameters);
+
+    param->ctrl_pressed = (action == GLFW_PRESS);
+  }
+
+
+  if (key == GLFW_KEY_Q && action == GLFW_PRESS && (mods & GLFW_MOD_CONTROL)) {
+    glfwSetWindowShouldClose(window, GLFW_TRUE);
+  }
+}
+
 void mesh_display_window(std::vector<gltf_insight::mesh>& meshes, bool* open) {
   if (open && !*open) return;
   if (ImGui::Begin("Mesh visibility", open)) {
@@ -1232,9 +1253,22 @@ void cursor_pos_callback(GLFWwindow* window, double mouse_x, double mouse_y) {
   // mouse left pressed
   if (param->button_states[0] && !ImGui::GetIO().WantCaptureMouse &&
       !ImGuizmo::IsOver() && !ImGuizmo::IsUsing()) {
-    param->rot_yaw -= param->rotation_scale * (mouse_x - param->last_mouse_x);
-    param->rot_pitch -= param->rotation_scale * (mouse_y - param->last_mouse_y);
-    param->rot_pitch = glm::clamp(param->rot_pitch, -90.0, +90.0);
+    if (param->ctrl_pressed) {
+      // dolly
+      // FIXME(LTE): apply translation after model transform
+      param->camera_position.z += float(param->dolly_scale) * float(mouse_y - param->last_mouse_y);
+    } else if (param->shift_pressed) {
+      // pan
+      // FIXME(LTE): apply translation after model transform
+#if 0
+      param->camera_position.x += float(param->pan_scale) * float(mouse_x - param->last_mouse_x);
+      param->camera_position.y += float(param->pan_scale) * float(mouse_y - param->last_mouse_y);
+#endif
+    } else {
+      param->rot_yaw -= param->rotation_scale * (mouse_x - param->last_mouse_x);
+      param->rot_pitch -= param->rotation_scale * (mouse_y - param->last_mouse_y);
+      param->rot_pitch = glm::clamp(param->rot_pitch, -90.0, +90.0);
+    }
   }
 
   param->last_mouse_x = mouse_x;

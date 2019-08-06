@@ -75,10 +75,15 @@ SOFTWARE.
 
 struct application_parameters {
   glm::vec3& camera_position;
+  bool ctrl_pressed = false;
+  bool shift_pressed = false;
   bool button_states[3]{false};
   double last_mouse_x{0}, last_mouse_y{0};
   double rot_pitch{-45}, rot_yaw{45};
   double rotation_scale = 0.2;
+  double pan_scale = 0.2;
+  double dolly_scale = 0.2;
+
   application_parameters(glm::vec3& cam_pos) : camera_position(cam_pos) {}
 };
 

@@ -160,7 +160,7 @@ static bool DecodeMorphWeights(const json &j, std::vector<std::pair<int, float>>
   return true;
 }
 
-static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform>> *params)
+static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform>> *params, bool additive = false)
 {
   params->clear();
 
@@ -185,6 +185,24 @@ static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform
     std::cout << "joint_id " << joint_id << "\n";
 
     Xform xform;
+    if (additive) {
+      // initialize with zeros.
+
+      // this is redundant, but just in case.
+      xform.translation[0] = 0.0f;
+      xform.translation[1] = 0.0f;
+      xform.translation[2] = 0.0f;
+
+      xform.rotation[0] = 0.0f;
+      xform.rotation[1] = 0.0f;
+      xform.rotation[2] = 0.0f;
+      xform.rotation[3] = 0.0f;
+
+      xform.scale[0] = 0.0f;
+      xform.scale[1] = 0.0f;
+      xform.scale[2] = 0.0f;
+
+    }
 
     if (elem.count("translation")) {
       json j_translation = elem["translation"];
@@ -199,6 +217,7 @@ static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform
       xform.translation[1] = translation[1];
       xform.translation[2] = translation[2];
 
+      fmt::print("joint_transform: translation = {}, {}, {}\n", translation[0], translation[1], translation[2]);
 
     } else if (elem.count("scale")) {
       json j_scale = elem["scale"];
@@ -213,8 +232,10 @@ static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform
       xform.scale[1] = scale[1];
       xform.scale[2] = scale[2];
 
-    } else if (elem.count("rotate")) { // quaternion
-      json j_rotate = elem["rotate"];
+      fmt::print("joint_transform: scale = {}, {}, {}\n", scale[0], scale[1], scale[2]);
+
+    } else if (elem.count("rotation")) { // quaternion
+      json j_rotate = elem["rotation"];
 
       std::vector<float> rotate;
       if (!DecodeNumberArray(j_rotate, /* length */4, &rotate)) {
@@ -222,13 +243,15 @@ static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform
         continue;
       }
 
-      xform.rotate[0] = rotate[0];
-      xform.rotate[1] = rotate[1];
-      xform.rotate[2] = rotate[2];
-      xform.rotate[3] = rotate[3];
+      xform.rotation[0] = rotate[0];
+      xform.rotation[1] = rotate[1];
+      xform.rotation[2] = rotate[2];
+      xform.rotation[3] = rotate[3];
 
-    } else if (elem.count("rotate_angle")) { // euler XYZ
-      json j_rotate = elem["rotate_angle"];
+      fmt::print("joint_transform: rotation = {}, {}, {}, {}\n", rotate[0], rotate[1], rotate[2], rotate[3]);
+
+    } else if (elem.count("rotation_angle")) { // euler XYZ
+      json j_rotate = elem["rotation_angle"];
 
       std::vector<float> angle;
       if (!DecodeNumberArray(j_rotate, /* length */3, &angle)) {
@@ -239,10 +262,12 @@ static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform
       // to quaternion. value is in radian!
       glm::quat q = glm::quat(glm::vec3(glm::radians(angle[0]), glm::radians(angle[1]), glm::radians(angle[2])));
 
-      xform.rotate[0] = q.x;
-      xform.rotate[1] = q.y;
-      xform.rotate[2] = q.z;
-      xform.rotate[3] = q.w;
+      xform.rotation[0] = q.x;
+      xform.rotation[1] = q.y;
+      xform.rotation[2] = q.z;
+      xform.rotation[3] = q.w;
+
+      fmt::print("joint_transform: rotation_angle {}, {}, {}, quat = {}, {}, {}, {}\n", angle[0], angle[1], angle[2], q.x, q.y, q.z, q.w);
     }
 
     params->push_back({joint_id, xform});
@@ -356,6 +381,30 @@ bool app::jsonrpc_dispatch(const std::string &json_str)
       }
     }
 
+  } else if (params.count("additive_joint_transforms")) {
+    json joint_transforms = params["additive_joint_transforms"];
+
+    std::vector<std::pair<int, Xform>> transform_params;
+    bool ret = DecodeNodeTransforms(joint_transforms, &transform_params, /* additive */true);
+    if (ret) {
+      std::cout << "Update additive_joint_transforms " << joint_transforms << "\n";
+    }
+
+    // Add update request to command queue, since directly update
+    // gltf_scene_tree from non-main thread will cause segmentation fault.
+    // Updating the scene must be done in main thead.
+    {
+      std::lock_guard<std::mutex> lock(_command_queue_mutex);
+
+      for (size_t i = 0; i < joint_transforms.size(); i++) {
+        Command command;
+        command.type = Command::ADDITIVE_JOINT_TRANSFORM;
+        command.joint_transform = transform_params[i];
+
+        _command_queue.push(command);
+      }
+    }
+
   }
 
   return true;
@@ -393,14 +442,80 @@ bool app::update_scene(const Command &command)
       joint->pose.translation.y = xform.translation[1];
       joint->pose.translation.z = xform.translation[2];
 
-      joint->pose.rotation.x = xform.rotate[0];
-      joint->pose.rotation.y = xform.rotate[1];
-      joint->pose.rotation.z = xform.rotate[2];
-      joint->pose.rotation.w = xform.rotate[3];
+      joint->pose.rotation.x = xform.rotation[0];
+      joint->pose.rotation.y = xform.rotation[1];
+      joint->pose.rotation.z = xform.rotation[2];
+      joint->pose.rotation.w = xform.rotation[3];
 
       joint->pose.scale.x = xform.scale[0];
       joint->pose.scale.y = xform.scale[1];
       joint->pose.scale.z = xform.scale[2];
+
+      fmt::print("Update joint[{}]. T = {}, {}, {}, R = {}, {}, {}, {}, S = {}, {}, {}\n", joint_id,
+        xform.translation[0],
+        xform.translation[1],
+        xform.translation[2],
+        xform.rotation[0],
+        xform.rotation[1],
+        xform.rotation[2],
+        xform.rotation[3],
+        xform.scale[0],
+        xform.scale[1],
+        xform.scale[2]);
+
+      // Update mesh.
+      // TODO(LTE): Call this function after consuming all commands from queue.
+      update_mesh_skeleton_graph_transforms(gltf_scene_tree);
+
+      int active_joint_gltf_node = -1;
+      bool gpu_geometry_buffers_dirty = false; // FIXME(LTE): Look up CPU skinning mode?
+      update_geometry(gpu_geometry_buffers_dirty, active_joint_gltf_node);
+
+    } else {
+      fmt::print("Invalid joint ID {}. joints.size = {}\n", joint_id, loaded_meshes[0].flat_joint_list.size());
+    }
+
+  } else if (command.type == Command::ADDITIVE_JOINT_TRANSFORM) {
+    std::pair<int, Xform> param = command.joint_transform;
+
+    int joint_id = param.first;
+    const Xform &xform = param.second;
+
+    if ((joint_id >= 0) && (joint_id < int(loaded_meshes[0].flat_joint_list.size()))) {
+      gltf_node* joint = loaded_meshes[0].flat_joint_list[size_t(joint_id)];
+
+      joint->pose.translation.x += xform.translation[0];
+      joint->pose.translation.y += xform.translation[1];
+      joint->pose.translation.z += xform.translation[2];
+
+      joint->pose.rotation.x += xform.rotation[0];
+      joint->pose.rotation.y += xform.rotation[1];
+      joint->pose.rotation.z += xform.rotation[2];
+      joint->pose.rotation.w += xform.rotation[3];
+
+      joint->pose.scale.x += xform.scale[0];
+      joint->pose.scale.y += xform.scale[1];
+      joint->pose.scale.z += xform.scale[2];
+
+      fmt::print("Additively update joint[{}]. T = {}, {}, {}, R = {}, {}, {}, {}, S = {}, {}, {}\n", joint_id,
+        xform.translation[0],
+        xform.translation[1],
+        xform.translation[2],
+        xform.rotation[0],
+        xform.rotation[1],
+        xform.rotation[2],
+        xform.rotation[3],
+        xform.scale[0],
+        xform.scale[1],
+        xform.scale[2]);
+
+      // Update mesh.
+      // TODO(LTE): Call this function after consuming all commands from queue.
+      update_mesh_skeleton_graph_transforms(gltf_scene_tree);
+
+      int active_joint_gltf_node = -1;
+      bool gpu_geometry_buffers_dirty = false; // FIXME(LTE): Look up CPU skinning mode?
+      update_geometry(gpu_geometry_buffers_dirty, active_joint_gltf_node);
     } else {
       fmt::print("Invalid joint ID {}. joints.size = {}\n", joint_id, loaded_meshes[0].flat_joint_list.size());
     }

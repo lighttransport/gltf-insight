@@ -14,6 +14,8 @@ We use JSON-RPC 2.0
 
 ### Joint transform
 
+Replaces existing joint transform.
+
 ```
 "joint_transforms" : ARRAY
 ```
@@ -29,8 +31,9 @@ Each object in ARRAY specifies the node translation/rotation/scale.
 }
 ```
 
-"rotation" parameter is specified by quaternion as in glTF spec.
-"rotation_angle" parameter is a gltf-insight extension. It specifis rotation by Euler angle(in degree). The order of rotation axes is currently set to `XYZ`(Maya default).
+
+"rotation" parameter value is specified by quaternion as in glTF spec.
+"rotation_angle" parameter is a gltf-insight extension. It specifies rotation by Euler angle(in degree). The order of rotation axes is currently set to `XYZ`(Maya default).
 
 Example:
 
@@ -50,6 +53,45 @@ Example:
 #### TODO
 
 Update by matrix.
+
+### Joint transform(additive)
+
+Add transformation to existing joint transform.
+Note that parameters are same with `joint_transforms`.
+
+```
+"additive_joint_transforms" : ARRAY
+```
+
+Each object in ARRAY specifies the node translation/rotation/scale.
+
+```json
+{ "joint_id" : 0, // mandatory
+  "translation": float[3], // optional
+  "rotation": float[4], // optional
+  "rotation_angle": float[3], // optional
+  "scale": float[3] // optional
+}
+```
+
+
+"rotation" parameter value is specified by quaternion as in glTF spec.
+"rotation_angle" parameter is a gltf-insight extension. It specifies rotation by Euler angle(in degree). The order of rotation axes is currently set to `XYZ`(Maya default).
+
+Example:
+
+```json
+{ "jsonrpc" : "2.0",
+  "method" : "update",
+  "params" : {
+    "additive_joint_transforms" : [
+      { "joint_id" : 0, "translation": [0.2, 0.4, 0.5] },
+      { "joint_id" : 0, "rotation": [0.1, 0.1, 0.1, 0.9], "scale": [2, 2, 2] },
+      { "joint_id" : 1, "rotation_angle": [30, 20, 40] }
+    ]
+  }
+}
+```
 
 ### Timeline
 

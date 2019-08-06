@@ -1262,7 +1262,25 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
       }
 
     } else {
-      shader_to_use = "unlit"; // TODO(LTE): Assign dummy shader
+      // Use dummy material.
+      shader_to_use = "pbr_metal_rough";
+
+      auto& active_shader_list = (mesh.skinned && do_soft_skinning)
+                                     ? *mesh.soft_skin_shader_list
+                                     : *mesh.shader_list;
+
+      const auto& active_shader = active_shader_list[shader_to_use];
+
+      dummy_material.set_shader_uniform(active_shader);
+
+      update_uniforms(
+          active_shader_list, editor_light.use_ibl, world_camera_location,
+          editor_light.color, editor_light.get_directional_light_direction(),
+          active_joint_index_model, shader_to_use,
+          projection_matrix * view_matrix * model_matrix,
+          projection_matrix * view_matrix * model_matrix, normal_matrix,
+          mesh.joint_matrices, active_poly_indices);
+
     }
 
 
@@ -1418,7 +1436,7 @@ void app::main_loop() {
   while (status) {
 
 #if defined(GLTF_INSIGHT_WITH_JSONRPC)
-    // Consume command queue.
+    // Consume commands from queues.
     {
       std::lock_guard<std::mutex> lock(_command_queue_mutex);
       while (!_command_queue.empty()) {

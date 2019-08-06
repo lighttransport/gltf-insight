@@ -5,7 +5,7 @@ namespace gltf_insight {
 
 struct Xform {
   std::array<float, 3> translation = {0.0f, 0.0f, 0.0f};
-  std::array<float, 4> rotate = {0.0f, 0.0f, 0.0f, 1.0f};  // quat
+  std::array<float, 4> rotation = {0.0f, 0.0f, 0.0f, 1.0f};  // quat
   std::array<float, 3> scale = {1.0f, 1.0f, 1.0f};
 };
 
@@ -16,7 +16,8 @@ struct Xform {
 struct Command {
  public:
   enum Type {
-    JOINT_TRANSFORM,
+    JOINT_TRANSFORM,  // overwrite transform
+    ADDITIVE_JOINT_TRANSFORM, // add transform to existing pose
     MORPH_WEIGHT,
     ANIMATION_CLIP,
     TIMELINE_CURRENT_FRAME,
@@ -26,7 +27,7 @@ struct Command {
 
   Type type;
 
-  // for JOINT_TRANSFORM
+  // for JOINT_TRANSFORM and JOINT_TRANSFORM_ADDITIVE
   std::pair<int, Xform> joint_transform;  // <joint_id, xform>
 
   // for MORPH_WEIGHT
