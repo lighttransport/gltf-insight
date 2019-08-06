@@ -1,0 +1,333 @@
+{
+    "asset": {
+        "copyright": "(C)2019 syoyo",
+        "generator": "Maya2glTF V0.9.9 df3632e",
+        "version": "2.0"
+    },
+    "scenes": [
+        {
+            "nodes": [
+                7,
+                0
+            ]
+        }
+    ],
+    "scene": 0,
+    "nodes": [
+        {
+            "children": [
+                1
+            ],
+            "translation": [
+                -3.0,
+                0.0,
+                -12.0
+            ],
+            "name": "joint1"
+        },
+        {
+            "children": [
+                2
+            ],
+            "translation": [
+                0.0,
+                0.0,
+                7.0
+            ],
+            "name": "joint2:SSC"
+        },
+        {
+            "children": [
+                3
+            ],
+            "name": "joint2"
+        },
+        {
+            "children": [
+                4
+            ],
+            "translation": [
+                4.0,
+                0.0,
+                10.5
+            ],
+            "name": "joint3:SSC"
+        },
+        {
+            "children": [
+                5
+            ],
+            "name": "joint3"
+        },
+        {
+            "children": [
+                6
+            ],
+            "translation": [
+                5.0,
+                0.0,
+                4.5
+            ],
+            "name": "joint4:SSC"
+        },
+        {
+            "name": "joint4"
+        },
+        {
+            "mesh": 0,
+            "skin": 0,
+            "name": "pPlane1"
+        }
+    ],
+    "meshes": [
+        {
+            "primitives": [
+                {
+                    "attributes": {
+                        "JOINTS_0": 1,
+                        "NORMAL": 2,
+                        "POSITION": 3,
+                        "TANGENT": 4,
+                        "TEXCOORD_0": 5,
+                        "WEIGHTS_0": 6
+                    },
+                    "indices": 0,
+                    "mode": 4,
+                    "material": 0
+                }
+            ],
+            "name": "pPlaneShape1"
+        }
+    ],
+    "skins": [
+        {
+            "inverseBindMatrices": 7,
+            "joints": [
+                0,
+                2,
+                4,
+                6
+            ],
+            "name": "pPlaneShape1"
+        }
+    ],
+    "accessors": [
+        {
+            "bufferView": 0,
+            "byteOffset": 0,
+            "componentType": 5123,
+            "count": 3750,
+            "max": [
+                675
+            ],
+            "min": [
+                0
+            ],
+            "type": "SCALAR"
+        },
+        {
+            "bufferView": 1,
+            "byteOffset": 0,
+            "componentType": 5123,
+            "count": 676,
+            "max": [
+                2,
+                3,
+                0,
+                0
+            ],
+            "min": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "bufferView": 2,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 676,
+            "max": [
+                0.0,
+                1.0,
+                2.220447108041497e-16
+            ],
+            "min": [
+                0.0,
+                1.0,
+                2.220444990459129e-16
+            ],
+            "type": "VEC3"
+        },
+        {
+            "bufferView": 2,
+            "byteOffset": 8112,
+            "componentType": 5126,
+            "count": 676,
+            "max": [
+                10.0,
+                2.220446049250313e-15,
+                10.0
+            ],
+            "min": [
+                -10.0,
+                -2.220446049250313e-15,
+                -10.0
+            ],
+            "type": "VEC3"
+        },
+        {
+            "bufferView": 3,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 676,
+            "max": [
+                1.0,
+                -0.0,
+                0.0,
+                1.0
+            ],
+            "min": [
+                1.0,
+                -0.0,
+                0.0,
+                1.0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "bufferView": 1,
+            "byteOffset": 5408,
+            "componentType": 5126,
+            "count": 676,
+            "max": [
+                1.0,
+                1.0
+            ],
+            "min": [
+                0.0,
+                0.0
+            ],
+            "type": "VEC2"
+        },
+        {
+            "bufferView": 3,
+            "byteOffset": 10816,
+            "componentType": 5126,
+            "count": 676,
+            "max": [
+                1.0,
+                0.5,
+                0.0,
+                0.0
+            ],
+            "min": [
+                0.5,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "bufferView": 4,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 4,
+            "max": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                3.0,
+                0.0,
+                12.0,
+                1.0
+            ],
+            "min": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                0.0,
+                -6.0,
+                0.0,
+                -10.0,
+                1.0
+            ],
+            "type": "MAT4"
+        }
+    ],
+    "materials": [
+        {
+            "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                    0.4000000059604645,
+                    0.4000000059604645,
+                    0.4000000059604645,
+                    1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 1.0
+            },
+            "name": "lambert1"
+        }
+    ],
+    "bufferViews": [
+        {
+            "buffer": 0,
+            "byteOffset": 48928,
+            "byteLength": 7500,
+            "target": 34963
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 38112,
+            "byteLength": 10816,
+            "byteStride": 8,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 21888,
+            "byteLength": 16224,
+            "byteStride": 12,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 256,
+            "byteLength": 21632,
+            "byteStride": 16,
+            "target": 34962
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 0,
+            "byteLength": 256
+        }
+    ],
+    "buffers": [
+        {
+            "byteLength": 56428,
+            "uri": "skincluster-simple-0010.bin"
+        }
+    ]
+}
