@@ -40,6 +40,7 @@ SOFTWARE.
 // need matrix decomposition for 3D gizmo
 #include "animation.hh"
 #include "glm/gtx/matrix_decompose.hpp"
+#include "glm/gtx/string_cast.hpp"
 
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -155,7 +156,6 @@ void app::load_as_metal_roughness(size_t i, material& currently_loading,
 }
 
 void app::load() {
-
   load_glTF_asset();
 
   const auto nb_textures = model.images.size();
@@ -1048,7 +1048,8 @@ void app::run_view_menu() {
     ImGui::MenuItem("Bone display window", nullptr, &show_bone_display_window);
     ImGui::MenuItem("Scene outline", nullptr, &show_scene_outline_window);
     ImGui::MenuItem("OBJ export window", nullptr, &show_obj_export_window);
-    ImGui::MenuItem("Software skinning control window", nullptr, &show_softskinning_window);
+    ImGui::MenuItem("Software skinning control window", nullptr,
+                    &show_softskinning_window);
 #if defined(GLTF_INSIGHT_WITH_JSONRPC)
     ImGui::MenuItem("JSON-RPC window", nullptr, &show_jsonrpc_window);
 #endif
@@ -1199,7 +1200,6 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
   if (!mesh.displayed) return;
   for (size_t submesh = 0; submesh < mesh.draw_call_descriptors.size();
        ++submesh) {
-
     bool double_sided = true;
 
     if (submesh < mesh.materials.size()) {
@@ -1249,7 +1249,6 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
             projection_matrix * view_matrix * model_matrix, normal_matrix,
             mesh.joint_matrices, active_poly_indices);
 
-
         double_sided = material_to_use.double_sided;
 
         if (material_to_use.alpha_mode == alpha_coverage::blend) {
@@ -1258,7 +1257,6 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
           glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
           glBlendEquation(GL_FUNC_ADD);
         }
-
       }
 
     } else {
@@ -1273,16 +1271,14 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
 
       dummy_material.set_shader_uniform(active_shader);
 
-      update_uniforms(
-          active_shader_list, editor_light.use_ibl, world_camera_location,
-          editor_light.color, editor_light.get_directional_light_direction(),
-          active_joint_index_model, shader_to_use,
-          projection_matrix * view_matrix * model_matrix,
-          projection_matrix * view_matrix * model_matrix, normal_matrix,
-          mesh.joint_matrices, active_poly_indices);
-
+      update_uniforms(active_shader_list, editor_light.use_ibl,
+                      world_camera_location, editor_light.color,
+                      editor_light.get_directional_light_direction(),
+                      active_joint_index_model, shader_to_use,
+                      projection_matrix * view_matrix * model_matrix,
+                      projection_matrix * view_matrix * model_matrix,
+                      normal_matrix, mesh.joint_matrices, active_poly_indices);
     }
-
 
     const auto& draw_call = mesh.draw_call_descriptors[submesh];
     glEnable(GL_DEPTH_TEST);
@@ -1422,19 +1418,15 @@ static bool show_file_dialog(const std::string& title,
 #endif
 
 void app::main_loop() {
-
 #if defined(GLTF_INSIGHT_WITH_JSONRPC)
   std::cout << "Run http server for JSON-RPC...\n";
   // start http server
-  std::thread th([&]{
-    spawn_http_listen();
-  });
+  std::thread th([&] { spawn_http_listen(); });
 
 #endif
 
   bool status = true;
   while (status) {
-
 #if defined(GLTF_INSIGHT_WITH_JSONRPC)
     // Consume commands from queues.
     {
@@ -1451,7 +1443,7 @@ void app::main_loop() {
   }
 
 #if defined(GLTF_INSIGHT_WITH_JSONRPC)
-  _jsonrpc_exit_flag = true; // let the thread know exit their loop
+  _jsonrpc_exit_flag = true;  // let the thread know exit their loop
   th.join();
 #endif
 }
@@ -1782,14 +1774,13 @@ void app::perform_skinning_and_morphing(bool gpu_geometry_buffers_dirty,
   }
 }
 
-void app::soft_skinning_controls(bool& gpu_geometry_buffers_dirty, bool *isopen) {
-
+void app::soft_skinning_controls(bool& gpu_geometry_buffers_dirty,
+                                 bool* isopen) {
   if (isopen && !*isopen) {
     return;
   }
 
   if (ImGui::Begin("Skinning control", isopen)) {
-
     if (ImGui::Checkbox("Software skinning", &do_soft_skinning)) {
       if (!do_soft_skinning)  // if we clicked on this, and we are not doing
                               // soft skinning anymore, gpu buffer contains
@@ -1978,8 +1969,8 @@ bool app::main_loop_frame() {
         ImGui::End();
       }
 
-      active_joint_index_model =
-          glm::clamp(active_joint_index_model, 0, loaded_meshes[0].nb_joints - 1);
+      active_joint_index_model = glm::clamp(active_joint_index_model, 0,
+                                            loaded_meshes[0].nb_joints - 1);
     }
 
     // Animation player advances time and apply animation interpolation.
@@ -1996,7 +1987,8 @@ bool app::main_loop_frame() {
 
     update_rendering_matrices();
     bool gpu_geometry_buffers_dirty = false;
-    soft_skinning_controls(gpu_geometry_buffers_dirty, &show_softskinning_window);
+    soft_skinning_controls(gpu_geometry_buffers_dirty,
+                           &show_softskinning_window);
 
     if (asset_loaded) {
       mouse_ray_debug_control();
@@ -2478,16 +2470,17 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
       manipulated_matrix, glm::value_ptr(vecTranslation),
       glm::value_ptr(vecRotation), glm::value_ptr(vecScale));
 
-  // This is used to check if user manipulated these values in the GUI, to avoid
-  // problems of numerical stability
-  const glm::vec3 savedTr = vecTranslation, savedRot = vecRotation,
-                  savedScale = vecScale;
+  // std::cout << "trans = " << vecTranslation[0] << ", " << vecTranslation[1]
+  // << ", " << vecTranslation[2] << "\n"; std::cout << "scale = " << vecScale[0]
+  // << ", " << vecScale[1] << ", " << vecScale[2] << "\n";
 
   // Display the transform window
-  transform_window(glm::value_ptr(vecTranslation), glm::value_ptr(vecRotation),
-                   glm::value_ptr(vecScale), mCurrentGizmoOperation,
-                   mCurrentGizmoMode, reinterpret_cast<int*>(&current_mode),
-                   &show_gizmo, &show_transform_window);
+  before_manipulate_matrix = glm::make_mat4(manipulated_matrix);
+  bool transform_edited = transform_window(
+      glm::value_ptr(vecTranslation), glm::value_ptr(vecRotation),
+      glm::value_ptr(vecScale), mCurrentGizmoOperation, mCurrentGizmoMode,
+      reinterpret_cast<int*>(&current_mode), &show_gizmo,
+      &show_transform_window);
 
   // If there's no active bone, make sure selected mode *stays* as mesh, even if
   // user's changed to bone mode
@@ -2497,16 +2490,19 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
 
   // If the mode has been changed by the user, return. We will do manipulation
   // for the next frame
-  if (current_mode != saved_mode)
+  if (current_mode != saved_mode) {
     return;  // If we just gone from mesh to bone, we are not manipulating the
+  }
 
   // If any of these values has been changed in the GUI, recompose the
   // manipulated matrix from these TRS vectors
-  if (savedTr != vecTranslation || savedRot != vecRotation ||
-      savedScale != vecScale)
+  if (transform_edited) {
+
     ImGuizmo::RecomposeMatrixFromComponents(
         glm::value_ptr(vecTranslation), glm::value_ptr(vecRotation),
         glm::value_ptr(vecScale), manipulated_matrix);
+
+  }
 
   // If we display the gizmo
   if (show_gizmo) {
@@ -2514,12 +2510,16 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
     auto& io = ImGui::GetIO();
     ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
-    // Save this unchanged matrix, it is going to be useful
-    before_manipulate_matrix = glm::make_mat4(manipulated_matrix);
     ImGuizmo::Manipulate(
         glm::value_ptr(view_matrix), glm::value_ptr(projection_matrix),
         mCurrentGizmoOperation, mCurrentGizmoMode, manipulated_matrix,
         static_cast<float*>(glm::value_ptr(delta_matrix)));
+
+    //if (delta_matrix != glm::mat4(1.f)) {
+    //  std::cout << "before: " << glm::to_string(before_manipulate_matrix) << "\n";
+    //  glm::mat4 m = glm::make_mat4(manipulated_matrix);
+    //  std::cout << "after: " << glm::to_string(m) << "\n";
+    //}
   }
 
   // If we are manipulating the mesh, the matrix has been updated as it should
@@ -2548,6 +2548,7 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
 
         // The manipulation made with the gizmo by taking the new mesh-oriented
         // world xform, relative to the untouched xform
+        // `bone_world_xform` contains changed by gizmo or edit box.
         glm::inverse(before_manipulate_matrix) * bone_world_xform;
 
     // The easiest way to detect that something was changed is to use this delta
@@ -2556,7 +2557,14 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
     // identity matrix. We could apply it at every frame, but the result could
     // drift due to floating point numerical instability while
     // decomposing/recomposing TRS matrices that way
-    if (delta_matrix != glm::mat4(1.f)) {
+    if (transform_edited || (delta_matrix != glm::mat4(1.f))) {
+      //std::cout << "parent bone world xform : " << glm::to_string(parent_bone_world_xform) << "\n";
+      //std::cout << "activebone world xform : " << glm::to_string(active_bone->world_xform) << "\n";
+      //std::cout << "bone_world_xform" << glm::to_string(bone_world_xform)
+      //          << "\n";
+      //std::cout << "before_manip_matrix" << glm::to_string(before_manipulate_matrix) << "\n";
+      //std::cout << "currently_posed" << glm::to_string(currently_posed) << "\n";
+
       // we actually don't need the skew and perpective ones, but GLM API does
       static glm::vec3 position(0.f), scale(1.f), skew(1.f);
       static glm::quat rotation(1.f, 0.f, 0.f, 0.f);
@@ -2565,9 +2573,15 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
                      perspective);
 
       gltf_node::animation_state& pose = active_bone->pose;
+      //std::cout << "prev pose.trans = " << pose.translation[0] << ", " << pose.translation[1] << ", " << pose.translation[2] << "\n";
       pose.translation = position;
       pose.rotation = rotation;
       pose.scale = scale;
+
+      //std::cout << "pose.trans = " << position[0] << ", " << position[1] << ", "
+      //          << position[2] << "\n";
+      //std::cout << "pose.rot(xyzw) = " << rotation[0] << ", " << rotation[1]
+      //          << ", " << rotation[2] << ", " << rotation[3] << "\n";
     }
   }
 }

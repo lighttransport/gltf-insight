@@ -596,21 +596,24 @@ void deinitialize_gui_and_window(GLFWwindow* window) {
   glfwTerminate();
 }
 
-void transform_window(float* vecTranslation, float* vecRotation,
+bool transform_window(float* vecTranslation, float* vecRotation,
                       float* vecScale,
                       ImGuizmo::OPERATION& current_gizmo_operation,
                       ImGuizmo::MODE& current_gizmo_mode, int* mode,
                       bool* show_gizmo, bool* open) {
-  if (open && !*open) return;
+
+  bool xform_changed = false;
+
+  if (open && !*open) return false;
   if (ImGui::Begin("Transform manipulator", open)) {
     if (ImGui::RadioButton("Mesh mode", *mode == 0)) *mode = 0;
     ImGui::SameLine();
     if (ImGui::RadioButton("Bone mode", *mode == 1)) *mode = 1;
     ImGui::Separator();
 
-    ImGui::InputFloat3("Tr", vecTranslation, 3);
-    ImGui::InputFloat3("Rt", vecRotation, 3);
-    ImGui::InputFloat3("Sc", vecScale, 3);
+    xform_changed |= ImGui::InputFloat3("Tr", vecTranslation, 3);
+    xform_changed |= ImGui::InputFloat3("Rt", vecRotation, 3);
+    xform_changed |= ImGui::InputFloat3("Sc", vecScale, 3);
 
     if (ImGui::Button("Reset transforms")) {
       if (*mode == 0) {
@@ -623,6 +626,7 @@ void transform_window(float* vecTranslation, float* vecRotation,
         vecScale[0] = 1;
         vecScale[1] = 1;
         vecScale[2] = 1;
+        xform_changed = true;
       } else {
         // TODO do we reset to bone current animation pose, or do we reset to
         // bone binding pose?
@@ -657,6 +661,8 @@ void transform_window(float* vecTranslation, float* vecRotation,
       current_gizmo_mode = ImGuizmo::LOCAL;
   }
   ImGui::End();
+
+  return xform_changed;
 }
 
 void timeline_window(gltf_insight::AnimSequence loaded_sequence,

@@ -142,7 +142,8 @@ void initialize_imgui(GLFWwindow* window);
 // Cleaup the gui and the window systems
 void deinitialize_gui_and_window(GLFWwindow* window);
 
-void transform_window(float* vecTranslation, float* vecRotation,
+// Return true when trans/rot/scale has been changed.
+bool transform_window(float* vecTranslation, float* vecRotation,
                       float* vecScale,
                       ImGuizmo::OPERATION& current_gizmo_operation,
                       ImGuizmo::MODE& current_gizmo_mode, int* mode,
