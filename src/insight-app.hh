@@ -494,6 +494,11 @@ class app {
   // Update scene content with `Command`.
   // This method must be called from a main thread.
   bool update_scene(const Command &command);
+
+  //
+  // Loads configuration(e.g. initial camera position)
+  //
+  void load_config();
 };
 
 }  // namespace gltf_insight

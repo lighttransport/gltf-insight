@@ -42,6 +42,8 @@ SOFTWARE.
 #include "glm/gtx/matrix_decompose.hpp"
 #include "glm/gtx/string_cast.hpp"
 
+#include "fmt/core.h"
+
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
@@ -933,6 +935,8 @@ void app::initialize_mouse_select_framebuffer() {
 
 app::app(int argc, char** argv) {
   parse_command_line(argc, argv);
+
+  load_config();
 
   initialize_glfw_opengl_window(window);
   // glfwSetWindowUserPointer(window, &gui_parameters);
@@ -2601,4 +2605,29 @@ void app::fill_sequencer() {
     }
     sequence.mFrameMax = max_time;
   }
+}
+
+#include "json-util.hh"
+void app::load_config() {
+  std::string config_filepath = os_utils::expand_filepath("~/.gltf-insight/config.json");
+  if (os_utils::file_exists(config_filepath)) {
+    nlohmann::json j;
+
+    std::ifstream ifs(config_filepath);
+    ifs >> j;
+
+    if (j.count("camera_position")) {
+      nlohmann::json j_camera = j["camera_position"];
+      if (j_camera.is_array()) {
+        std::vector<float> position;
+        if (DecodeNumberArray(j_camera, /* req_len */3, &position)) {
+          camera_position[0] = position[0];
+          camera_position[1] = position[1];
+          camera_position[2] = position[2];
+          fmt::print("Camera position: {},{},{}\n", camera_position[0], camera_position[1], camera_position[2]);
+        }
+      }
+    }
+  }
+
 }

@@ -22,6 +22,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 #include "insight-app.hh"
+#include "json-util.hh"
 #include "jsonrpc-http.hh"
 
 #ifdef __clang__
@@ -34,7 +35,10 @@ SOFTWARE.
 
 #include "fmt/core.h"
 
+#include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/quaternion.hpp"
+#include "glm/gtx/matrix_decompose.hpp"
+#include "glm/gtx/string_cast.hpp"
 
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -43,15 +47,14 @@ SOFTWARE.
 #include "jsonrpc-command.hh"
 
 #include <iostream>
-#include <vector>
 #include <thread>
+#include <vector>
 
 using nlohmann::json;
 
 namespace gltf_insight {
 
-bool app::spawn_http_listen()
-{
+bool app::spawn_http_listen() {
 #if !defined(GLTF_INSIGHT_WITH_JSONRPC)
   return false;
 #else
@@ -59,11 +62,10 @@ bool app::spawn_http_listen()
 
   _jsonrpc_exit_flag = false;
 
-  std::function<void(const std::string&)> cb_f = [&](const std::string &msg) {
-    bool ret =  this->jsonrpc_dispatch(msg);
+  std::function<void(const std::string&)> cb_f = [&](const std::string& msg) {
+    bool ret = this->jsonrpc_dispatch(msg);
     // TODO(LTE): Check return value.
     (void)ret;
-
   };
 
   JSONRPC rpc;
@@ -78,12 +80,12 @@ bool app::spawn_http_listen()
 
   return true;
 #endif
-
 }
 
+#if 0
 // req_len = -1 => allow arbitrary array length
-static bool DecodeNumberArray(const json &j, int req_len, std::vector<float> *values) {
-
+static bool DecodeNumberArray(const json& j, int req_len,
+                              std::vector<float>* values) {
   if (values == nullptr) {
     return false;
   }
@@ -97,7 +99,7 @@ static bool DecodeNumberArray(const json &j, int req_len, std::vector<float> *va
   if (req_len > 0) {
     if (req_len != int(j.size())) {
       fmt::print("Array length must be {} but got {}.\n", req_len, j.size());
-        return false;
+      return false;
     }
   }
 
@@ -114,9 +116,10 @@ static bool DecodeNumberArray(const json &j, int req_len, std::vector<float> *va
 
   return true;
 }
+#endif
 
-static bool DecodeMorphWeights(const json &j, std::vector<std::pair<int, float>> *params)
-{
+static bool DecodeMorphWeights(const json& j,
+                               std::vector<std::pair<int, float>>* params) {
   params->clear();
 
   if (!j.is_array()) {
@@ -154,14 +157,14 @@ static bool DecodeMorphWeights(const json &j, std::vector<std::pair<int, float>>
     std::cout << "weight " << weight << "\n";
 
     params->push_back({target_id, weight});
-
   }
 
   return true;
 }
 
-static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform>> *params, bool additive = false)
-{
+static bool DecodeNodeTransforms(const json& j,
+                                 std::vector<std::pair<int, Xform>>* params,
+                                 bool additive = false) {
   params->clear();
 
   if (!j.is_array()) {
@@ -201,14 +204,13 @@ static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform
       xform.scale[0] = 0.0f;
       xform.scale[1] = 0.0f;
       xform.scale[2] = 0.0f;
-
     }
 
     if (elem.count("translation")) {
       json j_translation = elem["translation"];
 
       std::vector<float> translation;
-      if (!DecodeNumberArray(j_translation, /* length */3, &translation)) {
+      if (!DecodeNumberArray(j_translation, /* length */ 3, &translation)) {
         std::cerr << "Failed to decode `translation` parameter.\n";
         continue;
       }
@@ -217,13 +219,14 @@ static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform
       xform.translation[1] = translation[1];
       xform.translation[2] = translation[2];
 
-      fmt::print("joint_transform: translation = {}, {}, {}\n", translation[0], translation[1], translation[2]);
+      fmt::print("joint_transform: translation = {}, {}, {}\n", translation[0],
+                 translation[1], translation[2]);
 
     } else if (elem.count("scale")) {
       json j_scale = elem["scale"];
 
       std::vector<float> scale;
-      if (!DecodeNumberArray(j_scale, /* length */3, &scale)) {
+      if (!DecodeNumberArray(j_scale, /* length */ 3, &scale)) {
         std::cerr << "Failed to decode `scale` parameter.\n";
         continue;
       }
@@ -232,13 +235,14 @@ static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform
       xform.scale[1] = scale[1];
       xform.scale[2] = scale[2];
 
-      fmt::print("joint_transform: scale = {}, {}, {}\n", scale[0], scale[1], scale[2]);
+      fmt::print("joint_transform: scale = {}, {}, {}\n", scale[0], scale[1],
+                 scale[2]);
 
-    } else if (elem.count("rotation")) { // quaternion
+    } else if (elem.count("rotation")) {  // quaternion
       json j_rotate = elem["rotation"];
 
       std::vector<float> rotate;
-      if (!DecodeNumberArray(j_rotate, /* length */4, &rotate)) {
+      if (!DecodeNumberArray(j_rotate, /* length */ 4, &rotate)) {
         std::cerr << "Failed to decode `rotate` parameter.\n";
         continue;
       }
@@ -248,43 +252,45 @@ static bool DecodeNodeTransforms(const json &j, std::vector<std::pair<int, Xform
       xform.rotation[2] = rotate[2];
       xform.rotation[3] = rotate[3];
 
-      fmt::print("joint_transform: rotation = {}, {}, {}, {}\n", rotate[0], rotate[1], rotate[2], rotate[3]);
+      fmt::print("joint_transform: rotation = {}, {}, {}, {}\n", rotate[0],
+                 rotate[1], rotate[2], rotate[3]);
 
-    } else if (elem.count("rotation_angle")) { // euler XYZ
+    } else if (elem.count("rotation_angle")) {  // euler XYZ
       json j_rotate = elem["rotation_angle"];
 
       std::vector<float> angle;
-      if (!DecodeNumberArray(j_rotate, /* length */3, &angle)) {
+      if (!DecodeNumberArray(j_rotate, /* length */ 3, &angle)) {
         std::cerr << "Failed to decode `rotate_angle` parameter.\n";
         continue;
       }
 
       // to quaternion. value is in radian!
-      glm::quat q = glm::quat(glm::vec3(glm::radians(angle[0]), glm::radians(angle[1]), glm::radians(angle[2])));
+      glm::quat q =
+          glm::quat(glm::vec3(glm::radians(angle[0]), glm::radians(angle[1]),
+                              glm::radians(angle[2])));
 
       xform.rotation[0] = q.x;
       xform.rotation[1] = q.y;
       xform.rotation[2] = q.z;
       xform.rotation[3] = q.w;
 
-      fmt::print("joint_transform: rotation_angle {}, {}, {}, quat = {}, {}, {}, {}\n", angle[0], angle[1], angle[2], q.x, q.y, q.z, q.w);
+      fmt::print(
+          "joint_transform: rotation_angle {}, {}, {}, quat = {}, {}, {}, {}\n",
+          angle[0], angle[1], angle[2], q.x, q.y, q.z, q.w);
     }
 
     params->push_back({joint_id, xform});
-
   }
 
   return true;
 }
 
-
-bool app::jsonrpc_dispatch(const std::string &json_str)
-{
+bool app::jsonrpc_dispatch(const std::string& json_str) {
   json j;
 
   try {
     j = json::parse(json_str);
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     fmt::print("Invalid JSON string. what = {}\n", e.what());
     return false;
   }
@@ -306,7 +312,8 @@ bool app::jsonrpc_dispatch(const std::string &json_str)
 
   std::string version = j["jsonrpc"].get<std::string>();
   if (version.compare("2.0") != 0) {
-    std::cerr << "JSONRPC version must be \"2.0\" but got \"" << version << "\"\n";
+    std::cerr << "JSONRPC version must be \"2.0\" but got \"" << version
+              << "\"\n";
     return false;
   }
 
@@ -385,9 +392,11 @@ bool app::jsonrpc_dispatch(const std::string &json_str)
     json joint_transforms = params["additive_joint_transforms"];
 
     std::vector<std::pair<int, Xform>> transform_params;
-    bool ret = DecodeNodeTransforms(joint_transforms, &transform_params, /* additive */true);
+    bool ret = DecodeNodeTransforms(joint_transforms, &transform_params,
+                                    /* additive */ true);
     if (ret) {
-      std::cout << "Update additive_joint_transforms " << joint_transforms << "\n";
+      std::cout << "Update additive_joint_transforms " << joint_transforms
+                << "\n";
     }
 
     // Add update request to command queue, since directly update
@@ -404,27 +413,27 @@ bool app::jsonrpc_dispatch(const std::string &json_str)
         _command_queue.push(command);
       }
     }
-
   }
 
   return true;
 }
 
-bool app::update_scene(const Command &command)
-{
-
+bool app::update_scene(const Command& command) {
   if (command.type == Command::MORPH_WEIGHT) {
     std::pair<int, float> param = command.morph_weight;
 
     if (gltf_scene_tree.pose.blend_weights.size() > 0) {
       int idx = param.first;
 
-      std::cout << idx << ", # of morphs = " << gltf_scene_tree.pose.blend_weights.size() << "\n";
+      std::cout << idx << ", # of morphs = "
+                << gltf_scene_tree.pose.blend_weights.size() << "\n";
 
-      if ((idx >= 0) && (idx < int(gltf_scene_tree.pose.blend_weights.size()))) {
+      if ((idx >= 0) &&
+          (idx < int(gltf_scene_tree.pose.blend_weights.size()))) {
         float weight = std::min(1.0f, std::max(0.0f, param.second));
 
-        std::cout << "Update " << idx << "th morph_weight with " << weight << "\n";
+        std::cout << "Update " << idx << "th morph_weight with " << weight
+                  << "\n";
         gltf_scene_tree.pose.blend_weights[size_t(idx)] = weight;
       }
     }
@@ -433,96 +442,226 @@ bool app::update_scene(const Command &command)
     std::pair<int, Xform> param = command.joint_transform;
 
     int joint_id = param.first;
-    const Xform &xform = param.second;
+    const Xform& xform = param.second;
 
-    if ((joint_id >= 0) && (joint_id < int(loaded_meshes[0].flat_joint_list.size()))) {
+    if ((joint_id >= 0) &&
+        (joint_id < int(loaded_meshes[0].flat_joint_list.size()))) {
       gltf_node* joint = loaded_meshes[0].flat_joint_list[size_t(joint_id)];
 
-      joint->pose.translation.x = xform.translation[0];
-      joint->pose.translation.y = xform.translation[1];
-      joint->pose.translation.z = xform.translation[2];
+      //
+      // Transform is given by world space.
+      // Convert it to local space(relative to parent's bone)
+      //
+      // FIXME(LTE): Refactor code.
+      //
+      glm::mat4 parent_bone_world_xform(1.f);
+      if (joint->parent) {
+        parent_bone_world_xform = joint->parent->world_xform;
+      }
 
-      joint->pose.rotation.x = xform.rotation[0];
-      joint->pose.rotation.y = xform.rotation[1];
-      joint->pose.rotation.z = xform.rotation[2];
-      joint->pose.rotation.w = xform.rotation[3];
+      glm::mat4 bone_world_xform;
+      // Compute the world transform
+      mesh* a_mesh =
+          &loaded_meshes[size_t(joint->skin_mesh_node->gltf_mesh_id)];
+      gltf_node* mesh_node =
+          gltf_scene_tree.get_node_with_index(a_mesh->instance.node);
 
-      joint->pose.scale.x = xform.scale[0];
-      joint->pose.scale.y = xform.scale[1];
-      joint->pose.scale.z = xform.scale[2];
+      const auto joint_index = size_t(
+          a_mesh->joint_inverse_bind_matrix_map.at(joint->gltf_node_index));
 
-      fmt::print("Update joint[{}]. T = {}, {}, {}, R = {}, {}, {}, {}, S = {}, {}, {}\n", joint_id,
-        xform.translation[0],
-        xform.translation[1],
-        xform.translation[2],
-        xform.rotation[0],
-        xform.rotation[1],
-        xform.rotation[2],
-        xform.rotation[3],
-        xform.scale[0],
-        xform.scale[1],
-        xform.scale[2]);
+      glm::mat4 bind_matrix =
+          glm::inverse(a_mesh->inverse_bind_matrices[joint_index]);
+      glm::mat4 joint_matrix = a_mesh->joint_matrices[joint_index];
 
-      // Update mesh.
-      // TODO(LTE): Call this function after consuming all commands from queue.
-      update_mesh_skeleton_graph_transforms(gltf_scene_tree);
+      bone_world_xform = mesh_node->world_xform * joint_matrix * bind_matrix;
 
-      int active_joint_gltf_node = -1;
-      bool gpu_geometry_buffers_dirty = false; // FIXME(LTE): Look up CPU skinning mode?
-      update_geometry(gpu_geometry_buffers_dirty, active_joint_gltf_node);
+      glm::mat4 new_bone_world_xform;
+      {
+        glm::vec3 tx(xform.translation[0], xform.translation[1],
+                     xform.translation[2]);
+        // (w, x, y, z)
+        glm::quat q(xform.rotation[3], xform.rotation[0], xform.rotation[1],
+                    xform.rotation[2]);
+        glm::vec3 sc(xform.scale[0], xform.scale[1], xform.scale[2]);
+
+        // T = trans x rot x scale
+        new_bone_world_xform = glm::translate(glm::mat4(1.0f), tx) *
+                               glm::mat4_cast(q) *
+                               glm::scale(glm::mat4(1.0f), sc);
+
+        // std::cout << "new_bone_world_xform = " <<
+        // glm::to_string(new_bone_world_xform) << "\n";
+      }
+
+      // The pose is expressed in the world referential, but skeleton and
+      // manipulator are in the mesh's referential. The skeleton and mesh don't
+      // necessary line-up!
+      auto currently_posed =
+          glm::inverse(parent_bone_world_xform) * joint->world_xform *
+          glm::inverse(bone_world_xform) * new_bone_world_xform;
+
+      {
+        // Get a local tx/rot/scale
+        glm::vec3 translation(0.f), scale(1.f), skew(1.f);
+        // glm::quat is (w, x, y, z)
+        glm::quat rotation(1.f, 0.f, 0.f, 0.f);
+        glm::vec4 perspective(1.f);
+        glm::decompose(currently_posed, scale, rotation, translation, skew,
+                       perspective);
+
+        // Update pose with local xform.
+        joint->pose.translation = translation;
+        joint->pose.rotation = rotation;
+        joint->pose.scale = scale;
+
+        fmt::print(
+            "Update joint[{}]. local. T = {}, {}, {}, R = {}, {}, {}, {}, S = "
+            "{}, {}, {}\n",
+            joint_id, translation[0], translation[1], translation[2],
+            rotation[0], rotation[1], rotation[2], rotation[3], scale[0],
+            scale[1], scale[2]);
+
+        // Update mesh.
+        // TODO(LTE): Call this function after consuming all commands from
+        // queue.
+        update_mesh_skeleton_graph_transforms(gltf_scene_tree);
+
+        int active_joint_gltf_node = -1;
+        bool gpu_geometry_buffers_dirty =
+            false;  // FIXME(LTE): Look up CPU skinning mode of GUI
+        update_geometry(gpu_geometry_buffers_dirty, active_joint_gltf_node);
+      }
 
     } else {
-      fmt::print("Invalid joint ID {}. joints.size = {}\n", joint_id, loaded_meshes[0].flat_joint_list.size());
+      fmt::print("Invalid joint ID {}. joints.size = {}\n", joint_id,
+                 loaded_meshes[0].flat_joint_list.size());
     }
 
   } else if (command.type == Command::ADDITIVE_JOINT_TRANSFORM) {
     std::pair<int, Xform> param = command.joint_transform;
 
     int joint_id = param.first;
-    const Xform &xform = param.second;
+    const Xform& xform = param.second;
 
-    if ((joint_id >= 0) && (joint_id < int(loaded_meshes[0].flat_joint_list.size()))) {
+    if ((joint_id >= 0) &&
+        (joint_id < int(loaded_meshes[0].flat_joint_list.size()))) {
       gltf_node* joint = loaded_meshes[0].flat_joint_list[size_t(joint_id)];
 
-      joint->pose.translation.x += xform.translation[0];
-      joint->pose.translation.y += xform.translation[1];
-      joint->pose.translation.z += xform.translation[2];
+      //
+      // Transform is given by world space.
+      // Convert it to local space(relative to parent's bone)
+      //
+      // FIXME(LTE): Refactor code.
+      //
+      glm::mat4 parent_bone_world_xform(1.f);
+      if (joint->parent) {
+        parent_bone_world_xform = joint->parent->world_xform;
+      }
 
-      joint->pose.rotation.x += xform.rotation[0];
-      joint->pose.rotation.y += xform.rotation[1];
-      joint->pose.rotation.z += xform.rotation[2];
-      joint->pose.rotation.w += xform.rotation[3];
+      glm::mat4 bone_world_xform;
+      // Compute the world transform
+      mesh* a_mesh =
+          &loaded_meshes[size_t(joint->skin_mesh_node->gltf_mesh_id)];
+      gltf_node* mesh_node =
+          gltf_scene_tree.get_node_with_index(a_mesh->instance.node);
 
-      joint->pose.scale.x += xform.scale[0];
-      joint->pose.scale.y += xform.scale[1];
-      joint->pose.scale.z += xform.scale[2];
+      const auto joint_index = size_t(
+          a_mesh->joint_inverse_bind_matrix_map.at(joint->gltf_node_index));
 
-      fmt::print("Additively update joint[{}]. T = {}, {}, {}, R = {}, {}, {}, {}, S = {}, {}, {}\n", joint_id,
-        xform.translation[0],
-        xform.translation[1],
-        xform.translation[2],
-        xform.rotation[0],
-        xform.rotation[1],
-        xform.rotation[2],
-        xform.rotation[3],
-        xform.scale[0],
-        xform.scale[1],
-        xform.scale[2]);
+      glm::mat4 bind_matrix =
+          glm::inverse(a_mesh->inverse_bind_matrices[joint_index]);
+      glm::mat4 joint_matrix = a_mesh->joint_matrices[joint_index];
 
-      // Update mesh.
+      bone_world_xform = mesh_node->world_xform * joint_matrix * bind_matrix;
+
+      glm::mat4 new_bone_world_xform;
+      {
+        glm::vec3 curr_tx(0.f), curr_sc(1.f), skew(1.f);
+        // glm::quat is (w, x, y, z)
+        glm::quat curr_quat(1.f, 0.f, 0.f, 0.f);
+        glm::vec4 perspective(1.f);
+        glm::decompose(bone_world_xform, curr_sc, curr_quat, curr_tx, skew,
+                       perspective);
+
+        glm::vec3 tx(xform.translation[0], xform.translation[1],
+                     xform.translation[2]);
+        // (w, x, y, z)
+        glm::quat q(xform.rotation[3], xform.rotation[0], xform.rotation[1],
+                    xform.rotation[2]);
+        glm::vec3 sc(xform.scale[0], xform.scale[1], xform.scale[2]);
+
+        // FIXME(LTE): additive rotation.
+        new_bone_world_xform = glm::translate(glm::mat4(1.0f), tx + curr_tx) *
+                           glm::mat4_cast(q + curr_quat) * glm::scale(glm::mat4(1.0f), sc + curr_sc);
+
+      }
+
+      // The pose is expressed in the world referential, but skeleton and
+      // manipulator are in the mesh's referential. The skeleton and mesh don't
+      // necessary line-up!
+      auto currently_posed =
+          glm::inverse(parent_bone_world_xform) * joint->world_xform *
+          glm::inverse(bone_world_xform) * new_bone_world_xform;
+
+      //std::cout << "currently_posed = " << glm::to_string(currently_posed)
+      //          << "\n";
+
+      //std::cout << "parent bone world xform : "
+      //          << glm::to_string(parent_bone_world_xform) << "\n";
+      //std::cout << "joint.world_xform : " << glm::to_string(joint->world_xform)
+      //          << "\n";
+      //std::cout << "bone_world_xform" << glm::to_string(bone_world_xform)
+      //          << "\n";
+      //std::cout << "new_bone_world_xform"
+      //          << glm::to_string(new_bone_world_xform) << "\n";
+
+      {
+        // Get a local tx/rot/scale
+        glm::vec3 translation(0.f), scale(1.f), skew(1.f);
+        // glm::quat is (w, x, y, z)
+        glm::quat rotation(1.f, 0.f, 0.f, 0.f);
+        glm::vec4 perspective(1.f);
+        glm::decompose(currently_posed, scale, rotation, translation, skew,
+                       perspective);
+
+        joint->pose.translation = translation;
+        joint->pose.rotation = rotation;
+        joint->pose.scale = scale;
+
+        fmt::print(
+            "Additively update joint[{}]. T = {}, {}, {}, R = {}, {}, {}, {}, "
+            "S = "
+            "{}, {}, {}\n",
+            joint_id, translation[0], translation[1], translation[2],
+            rotation[0], rotation[1], rotation[2], rotation[3], scale[0],
+            scale[1], scale[2]);
+
+        // Update mesh.
+        // TODO(LTE): Call this function after consuming all commands from
+        // queue.
+        update_mesh_skeleton_graph_transforms(gltf_scene_tree);
+
+        int active_joint_gltf_node = -1;
+        bool gpu_geometry_buffers_dirty =
+            false;  // FIXME(LTE): Look up CPU skinning mode of GUI state.
+        update_geometry(gpu_geometry_buffers_dirty, active_joint_gltf_node);
+      }
+
+      // Update scene
       // TODO(LTE): Call this function after consuming all commands from queue.
       update_mesh_skeleton_graph_transforms(gltf_scene_tree);
 
       int active_joint_gltf_node = -1;
-      bool gpu_geometry_buffers_dirty = false; // FIXME(LTE): Look up CPU skinning mode?
+      bool gpu_geometry_buffers_dirty =
+          false;  // FIXME(LTE): Look up CPU skinning mode?
       update_geometry(gpu_geometry_buffers_dirty, active_joint_gltf_node);
     } else {
-      fmt::print("Invalid joint ID {}. joints.size = {}\n", joint_id, loaded_meshes[0].flat_joint_list.size());
+      fmt::print("Invalid joint ID {}. joints.size = {}\n", joint_id,
+                 loaded_meshes[0].flat_joint_list.size());
     }
-
   }
 
   return true;
 }
 
-} // namespace gltf_insight
+}  // namespace gltf_insight
