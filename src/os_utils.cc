@@ -5,7 +5,8 @@
 #include <fstream>
 
 #if defined(ANDROID)
-#else
+#elif defined(_MSC_VER)
+#else // Assume linux or macOS
 #include <wordexp.h>
 #endif
 
