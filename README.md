@@ -120,7 +120,9 @@ You can use cmake3 package and You may need to install a few dependencies :
 sudo yum install git cmake3 libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel
 ```
 
-#### Emscripten (WebGL version)
+#### Emscripten (WebGL version) Deprecated
+
+Emscripten build is deprecated. This may not work.
 
 This program is buildable as a WebAssembly WebGL 2.0 application using Emscripten.
 
