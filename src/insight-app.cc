@@ -340,7 +340,7 @@ void app::load() {
       load_inverse_bind_matrix_array(model, gltf_skin,
                                      size_t(current_mesh.nb_joints),
                                      current_mesh.inverse_bind_matrices);
-      genrate_joint_inverse_bind_matrix_map(
+      generate_joint_inverse_bind_matrix_map(
           gltf_skin, size_t(current_mesh.nb_joints),
           current_mesh.joint_inverse_bind_matrix_map);
       std::cerr << " This is a skinned mesh with " << current_mesh.nb_joints
@@ -2072,7 +2072,7 @@ void app::load_all_textures(size_t nb_textures) {
   glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void app::genrate_joint_inverse_bind_matrix_map(
+void app::generate_joint_inverse_bind_matrix_map(
     const tinygltf::Skin& skin, const std::vector<int>::size_type nb_joints,
     std::map<int, int>& joint_inverse_bind_matrix_map) {
   for (size_t i = 0; i < nb_joints; ++i) {
