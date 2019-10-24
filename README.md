@@ -1,4 +1,4 @@
-# glTF 2.0 data insight tool [![Build Status](https://travis-ci.org/lighttransport/gltf-insight.svg?branch=devel)](https://travis-ci.org/lighttransport/gltf-insight) [![Build status](https://ci.appveyor.com/api/projects/status/pb5f6g3qwxrrnxga/branch/devel?svg=true)](https://ci.appveyor.com/project/Ybalrid/gltf-insight/branch/devel)
+# glTF 2.0 data insight tool [![Build Status](https://travis-ci.org/lighttransport/gltf-insight.svg?branch=devel)](https://travis-ci.org/lighttransport/gltf-insight) [![Build status](https://ci.appveyor.com/api/projects/status/9xs909xqao9v8cga/branch/devel?svg=true)](https://ci.appveyor.com/project/syoyo/gltf-insight/branch/devel)
 
 <img align="left" width="190" height="190" src="icons/gltf-insight.png">
 
