@@ -1194,7 +1194,6 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
   if (!mesh.displayed) return;
   for (size_t submesh = 0; submesh < mesh.draw_call_descriptors.size();
        ++submesh) {
-
     bool double_sided = true;
 
     if (submesh < mesh.materials.size()) {
@@ -1244,7 +1243,6 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
             projection_matrix * view_matrix * model_matrix, normal_matrix,
             mesh.joint_matrices, active_poly_indices);
 
-
         double_sided = material_to_use.double_sided;
 
         if (material_to_use.alpha_mode == alpha_coverage::blend) {
@@ -1253,13 +1251,11 @@ void app::draw_mesh(const glm::vec3& world_camera_location, const mesh& mesh,
           glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
           glBlendEquation(GL_FUNC_ADD);
         }
-
       }
 
     } else {
-      shader_to_use = "unlit"; // TODO(LTE): Assign dummy shader
+      shader_to_use = "unlit";  // TODO(LTE): Assign dummy shader
     }
-
 
     const auto& draw_call = mesh.draw_call_descriptors[submesh];
     glEnable(GL_DEPTH_TEST);
@@ -1913,8 +1909,8 @@ bool app::main_loop_frame() {
         ImGui::End();
       }
 
-      active_joint_index_model =
-          glm::clamp(active_joint_index_model, 0, loaded_meshes[0].nb_joints - 1);
+      active_joint_index_model = glm::clamp(active_joint_index_model, 0,
+                                            loaded_meshes[0].nb_joints - 1);
     }
 
     // Animation player advances time and apply animation interpolation.
@@ -2386,15 +2382,22 @@ void app::run_3D_gizmo(gltf_node* active_bone) {
     a_mesh = &loaded_meshes[size_t(active_bone->skin_mesh_node->gltf_mesh_id)];
     mesh_node = gltf_scene_tree.get_node_with_index(a_mesh->instance.node);
 
-    // Get the number of the node inside the mesh data (it's index for the
-    // "joint matrices", "inverse bind matrices" and "flat bone list" arrays)
-    const auto joint_index = size_t(
-        a_mesh->joint_inverse_bind_matrix_map.at(active_bone->gltf_node_index));
+    if (a_mesh->joint_inverse_bind_matrix_map.count(
+            active_bone->gltf_node_index)) {
+      // Get the number of the node inside the mesh data (it's index for the
+      // "joint matrices", "inverse bind matrices" and "flat bone list" arrays)
+      const auto joint_index = size_t(a_mesh->joint_inverse_bind_matrix_map.at(
+          active_bone->gltf_node_index));
 
-    // Compute the world transform
-    bind_matrix = glm::inverse(a_mesh->inverse_bind_matrices[joint_index]);
-    joint_matrix = a_mesh->joint_matrices[joint_index];
-    bone_world_xform = mesh_node->world_xform * joint_matrix * bind_matrix;
+      // Compute the world transform
+      bind_matrix = glm::inverse(a_mesh->inverse_bind_matrices[joint_index]);
+      joint_matrix = a_mesh->joint_matrices[joint_index];
+      bone_world_xform = mesh_node->world_xform * joint_matrix * bind_matrix;
+    } else {
+	  // FIXME(LTE): Do not exit.
+	  std::cerr << "Failed to find inverse bind matrix for gltf node index[" << active_bone->gltf_node_index << "]\n";
+	  exit(EXIT_FAILURE);
+    }
   }
 
   // The mode to be used is modifiable by the window we are going to display. If
