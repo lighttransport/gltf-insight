@@ -406,7 +406,7 @@ class app {
   // `nb_textures`
   void load_all_textures(size_t nb_textures);
 
-  void genrate_joint_inverse_bind_matrix_map(
+  void generate_joint_inverse_bind_matrix_map(
       const tinygltf::Skin& skin, const std::vector<int>::size_type nb_joints,
       std::map<int, int>& joint_inverse_bind_matrix_map);
 

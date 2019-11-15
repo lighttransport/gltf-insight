@@ -14,13 +14,13 @@ matrix:
         - g++-4.9
         - clang-3.9
         - cmake
-        - mesa-common-dev 
+        - mesa-common-dev
         - xorg-dev
-        - libgl1-mesa-dev 
-        - libxrandr-dev 
-        - libxcb-xinerama0 
-        - libxinerama-dev 
-        - libxcursor-dev 
+        - libgl1-mesa-dev
+        - libxrandr-dev
+        - libxcb-xinerama0
+        - libxinerama-dev
+        - libxcursor-dev
         - libxi-dev
         - python
     compiler: clang
@@ -40,18 +40,19 @@ matrix:
 #    compiler: clang
 #    env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
 
-  - os: linux
-    dist: xenial
-    addons: *1
-    env: UPLOAD=false EMSCRIPTEN=true
-    
-    
+# Disable EMSCRIPTEN build for a while.
+#  - os: linux
+#    dist: xenial
+#    addons: *1
+#    env: UPLOAD=false EMSCRIPTEN=true
+
+
   - os: osx
     osx_image: xcode10.2
     compiler: clang
     env: UPLOAD=false APPIMAGE=false EMSCRIPTEN=false
 
-  
+
 
 before_install:
   - git submodule update --init --recursive
