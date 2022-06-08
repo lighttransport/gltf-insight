@@ -15,7 +15,7 @@ More to say, `gltf-insight` also could be used for playground and reference impl
 
 ## Status
 
-Work-in-progress.
+**The development is abondoned and archived**
 
 ### glTF extension support:
 
